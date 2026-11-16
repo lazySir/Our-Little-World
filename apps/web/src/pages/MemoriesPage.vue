@@ -1,2 +1,4 @@
-<script setup lang="ts">import ResourcePage from './ResourcePage.vue';</script>
-<template><ResourcePage kind="memories"/></template>
+<script setup lang="ts">
+import ResourcePage from './ResourcePage.vue';
+</script>
+<template><ResourcePage kind="memories" /></template>

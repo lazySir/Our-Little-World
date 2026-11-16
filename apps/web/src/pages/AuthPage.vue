@@ -1,9 +1,226 @@
 <script setup lang="ts">
-import {ref,reactive,onMounted} from 'vue';import {useRoute,useRouter} from 'vue-router';import {ElMessage} from 'element-plus';import {api,getBase,setBase} from '../api';import {today} from '../domain';import {useSession} from '../stores/session';import HouseArt from '../components/HouseArt.vue';
-const session=useSession(),router=useRouter(),route=useRoute(),mode=ref('login'),loading=ref(false),checking=ref(true),error=ref(''),initialized=ref(true),formRef=ref<any>(),addressOpen=ref(false),address=ref(getBase());const form=reactive({username:'',password:'',nickname:'',spaceName:'我们的小世界',startDate:today(),code:String(route.query.code||'')});
-const rules={username:[{required:true,message:'给自己的账号起个名字',trigger:'blur'},{min:3,max:32,message:'账号长度为 3–32 位',trigger:'blur'}],password:[{required:true,message:'请输入密码',trigger:'blur'},{min:8,max:128,message:'密码至少 8 位',trigger:'blur'}],nickname:[{required:true,message:'我们怎么称呼你呢',trigger:'blur'}],spaceName:[{required:true,message:'给我们的家起个名字',trigger:'blur'}],startDate:[{required:true,message:'请选择在一起的日子',trigger:'change'}],code:[{required:true,message:'请输入另一半分享的邀请码',trigger:'blur'}]};
-async function check(){checking.value=true;error.value='';try{initialized.value=(await api.get('/auth/status')).initialized;mode.value=form.code?'join':initialized.value?'login':'setup';}catch(e){error.value=e.message;}finally{checking.value=false;}}
-async function submit(){if(!await formRef.value.validate().catch(()=>false))return;loading.value=true;error.value='';try{const payload=mode.value==='login'?{username:form.username,password:form.password}:mode.value==='join'?{username:form.username,password:form.password,nickname:form.nickname,code:form.code}:{username:form.username,password:form.password,nickname:form.nickname,spaceName:form.spaceName,startDate:form.startDate};const result=await api.post(`/auth/${mode.value}`,payload);session.accept(result);await session.refresh();ElMessage.success(mode.value==='login'?'欢迎回家':'小世界，从今天开始');router.replace(String(route.query.redirect||'/'));}catch(e){error.value=e.message;}finally{loading.value=false;}}
-function saveAddress(){try{setBase(address.value);addressOpen.value=false;check();}catch(e){ElMessage.error(e.message);}}onMounted(check);
+import { ref, reactive, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import { api, getBase, setBase } from '../api';
+import { today } from '../domain';
+import { useSession } from '../stores/session';
+import HouseArt from '../components/HouseArt.vue';
+const session = useSession(),
+  router = useRouter(),
+  route = useRoute(),
+  mode = ref('login'),
+  loading = ref(false),
+  checking = ref(true),
+  error = ref(''),
+  initialized = ref(true),
+  formRef = ref<any>(),
+  addressOpen = ref(false),
+  address = ref(getBase());
+const form = reactive({
+  username: '',
+  password: '',
+  nickname: '',
+  spaceName: '我们的小世界',
+  startDate: today(),
+  code: String(route.query.code || ''),
+});
+const rules = {
+  username: [
+    { required: true, message: '给自己的账号起个名字', trigger: 'blur' },
+    { min: 3, max: 32, message: '账号长度为 3–32 位', trigger: 'blur' },
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 8, max: 128, message: '密码至少 8 位', trigger: 'blur' },
+  ],
+  nickname: [{ required: true, message: '我们怎么称呼你呢', trigger: 'blur' }],
+  spaceName: [{ required: true, message: '给我们的家起个名字', trigger: 'blur' }],
+  startDate: [{ required: true, message: '请选择在一起的日子', trigger: 'change' }],
+  code: [{ required: true, message: '请输入另一半分享的邀请码', trigger: 'blur' }],
+};
+async function check() {
+  checking.value = true;
+  error.value = '';
+  try {
+    initialized.value = (await api.get('/auth/status')).initialized;
+    mode.value = form.code ? 'join' : initialized.value ? 'login' : 'setup';
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    checking.value = false;
+  }
+}
+async function submit() {
+  if (!(await formRef.value.validate().catch(() => false))) return;
+  loading.value = true;
+  error.value = '';
+  try {
+    const payload =
+      mode.value === 'login'
+        ? { username: form.username, password: form.password }
+        : mode.value === 'join'
+          ? {
+              username: form.username,
+              password: form.password,
+              nickname: form.nickname,
+              code: form.code,
+            }
+          : {
+              username: form.username,
+              password: form.password,
+              nickname: form.nickname,
+              spaceName: form.spaceName,
+              startDate: form.startDate,
+            };
+    const result = await api.post(`/auth/${mode.value}`, payload);
+    session.accept(result);
+    await session.refresh();
+    ElMessage.success(mode.value === 'login' ? '欢迎回家' : '小世界，从今天开始');
+    router.replace(String(route.query.redirect || '/'));
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    loading.value = false;
+  }
+}
+function saveAddress() {
+  try {
+    setBase(address.value);
+    addressOpen.value = false;
+    check();
+  } catch (e) {
+    ElMessage.error(e.message);
+  }
+}
+onMounted(check);
 </script>
-<template><div class="auth-page"><div class="auth-story"><router-link to="/" class="brand"><span class="brand-mark"><AppIcon name="home" :size="28"/></span><span>我们的小世界<small>OUR LITTLE WORLD</small></span></router-link><div class="auth-story-main"><span class="handwritten">A little home, a lot of love.</span><h1>日子很长，<br>我们慢慢收藏。</h1><p>那些想一起做的事、吃过的好味道，<br>和说不完的日常，都住在这里。</p><HouseArt/><div class="auth-pills"><span>两个人的私密空间</span><span>每份回忆，认真珍藏</span></div></div><small class="auth-note">属于我们的故事 · 从一个温暖的小家开始</small></div><div class="auth-form-side"><div class="auth-card"><p class="eyebrow">{{mode==='setup'?'HELLO, OUR NEW CHAPTER':mode==='join'?'BETTER TOGETHER':'WELCOME HOME'}}</p><h2>{{mode==='setup'?'给我们安一个家':mode==='join'?'来，一起回家':'好久不见，欢迎回家'}}</h2><p class="muted">{{mode==='setup'?'创建只属于你们两个人的小世界。':mode==='join'?'输入另一半的邀请码，故事就完整了。':'把今天的小事，也写进我们的故事里。'}}</p><el-alert v-if="error" :title="error" type="error" show-icon :closable="false"/><el-skeleton v-if="checking" :rows="6" animated/><template v-else><el-form ref="formRef" :model="form" :rules="rules" label-position="top" size="large" @submit.prevent="submit"><el-form-item v-if="mode==='join'" label="我们之间的暗号" prop="code"><el-input v-model="form.code" placeholder="输入邀请码" autocomplete="off"/></el-form-item><el-form-item v-if="mode!=='login'" label="你的昵称" prop="nickname"><el-input v-model="form.nickname" placeholder="想让另一半怎么称呼你" maxlength="30"/></el-form-item><el-form-item label="账号" prop="username"><el-input v-model="form.username" placeholder="你的专属账号" autocomplete="username" maxlength="32"/></el-form-item><el-form-item label="密码" prop="password"><el-input v-model="form.password" type="password" show-password :placeholder="mode==='login'?'输入密码':'至少 8 位，保管好我们的故事'" :autocomplete="mode==='login'?'current-password':'new-password'"/></el-form-item><template v-if="mode==='setup'"><el-form-item label="小世界的名字" prop="spaceName"><el-input v-model="form.spaceName" maxlength="60"/></el-form-item><el-form-item label="我们在一起的日子" prop="startDate"><el-date-picker v-model="form.startDate" type="date" value-format="YYYY-MM-DD" placeholder="选择故事开始的那一天" style="width:100%"/></el-form-item></template><el-button native-type="submit" type="primary" :loading="loading" class="auth-submit">{{mode==='setup'?'开启我们的小世界':mode==='join'?'加入我们的家':'回到小世界'}}<AppIcon name="arrow" :size="18"/></el-button></el-form><div class="auth-mode" v-if="initialized"><span>{{mode==='join'?'已经是家里的一员？':'收到另一半的邀请？'}}</span><el-button link type="primary" @click="mode=mode==='join'?'login':'join';error=''">{{mode==='join'?'直接登录':'邀请码加入'}}</el-button></div></template><button class="text-link api-address" @click="addressOpen=true">连接我的私人服务 <AppIcon name="settings" :size="14"/></button></div></div><el-dialog v-model="addressOpen" title="连接我的私人服务" width="min(460px, 92vw)"><p class="muted">同一台设备部署可使用 /api。连接家中的电脑或 NAS，请填写完整接口地址。</p><el-input v-model="address" placeholder="http://192.168.1.10:3000/api"/><template #footer><el-button @click="addressOpen=false">取消</el-button><el-button type="primary" @click="saveAddress">保存并连接</el-button></template></el-dialog></div></template>
+<template>
+  <div class="auth-page">
+    <div class="auth-story">
+      <router-link to="/" class="brand"
+        ><span class="brand-mark"><AppIcon name="home" :size="28" /></span
+        ><span>我们的小世界<small>OUR LITTLE WORLD</small></span></router-link
+      >
+      <div class="auth-story-main">
+        <span class="handwritten">A little home, a lot of love.</span>
+        <h1>日子很长，<br />我们慢慢收藏。</h1>
+        <p>那些想一起做的事、吃过的好味道，<br />和说不完的日常，都住在这里。</p>
+        <HouseArt />
+        <div class="auth-pills"><span>两个人的私密空间</span><span>每份回忆，认真珍藏</span></div>
+      </div>
+      <small class="auth-note">属于我们的故事 · 从一个温暖的小家开始</small>
+    </div>
+    <div class="auth-form-side">
+      <div class="auth-card">
+        <p class="eyebrow">
+          {{
+            mode === 'setup'
+              ? 'HELLO, OUR NEW CHAPTER'
+              : mode === 'join'
+                ? 'BETTER TOGETHER'
+                : 'WELCOME HOME'
+          }}
+        </p>
+        <h2>
+          {{
+            mode === 'setup'
+              ? '给我们安一个家'
+              : mode === 'join'
+                ? '来，一起回家'
+                : '好久不见，欢迎回家'
+          }}
+        </h2>
+        <p class="muted">
+          {{
+            mode === 'setup'
+              ? '创建只属于你们两个人的小世界。'
+              : mode === 'join'
+                ? '输入另一半的邀请码，故事就完整了。'
+                : '把今天的小事，也写进我们的故事里。'
+          }}
+        </p>
+        <el-alert
+          v-if="error"
+          :title="error"
+          type="error"
+          show-icon
+          :closable="false"
+        /><el-skeleton v-if="checking" :rows="6" animated /><template v-else
+          ><el-form
+            ref="formRef"
+            :model="form"
+            :rules="rules"
+            label-position="top"
+            size="large"
+            @submit.prevent="submit"
+            ><el-form-item v-if="mode === 'join'" label="我们之间的暗号" prop="code"
+              ><el-input
+                v-model="form.code"
+                placeholder="输入邀请码"
+                autocomplete="off" /></el-form-item
+            ><el-form-item v-if="mode !== 'login'" label="你的昵称" prop="nickname"
+              ><el-input
+                v-model="form.nickname"
+                placeholder="想让另一半怎么称呼你"
+                maxlength="30" /></el-form-item
+            ><el-form-item label="账号" prop="username"
+              ><el-input
+                v-model="form.username"
+                placeholder="你的专属账号"
+                autocomplete="username"
+                maxlength="32" /></el-form-item
+            ><el-form-item label="密码" prop="password"
+              ><el-input
+                v-model="form.password"
+                type="password"
+                show-password
+                :placeholder="mode === 'login' ? '输入密码' : '至少 8 位，保管好我们的故事'"
+                :autocomplete="
+                  mode === 'login' ? 'current-password' : 'new-password'
+                " /></el-form-item
+            ><template v-if="mode === 'setup'"
+              ><el-form-item label="小世界的名字" prop="spaceName"
+                ><el-input v-model="form.spaceName" maxlength="60" /></el-form-item
+              ><el-form-item label="我们在一起的日子" prop="startDate"
+                ><el-date-picker
+                  v-model="form.startDate"
+                  type="date"
+                  value-format="YYYY-MM-DD"
+                  placeholder="选择故事开始的那一天"
+                  style="width: 100%" /></el-form-item></template
+            ><el-button native-type="submit" type="primary" :loading="loading" class="auth-submit"
+              >{{
+                mode === 'setup'
+                  ? '开启我们的小世界'
+                  : mode === 'join'
+                    ? '加入我们的家'
+                    : '回到小世界'
+              }}<AppIcon name="arrow" :size="18" /></el-button
+          ></el-form>
+          <div class="auth-mode" v-if="initialized">
+            <span>{{ mode === 'join' ? '已经是家里的一员？' : '收到另一半的邀请？' }}</span
+            ><el-button
+              link
+              type="primary"
+              @click="
+                mode = mode === 'join' ? 'login' : 'join';
+                error = '';
+              "
+              >{{ mode === 'join' ? '直接登录' : '邀请码加入' }}</el-button
+            >
+          </div></template
+        ><button class="text-link api-address" @click="addressOpen = true">
+          连接我的私人服务 <AppIcon name="settings" :size="14" />
+        </button>
+      </div>
+    </div>
+    <el-dialog v-model="addressOpen" title="连接我的私人服务" width="min(460px, 92vw)"
+      ><p class="muted">同一台设备部署可使用 /api。连接家中的电脑或 NAS，请填写完整接口地址。</p>
+      <el-input v-model="address" placeholder="http://192.168.1.10:3000/api" /><template #footer
+        ><el-button @click="addressOpen = false">取消</el-button
+        ><el-button type="primary" @click="saveAddress">保存并连接</el-button></template
+      ></el-dialog
+    >
+  </div>
+</template>

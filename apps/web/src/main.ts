@@ -1,2 +1,21 @@
-import { createApp } from 'vue';import { createPinia } from 'pinia';import ElementPlus from 'element-plus';import zhCn from 'element-plus/es/locale/lang/zh-cn';import 'element-plus/dist/index.css';import './style.css';import App from './App.vue';import router from './router';import AppIcon from './components/AppIcon.vue';import PageHeader from './components/PageHeader.vue';import EmptyState from './components/EmptyState.vue';import LoadState from './components/LoadState.vue';
-createApp(App).use(createPinia()).use(router).use(ElementPlus,{locale:zhCn}).component('AppIcon',AppIcon).component('PageHeader',PageHeader).component('EmptyState',EmptyState).component('LoadState',LoadState).mount('#app');
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import ElementPlus from 'element-plus';
+import zhCn from 'element-plus/es/locale/lang/zh-cn';
+import 'element-plus/dist/index.css';
+import './style.css';
+import App from './App.vue';
+import router from './router';
+import AppIcon from './components/AppIcon.vue';
+import PageHeader from './components/PageHeader.vue';
+import EmptyState from './components/EmptyState.vue';
+import LoadState from './components/LoadState.vue';
+createApp(App)
+  .use(createPinia())
+  .use(router)
+  .use(ElementPlus, { locale: zhCn })
+  .component('AppIcon', AppIcon)
+  .component('PageHeader', PageHeader)
+  .component('EmptyState', EmptyState)
+  .component('LoadState', LoadState)
+  .mount('#app');

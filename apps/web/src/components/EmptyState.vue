@@ -1,2 +1,19 @@
-<script setup lang="ts">defineProps({title:{default:'这里，等着我们的故事'},description:{default:'从一件小事开始，把平凡的日子认真收藏。'},icon:{default:'heart'},action:String});defineEmits(['action']);</script>
-<template><div class="empty-state"><span class="empty-icon"><AppIcon :name="icon" :size="34"/></span><h3>{{title}}</h3><p>{{description}}</p><el-button v-if="action" type="primary" @click="$emit('action')"><AppIcon name="plus" :size="17"/>{{action}}</el-button></div></template>
+<script setup lang="ts">
+defineProps({
+  title: { default: '这里，等着我们的故事' },
+  description: { default: '从一件小事开始，把平凡的日子认真收藏。' },
+  icon: { default: 'heart' },
+  action: String,
+});
+defineEmits(['action']);
+</script>
+<template>
+  <div class="empty-state">
+    <span class="empty-icon"><AppIcon :name="icon" :size="34" /></span>
+    <h3>{{ title }}</h3>
+    <p>{{ description }}</p>
+    <el-button v-if="action" type="primary" @click="$emit('action')"
+      ><AppIcon name="plus" :size="17" />{{ action }}</el-button
+    >
+  </div>
+</template>

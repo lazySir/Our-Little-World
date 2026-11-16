@@ -1,0 +1,10 @@
+node_modules
+**/dist
+**/uni_modules
+apps/mobile/android
+data
+storage
+deliverables
+test-results
+playwright-report
+package-lock.json

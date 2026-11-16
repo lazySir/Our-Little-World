@@ -14,7 +14,21 @@ test('parses decimal amounts without floating point rounding', () => {
 });
 
 test('rejects invalid amounts and excess fractional precision', () => {
-  for (const input of ['', ' ', '1.234', '1e3', '1,000.00', 'abc', '.50', '2.', NaN, Infinity, null, undefined, true]) {
+  for (const input of [
+    '',
+    ' ',
+    '1.234',
+    '1e3',
+    '1,000.00',
+    'abc',
+    '.50',
+    '2.',
+    NaN,
+    Infinity,
+    null,
+    undefined,
+    true,
+  ]) {
     assert.throws(() => parseCents(input), { name: 'TypeError' }, String(input));
   }
 });
@@ -39,4 +53,3 @@ test('rejects fractional or unsafe cents for formatting', () => {
     assert.throws(() => formatCents(input), { name: 'TypeError' }, String(input));
   }
 });
-

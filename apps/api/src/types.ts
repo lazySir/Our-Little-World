@@ -1,7 +1,10 @@
 import type { Request } from 'express';
 import type { User } from '@prisma/client';
 
-export type SpaceUser = Pick<User, 'id' | 'username' | 'nickname' | 'role' | 'spaceId' | 'passwordHash'>;
+export type SpaceUser = Pick<
+  User,
+  'id' | 'username' | 'nickname' | 'role' | 'spaceId' | 'passwordHash'
+>;
 export interface AuthenticatedRequest extends Request {
   user: SpaceUser;
   sessionId: string;

@@ -6,7 +6,18 @@ test('validates exact calendar dates and rejects rolled-over dates', () => {
   for (const date of ['2024-02-29', '2000-02-29', '2026-11-16', '0001-01-01']) {
     assert.equal(isValidDate(date), true, date);
   }
-  for (const date of ['2025-02-29', '1900-02-29', '2026-04-31', '2026-13-01', '2026-00-01', '2026-01-00', '2026-1-01', '0000-01-01', '2026-01-01T00:00:00Z', null]) {
+  for (const date of [
+    '2025-02-29',
+    '1900-02-29',
+    '2026-04-31',
+    '2026-13-01',
+    '2026-00-01',
+    '2026-01-00',
+    '2026-1-01',
+    '0000-01-01',
+    '2026-01-01T00:00:00Z',
+    null,
+  ]) {
     assert.equal(isValidDate(date), false, String(date));
   }
 });
@@ -27,13 +38,25 @@ test('counts the start date as the first day together', () => {
 
 test('uses February 28 for leap-day anniversaries in common years', () => {
   assert.deepEqual(anniversaryInfo('2024-02-29', '2025-02-27'), {
-    date: '2024-02-29', nextDate: '2025-02-28', daysUntil: 1, isToday: false, years: 1,
+    date: '2024-02-29',
+    nextDate: '2025-02-28',
+    daysUntil: 1,
+    isToday: false,
+    years: 1,
   });
   assert.deepEqual(anniversaryInfo('2024-02-29', '2025-02-28'), {
-    date: '2024-02-29', nextDate: '2025-02-28', daysUntil: 0, isToday: true, years: 1,
+    date: '2024-02-29',
+    nextDate: '2025-02-28',
+    daysUntil: 0,
+    isToday: true,
+    years: 1,
   });
   assert.deepEqual(anniversaryInfo('2024-02-29', '2025-03-01'), {
-    date: '2024-02-29', nextDate: '2026-02-28', daysUntil: 364, isToday: false, years: 2,
+    date: '2024-02-29',
+    nextDate: '2026-02-28',
+    daysUntil: 364,
+    isToday: false,
+    years: 2,
   });
 });
 
@@ -46,14 +69,21 @@ test('keeps February 29 in leap years and moves past occurrences forward', () =>
 
 test('does not schedule an anniversary before its original date', () => {
   assert.deepEqual(anniversaryInfo('2027-02-28', '2026-11-16'), {
-    date: '2027-02-28', nextDate: '2027-02-28', daysUntil: 104, isToday: false, years: 0,
+    date: '2027-02-28',
+    nextDate: '2027-02-28',
+    daysUntil: 104,
+    isToday: false,
+    years: 0,
   });
 });
 
 test('preserves a one-time date and its signed day distance', () => {
   assert.deepEqual(anniversaryInfo('2024-02-29', '2025-02-28', { recurring: false }), {
-    date: '2024-02-29', nextDate: '2024-02-29', daysUntil: -365, isToday: false, years: 0,
+    date: '2024-02-29',
+    nextDate: '2024-02-29',
+    daysUntil: -365,
+    isToday: false,
+    years: 0,
   });
   assert.throws(() => anniversaryInfo('2025-02-29', '2026-11-16'), { name: 'TypeError' });
 });
-

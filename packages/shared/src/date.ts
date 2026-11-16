@@ -16,7 +16,8 @@ export function isValidDate(value) {
 }
 
 function dateParts(value) {
-  if (!isValidDate(value)) throw new TypeError('Expected a valid calendar date in YYYY-MM-DD format');
+  if (!isValidDate(value))
+    throw new TypeError('Expected a valid calendar date in YYYY-MM-DD format');
   return value.split('-').map(Number);
 }
 
