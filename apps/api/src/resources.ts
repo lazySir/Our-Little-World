@@ -54,7 +54,6 @@ export class ResourcesService {
     const rows = await this.db.entry.findMany({
       where: { kind, spaceId: user.spaceId },
       orderBy: { createdAt: 'desc' },
-      take: 1000,
     });
     return Promise.all(rows.map((row) => this.shape(row, user)));
   }
