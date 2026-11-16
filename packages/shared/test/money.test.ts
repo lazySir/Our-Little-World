@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseCents, formatCents } from '../src/money.js';
+import { parseCents, formatCents } from '../src/money.ts';
 
 test('parses decimal amounts without floating point rounding', () => {
   assert.equal(parseCents('0.10'), 10);
@@ -39,3 +39,4 @@ test('rejects fractional or unsafe cents for formatting', () => {
     assert.throws(() => formatCents(input), { name: 'TypeError' }, String(input));
   }
 });
+

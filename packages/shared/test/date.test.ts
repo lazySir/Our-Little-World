@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isValidDate, daysBetween, daysTogether, anniversaryInfo } from '../src/date.js';
+import { isValidDate, daysBetween, daysTogether, anniversaryInfo } from '../src/date.ts';
 
 test('validates exact calendar dates and rejects rolled-over dates', () => {
   for (const date of ['2024-02-29', '2000-02-29', '2026-11-16', '0001-01-01']) {
@@ -56,3 +56,4 @@ test('preserves a one-time date and its signed day distance', () => {
   });
   assert.throws(() => anniversaryInfo('2025-02-29', '2026-11-16'), { name: 'TypeError' });
 });
+

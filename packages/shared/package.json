@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./date": "./src/date.js",
-    "./money": "./src/money.js"
+    "./date": { "types": "./dist/date.d.ts", "default": "./dist/date.js" },
+    "./money": { "types": "./dist/money.d.ts", "default": "./dist/money.js" }
   },
   "scripts": {
-    "test": "node --test test/*.test.js"
-  }
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "devDependencies": {"typescript":"^5.9.3","tsx":"^4.23.0"}
 }

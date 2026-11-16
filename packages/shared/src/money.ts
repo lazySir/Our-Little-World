@@ -1,5 +1,5 @@
 /** Convert a decimal amount to integer cents without floating point rounding. */
-export function parseCents(value) {
+export function parseCents(value: unknown): number {
   if (typeof value !== 'string' && typeof value !== 'number') {
     throw new TypeError('Amount must be a decimal string or number');
   }
@@ -18,7 +18,7 @@ export function parseCents(value) {
 }
 
 /** Format integer cents for display or editing; currency symbols belong to UI. */
-export function formatCents(cents) {
+export function formatCents(cents: number): string {
   if (!Number.isSafeInteger(cents)) {
     throw new TypeError('Cents must be a safe integer');
   }
