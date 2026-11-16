@@ -254,9 +254,20 @@ async function restore() {
       ))
     )
       return;
-    await uploadFile(path, '/backup/restore');
+    const result = await uploadFile<{ safetyMissingAssets?: number }>(path, '/backup/restore');
     await session.load();
-    notify('恢复完成，记录已经回到小世界');
+    if (result.safetyMissingAssets) {
+      await new Promise<void>((resolve) =>
+        uni.showModal({
+          title: '记录已经恢复',
+          content: `恢复前已有 ${result.safetyMissingAssets} 张照片文件缺失，保护副本已标记这些缺失；本次已按所选备份恢复。`,
+          showCancel: false,
+          confirmText: '知道了',
+          confirmColor: '#b8776e',
+          complete: () => resolve(),
+        }),
+      );
+    } else notify('恢复完成，记录已经回到小世界');
     uni.reLaunch({ url: '/pages/home/index' });
   });
 }

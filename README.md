@@ -74,6 +74,7 @@ npm test
 npm run typecheck
 npm run test:e2e
 npm run test:e2e:uni
+npm run test:e2e:cleanup
 npm run test:shared
 npm run test:scripts
 npm run test --workspace=@our-little-world/api
@@ -87,7 +88,7 @@ npm run health
 node --experimental-strip-types scripts/verify-demo.mts
 ```
 
-两套浏览器验证都会自动启动服务并使用临时数据库与附件目录。主 Web 使用端口 `3001`、`5174`；小程序 H5 联调使用 `3002`、`5175`，不复用已运行的页面服务。测试前释放相应端口，避免连接到日常使用的空间。
+两套浏览器验证都会自动启动服务并使用临时数据库与附件目录，结束后停止本次服务并删除临时数据。主 Web 使用端口 `3001`、`5174`；小程序 H5 联调使用 `3002`、`5175`，端口已占用时拒绝启动，不复用已运行的服务。`test:e2e:cleanup` 单独验证两套环境的进程停止和临时目录清理。
 
 Web 产物在 `apps/web/dist`；微信小程序产物在 `apps/uni/dist/build/mp-weixin`。`apps/uni/dist/build/h5` 保留用于小程序页面的浏览器联调。Web 构建由 Nest 服务提供，生产访问只需要一个 `3000` 端口。
 
@@ -120,6 +121,8 @@ docker compose logs -f world
 ## 数据与备份
 
 设置里的 **JSON 导出**用于可读的数据携带，不包含登录密码、会话和图片文件；完整迁移应使用 **ZIP 备份**，同时保存数据库和附件。恢复前先下载一次当前 ZIP，使用空间所有者账号操作。恢复会替换当前空间记录，保留当前账号与密码；成功后刷新即可，不需要重启服务。
+
+如果当前磁盘上的照片已经丢失，仍可用先前保存的完整 ZIP 恢复。恢复前保护副本会保存现有记录和可读取的照片，并在 `manifest.json` 的 `missingAssets` 中标记缺失文件；界面也会显示提示。这种标记为 `complete: false` 的保护副本用于追溯现状，不能作为完整 ZIP 直接恢复。普通下载和自动备份遇到缺失照片会报错，不会生成看似完整的备份。
 
 服务默认每 24 小时在 `storage/backups` 自动保存一次 ZIP，仅保留最新 7 份自动备份；恢复前的保护副本单独保留。根 `.env` 的 `AUTO_BACKUP_HOURS=24` 可调整间隔，正数范围为 1–596 小时，`0` 关闭。首次自动备份需服务连续运行一个完整间隔；请定期将备份复制到另一块磁盘。
 

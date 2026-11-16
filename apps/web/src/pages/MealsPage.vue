@@ -12,6 +12,7 @@ const orders = ref<Order[]>([]),
   assets = ref<Asset[]>([]);
 const query = ref(''),
   tab = ref('all'),
+  showAllOrders = ref(false),
   dialog = ref(false),
   orderDialog = ref(false),
   editing = ref<MenuItem | null>(null),
@@ -53,6 +54,9 @@ const cartRows = computed(() =>
   items.value.filter((i) => cart[i.id]).map((i) => ({ ...i, quantity: cart[i.id] })),
 );
 const total = computed(() => cartRows.value.reduce((sum, i) => sum + i.priceCents * i.quantity, 0));
+const visibleOrders = computed(() =>
+  showAllOrders.value ? orders.value : orders.value.slice(0, 6),
+);
 function edit(item: MenuItem | null = null) {
   editing.value = item;
   Object.assign(
@@ -272,9 +276,23 @@ onMounted(fetchOrders);
     <section v-if="orders.length" class="orders-section">
       <div class="section-head">
         <h3><AppIcon name="meal" :size="18" />最近的点单<span class="subtitle">OUR TABLE</span></h3>
+        <el-button
+          v-if="orders.length > 6"
+          text
+          type="primary"
+          :aria-expanded="showAllOrders"
+          aria-controls="order-history"
+          @click="showAllOrders = !showAllOrders"
+          >{{ showAllOrders ? '收起点单' : `查看全部点单（${orders.length}）` }}</el-button
+        >
       </div>
-      <div class="orders-list panel">
-        <div v-for="order in orders.slice(0, 6)" :key="order.id" class="order-row">
+      <div id="order-history" class="orders-list panel">
+        <div
+          v-for="order in visibleOrders"
+          :key="order.id"
+          :data-order-id="order.id"
+          class="order-row"
+        >
           <div>
             <strong>{{ order.items.map((i) => `${i.name} ×${i.quantity}`).join('、') }}</strong
             ><small>{{ order.createdAt?.slice(0, 10) }} · {{ order.note || '没有备注' }}</small>

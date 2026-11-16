@@ -144,8 +144,18 @@ async function restore(event: Event) {
     async () => {
       const form = new FormData();
       form.append('file', file);
-      await request('/backup/restore', { method: 'POST', body: form });
+      const result = await request<{ safetyMissingAssets?: number }>('/backup/restore', {
+        method: 'POST',
+        body: form,
+      });
       await session.refresh();
+      if (result.safetyMissingAssets) {
+        ElMessage.warning({
+          message: `恢复前已有 ${result.safetyMissingAssets} 张照片文件缺失，保护副本已标记这些缺失；本次已按所选备份恢复。`,
+          duration: 0,
+          showClose: true,
+        });
+      }
     },
     '备份已恢复，记录已回到小世界',
   );
@@ -166,14 +176,16 @@ async function logout() {
       </div>
       <div class="members-row">
         <div>
-          <span class="avatar">{{ session.user?.nickname.slice(0, 1) }}</span
-          ><strong>{{ session.user?.nickname }}</strong
+          <span class="avatar">{{ session.user?.nickname.slice(0, 1) }}</span><strong>{{
+            session.user?.nickname
+          }}</strong
           ><small>我 · {{ session.isOwner ? '空间创建者' : '家庭成员' }}</small>
         </div>
         <AppIcon name="heart" :size="24" />
         <div>
-          <span class="avatar partner">{{ session.partner?.nickname.slice(0, 1) || '?' }}</span
-          ><strong>{{ session.partner?.nickname || '等待另一半' }}</strong
+          <span class="avatar partner">{{
+            session.partner?.nickname.slice(0, 1) || '?'
+          }}</span><strong>{{ session.partner?.nickname || '等待另一半' }}</strong
           ><small>{{ session.partner ? '故事里的另一个主角' : '让故事更完整' }}</small>
         </div>
       </div>
@@ -194,8 +206,11 @@ async function logout() {
             }}</el-button
           >
           <div v-if="invite" class="invite-code">
-            <strong>{{ invite.code }}</strong
-            ><el-button link type="primary" @click="copy(invite.code)">复制暗号</el-button
+            <strong>{{ invite.code }}</strong><el-button
+              link
+              type="primary"
+              @click="copy(invite.code)"
+              >复制暗号</el-button
             ><el-button link @click="copy(inviteLink)">复制邀请链接</el-button
             ><small>有效期至 {{ new Date(invite.expiresAt).toLocaleString('zh-CN') }}</small>
           </div></template
@@ -283,7 +298,7 @@ async function logout() {
           <p>
             {{
               session.isOwner
-                ? '包含数据库与原始照片，建议定期保存。'
+                ? '包含数据库与服务内处理后的照片，相机原片请另行保存。'
                 : '完整备份由空间创建者下载。'
             }}
           </p>

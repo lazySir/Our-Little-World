@@ -1,5 +1,7 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { removeTestPhoto } from '../../../../e2e/backup-fixture.mts';
 
 const api = 'http://127.0.0.1:3002/api';
 const stamp = Date.now();
@@ -246,5 +248,17 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await visit(page, 'wishes', '一起做');
   await expect(page.locator('.card-title').filter({ hasText: afterBackupWish })).toHaveCount(0);
   await expect(page.locator('.card-title').filter({ hasText: names.wish })).toBeVisible();
+  await visit(page, 'settings', '我们的设置');
+  const missingPhoto = await removeTestPhoto(backupPath!, 'uni');
+  const warningChooser = page.waitForEvent('filechooser');
+  await click(page, '选择 ZIP 并恢复');
+  await (await warningChooser).setFiles(backupPath!);
+  await expect(page.getByText('恢复完整备份', { exact: true })).toBeVisible();
+  await page.getByText('确定', { exact: true }).last().click();
+  await expect(page.getByText('记录已经恢复', { exact: true })).toBeVisible();
+  await expect(page.getByText(/恢复前已有 1 张照片文件缺失/)).toBeVisible();
+  await page.getByText('知道了', { exact: true }).click();
+  await expect(page.locator('.title')).toHaveText('今天，也在好好生活');
+  expect(await readFile(missingPhoto.target)).toEqual(missingPhoto.bytes);
   expect(errors).toEqual([]);
 });

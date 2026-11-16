@@ -1,5 +1,7 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { removeTestPhoto } from './backup-fixture.mts';
 const stamp = Date.now();
 const names = {
   wish: `一起看海 ${stamp}`,
@@ -212,7 +214,32 @@ test('two people can create, share and persist their complete little world', asy
   expect((await exported).suggestedFilename()).toMatch(/\.json$/);
   const backup = page.waitForEvent('download');
   await page.getByRole('button', { name: '下载备份', exact: true }).click();
-  expect((await backup).suggestedFilename()).toMatch(/\.zip$/);
+  const downloadedBackup = await backup;
+  expect(downloadedBackup.suggestedFilename()).toMatch(/\.zip$/);
+  const backupPath = await downloadedBackup.path();
+  expect(backupPath).toBeTruthy();
+  const newerWish = await request.post('http://127.0.0.1:3001/api/wishes', {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { title: `恢复后应移除 ${stamp}` },
+  });
+  expect(newerWish.ok()).toBeTruthy();
+  const newerWishId = (await newerWish.json()).id;
+  const missingPhoto = await removeTestPhoto(backupPath!, 'web');
+  await page.locator('input[type="file"]').setInputFiles(backupPath!);
+  const restored = page.waitForResponse((response) =>
+    response.url().endsWith('/api/backup/restore'),
+  );
+  await page.locator('.el-message-box:visible').getByRole('button', { name: '确认恢复' }).click();
+  const restoreResponse = await restored;
+  expect(restoreResponse.ok(), await restoreResponse.text()).toBeTruthy();
+  await expect(page.getByText(/恢复前已有 1 张照片文件缺失/)).toBeVisible();
+  await expect(page.getByText('备份已恢复，记录已回到小世界', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('little-world-token'))).toBe(token);
+  const restoredWishes = await request.get('http://127.0.0.1:3001/api/wishes', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect((await restoredWishes.json()).some((row) => row.id === newerWishId)).toBeFalsy();
+  expect(await readFile(missingPhoto.target)).toEqual(missingPhoto.bytes);
   let partnerToken: string | undefined;
   if (await page.getByRole('button', { name: '生成邀请码', exact: true }).isVisible()) {
     await page.getByRole('button', { name: '生成邀请码', exact: true }).click();
@@ -299,4 +326,99 @@ test('all pages fit a small phone and the server address stays reachable', async
   await page.getByRole('button', { name: '连接我的私人服务' }).click();
   await expect(dialog(page).getByRole('heading', { name: '连接我的私人服务' })).toBeVisible();
   await expect(dialog(page).locator('input')).toHaveValue('http://127.0.0.1:9/api');
+});
+
+test('older meal orders remain reachable and manageable beyond the recent six', async ({
+  page,
+  request,
+}) => {
+  const apiBase = 'http://127.0.0.1:3001/api';
+  const status = await (await request.get(`${apiBase}/auth/status`)).json();
+  const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
+    data: {
+      username: 'web_owner',
+      password: 'little-world-e2e-123',
+      nickname: '小林',
+      spaceName: '点单历史测试',
+      startDate: '2024-02-29',
+    },
+  });
+  expect(signedIn.ok(), await signedIn.text()).toBeTruthy();
+  const { token } = await signedIn.json();
+  const headers = { Authorization: `Bearer ${token}` };
+  const menu = await request.post(`${apiBase}/menu`, {
+    headers,
+    data: { name: `点单历史菜品 ${stamp}`, priceCents: 1800 },
+  });
+  expect(menu.ok(), await menu.text()).toBeTruthy();
+  const menuItem = await menu.json();
+  const created: { id: string; note: string }[] = [];
+  for (let index = 0; index < 8; index++) {
+    const response = await request.post(`${apiBase}/orders`, {
+      headers,
+      data: {
+        items: [{ menuItemId: menuItem.id, quantity: 1 }],
+        note: `历史点单 ${index + 1} · ${stamp}`,
+      },
+    });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    created.push(await response.json());
+  }
+  const allOrders = await (await request.get(`${apiBase}/orders`, { headers })).json();
+  await page.addInitScript((value) => localStorage.setItem('little-world-token', value), token);
+  await visit(page, '/meals', '今天吃什么');
+  const section = page.locator('.orders-section');
+  const rows = section.locator('.order-row');
+  const oldest = section.locator(`.order-row[data-order-id="${created[0].id}"]`);
+  await expect(rows).toHaveCount(6);
+  await expect(oldest).toHaveCount(0);
+  const historyButton = section.getByRole('button', { name: /查看全部点单/ });
+  await expect(historyButton).toBeVisible();
+  await historyButton.click();
+  await expect(rows).toHaveCount(allOrders.length);
+  await expect(oldest).toBeVisible();
+
+  const completed = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/orders/${created[0].id}`) &&
+      response.request().method() === 'PATCH',
+  );
+  await oldest.getByRole('button', { name: '完成', exact: true }).click();
+  expect((await completed).ok()).toBeTruthy();
+  await expect(oldest.locator('.tag')).toHaveText('已完成');
+  await expect(oldest).toContainText(created[0].note);
+  await page.screenshot({ path: 'test-results/web-order-history-desktop.png', fullPage: true });
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await section.getByRole('button', { name: '收起点单', exact: true }).click();
+  await expect(rows).toHaveCount(6);
+  await section.getByRole('button', { name: /查看全部点单/ }).click();
+  await expect(oldest).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBeTruthy();
+  await page.screenshot({ path: 'test-results/web-order-history-mobile.png', fullPage: true });
+
+  const deleted = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/orders/${created[0].id}`) &&
+      response.request().method() === 'DELETE',
+  );
+  await oldest.getByRole('button', { name: '删除点单', exact: true }).click();
+  await page
+    .locator('.el-message-box:visible')
+    .getByRole('button', { name: '删除', exact: true })
+    .click();
+  expect((await deleted).ok()).toBeTruthy();
+  await expect(oldest).toHaveCount(0);
+  await expect(rows).toHaveCount(allOrders.length - 1);
+  const persisted = await (await request.get(`${apiBase}/orders`, { headers })).json();
+  expect(persisted.some((order: { id: string }) => order.id === created[0].id)).toBeFalsy();
+
+  for (const order of persisted.slice(6)) {
+    await request.delete(`${apiBase}/orders/${order.id}`, { headers });
+  }
+  await page.reload();
+  await expect(rows).toHaveCount(6);
+  await expect(section.getByRole('button', { name: /查看全部点单|收起点单/ })).toHaveCount(0);
 });

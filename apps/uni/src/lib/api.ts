@@ -58,7 +58,7 @@ export async function request<T = any>(
     ),
   );
 }
-export async function uploadFile(filePath: string, path = '/assets'): Promise<Asset> {
+export async function uploadFile<T = Asset>(filePath: string, path = '/assets'): Promise<T> {
   return new Promise((resolve, reject) =>
     uni.uploadFile({
       url: `${getBase()}${path}`,
