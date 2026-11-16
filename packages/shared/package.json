@@ -1,0 +1,13 @@
+{
+  "name": "@our-little-world/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./date": "./src/date.js",
+    "./money": "./src/money.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

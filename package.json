@@ -1,0 +1,13 @@
+{
+  "name": "our-little-world",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "test:shared": "npm run test --workspace=@our-little-world/shared"
+  },
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10.0.0"
+  }
+}
