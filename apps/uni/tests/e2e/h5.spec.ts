@@ -113,14 +113,35 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await click(page, '＋ 写一篇');
   await fill(sheet(page), '给这段回忆起个名字', names.memory);
   await fill(sheet(page), '写点什么', '阳光落在桌上，早餐也变得可爱。');
+  let releaseUploads = () => {};
+  const uploadGate = new Promise<void>((resolve) => {
+    releaseUploads = resolve;
+  });
+  await page.route('**/api/assets', async (route) => {
+    if (route.request().method() === 'POST') await uploadGate;
+    await route.continue();
+  });
+  const uploading = page.waitForRequest(
+    (request) => request.url().endsWith('/api/assets') && request.method() === 'POST',
+  );
   const chooser = page.waitForEvent('filechooser');
   await sheet(page).locator('.upload-tile').click();
-  await (
-    await chooser
-  ).setFiles([
-    { name: 'morning.png', mimeType: 'image/png', buffer: pixel },
-    { name: 'sunshine.png', mimeType: 'image/png', buffer: pixel },
-  ]);
+  try {
+    await (
+      await chooser
+    ).setFiles([
+      { name: 'morning.png', mimeType: 'image/png', buffer: pixel },
+      { name: 'sunshine.png', mimeType: 'image/png', buffer: pixel },
+    ]);
+    await uploading;
+    await expect(sheet(page).locator('uni-button').filter({ hasText: '保存这一刻' })).toHaveClass(
+      /is-disabled/,
+    );
+    await click(sheet(page), '先放一放');
+    await expect(sheet(page)).toHaveCount(1);
+  } finally {
+    releaseUploads();
+  }
   await expect(sheet(page).locator('.photo')).toHaveCount(2);
   await save(page, 'memories');
   await page.reload();
@@ -135,6 +156,34 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
     path: path.resolve('apps/uni/test-results/uni-home-mobile.png'),
     fullPage: true,
   });
+
+  await visit(page, 'anniversaries', '纪念日');
+  await click(page, '＋ 添加');
+  await fill(sheet(page), '这是什么日子', names.anniversary);
+  await fill(sheet(page), '关于这一天', '每年都要好好记得。');
+  await save(page, 'anniversaries');
+  await page.reload();
+  await expect(page.locator('.card-title').filter({ hasText: names.anniversary })).toBeVisible();
+
+  await visit(page, 'baby', '宝宝成长');
+  await click(page, '建立宝宝档案');
+  await fill(sheet(page), '宝宝的名字', '小糯米');
+  const profile = page.waitForResponse(
+    (response) => response.url().endsWith('/api/baby') && response.request().method() === 'PUT',
+  );
+  await click(sheet(page), '保存这一刻');
+  expect((await profile).ok()).toBeTruthy();
+  await expect(sheet(page)).toHaveCount(0);
+  await expect(page.locator('.hero')).toContainText('小糯米');
+  await click(page, '＋ 记录');
+  await fill(sheet(page), '这一刻叫什么', `第一次翻身 ${stamp}`);
+  await fill(sheet(page), '记录内容', '认真记住成长的每一步。');
+  await save(page, 'growth');
+  await page.reload();
+  await expect(page.locator('.hero')).toContainText('小糯米');
+  await expect(
+    page.locator('.card-title').filter({ hasText: `第一次翻身 ${stamp}` }),
+  ).toBeVisible();
 
   await visit(page, 'work', '工作手记');
   await click(page, '＋ 写一篇');
@@ -153,7 +202,10 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await visit(page, 'settings', '我们的设置');
   await click(page, '玫瑰日记');
   const space = page.waitForResponse(
-    (response) => response.url().endsWith('/api/space') && response.request().method() === 'PATCH',
+    (response) =>
+      response.url().endsWith('/api/space') &&
+      response.request().method() === 'POST' &&
+      response.request().headers()['x-http-method-override'] === 'PATCH',
   );
   await click(page, '保存小世界');
   expect((await space).ok()).toBeTruthy();
@@ -167,5 +219,32 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
     path: path.resolve('apps/uni/test-results/uni-settings-mobile.png'),
     fullPage: true,
   });
+
+  const backupDownload = page.waitForEvent('download');
+  await click(page, '下载完整 ZIP');
+  const backup = await backupDownload;
+  expect(backup.suggestedFilename()).toMatch(/\.zip$/);
+  const backupPath = await backup.path();
+  expect(backupPath).toBeTruthy();
+  const afterBackupWish = `备份后新增 ${stamp}`;
+  await visit(page, 'wishes', '一起做');
+  await click(page, '＋ 添加');
+  await fill(sheet(page), '想做什么', afterBackupWish);
+  await save(page, 'wishes');
+  await visit(page, 'settings', '我们的设置');
+  const archiveChooser = page.waitForEvent('filechooser');
+  await click(page, '选择 ZIP 并恢复');
+  await (await archiveChooser).setFiles(backupPath!);
+  await expect(page.getByText('恢复完整备份', { exact: true })).toBeVisible();
+  const restored = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/backup/restore') && response.request().method() === 'POST',
+  );
+  await page.getByText('确定', { exact: true }).last().click();
+  expect((await restored).ok()).toBeTruthy();
+  await expect(page.locator('.title')).toHaveText('今天，也在好好生活');
+  await visit(page, 'wishes', '一起做');
+  await expect(page.locator('.card-title').filter({ hasText: afterBackupWish })).toHaveCount(0);
+  await expect(page.locator('.card-title').filter({ hasText: names.wish })).toBeVisible();
   expect(errors).toEqual([]);
 });

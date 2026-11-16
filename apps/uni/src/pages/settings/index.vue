@@ -109,7 +109,7 @@
     ><view class="section-head"><view class="section-title">把回忆好好保存</view></view
     ><view class="card"
       ><view class="card-text"
-        >数据导出用于阅读和迁移，完整备份包含数据库与照片原图。请把备份保存在你信任的位置。</view
+        >数据导出用于阅读和迁移，完整备份包含数据库与服务内处理后的照片。相机原片请另行保存，备份请放在你信任的位置。</view
       ><view class="actions"
         ><wd-button size="small" plain :loading="busy === 'export'" @click="download('export')"
           >导出数据 JSON</wd-button
@@ -125,7 +125,7 @@
         ><view class="divider" /><view class="card-title">从备份恢复</view
         ><view class="card-text"
           >选择本应用导出的
-          ZIP。恢复会覆盖当前空间数据，服务端会先保存恢复前备份；恢复后需要重新登录。</view
+          ZIP。恢复会覆盖当前空间数据，服务端会先保存恢复前备份；成功后会回到首页查看恢复的记录。</view
         ><wd-button
           block
           plain
@@ -157,7 +157,6 @@ import {
   downloadArchive,
   chooseArchive,
   uploadFile,
-  setToken,
 } from '../../lib/api';
 import { today } from '../../lib/domain';
 import type { Space } from '../../types';
@@ -256,9 +255,9 @@ async function restore() {
     )
       return;
     await uploadFile(path, '/backup/restore');
-    setToken('');
-    notify('恢复完成，请重新登录');
-    uni.reLaunch({ url: '/pages/auth/index' });
+    await session.load();
+    notify('恢复完成，记录已经回到小世界');
+    uni.reLaunch({ url: '/pages/home/index' });
   });
 }
 async function logout() {
