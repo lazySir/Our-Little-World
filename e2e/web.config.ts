@@ -12,13 +12,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
-  webServer: {
-    command: 'node --import tsx e2e/web-server.mts',
-    cwd: '..',
-    url: 'http://127.0.0.1:5174',
-    reuseExistingServer: !process.env.CI,
-    timeout: 90000,
-  },
+  globalSetup: './web-server.mts',
   outputDir: '../test-results/web',
   reporter: [['list']],
 });

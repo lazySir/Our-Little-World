@@ -14,11 +14,5 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
-  webServer: {
-    command: 'node --experimental-strip-types e2e/uni-server.mts',
-    cwd: '../..',
-    url: 'http://127.0.0.1:5175',
-    reuseExistingServer: false,
-    timeout: 90000,
-  },
+  globalSetup: '../../e2e/uni-server.mts',
 });
