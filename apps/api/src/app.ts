@@ -36,6 +36,7 @@ import express from 'express';
 import type { Response } from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
+import methodOverride from 'method-override';
 import { AuthService } from './auth';
 import { AssetsService } from './assets';
 import { ResourcesService } from './resources';
@@ -262,6 +263,12 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
     helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }),
   );
   app.use(compression());
+  // WeChat transports edits through POST; keep the existing PATCH routes and guards.
+  app.use(
+    methodOverride((req) => (req.header('X-HTTP-Method-Override') === 'PATCH' ? 'PATCH' : ''), {
+      methods: ['POST'],
+    }),
+  );
   // A single private SQLite writer also makes archive DB/data/file snapshots
   // consistent, and prevents duplicate singleton profiles or mood upserts.
   app.useGlobalInterceptors({
@@ -287,7 +294,7 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   app.enableCors({
     origin: (origin, cb) => cb(null, !origin || allowed.includes(origin)),
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-HTTP-Method-Override'],
   });
   // Short-lived in-memory buckets bound login/setup/join brute force and uploads.
   const buckets = new Map<string, { count: number; reset: number }>();

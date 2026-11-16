@@ -1,4 +1,6 @@
 import { normalizeBase, resolveAsset, decodeResponse } from './domain';
+import { toUniRequest } from './transport';
+import type { ApiMethod } from './transport';
 import type { Asset, ApiError } from '../types';
 const BASE_KEY = 'little-world-api';
 const TOKEN_KEY = 'little-world-token';
@@ -22,36 +24,38 @@ export function assetUrl(asset: Asset | string) {
 }
 export async function request<T = any>(
   path: string,
-  method = 'GET',
+  method: ApiMethod = 'GET',
   data?: unknown,
   anonymous = false,
 ): Promise<T> {
   return new Promise((resolve, reject) =>
-    uni.request({
-      url: `${getBase()}${path}`,
-      method: method as UniApp.RequestOptions['method'],
-      data: data as UniApp.RequestOptions['data'],
-      timeout: 20000,
-      header: {
-        'Content-Type': 'application/json',
-        ...(!anonymous && getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
-      },
-      success(response) {
-        try {
-          resolve(decodeResponse(response.statusCode, response.data));
-        } catch (error) {
-          if (error.status === 401 && !anonymous) {
-            setToken('');
-            uni.$emit('session-expired');
-            uni.reLaunch({ url: '/pages/auth/index' });
+    uni.request(
+      toUniRequest({
+        url: `${getBase()}${path}`,
+        method,
+        data: data as UniApp.RequestOptions['data'],
+        timeout: 20000,
+        header: {
+          'Content-Type': 'application/json',
+          ...(!anonymous && getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+        },
+        success(response) {
+          try {
+            resolve(decodeResponse(response.statusCode, response.data));
+          } catch (error) {
+            if (error.status === 401 && !anonymous) {
+              setToken('');
+              uni.$emit('session-expired');
+              uni.reLaunch({ url: '/pages/auth/index' });
+            }
+            reject(error);
           }
-          reject(error);
-        }
-      },
-      fail() {
-        reject(new Error('连接不到小世界，请检查服务是否启动和当前接口地址'));
-      },
-    }),
+        },
+        fail() {
+          reject(new Error('连接不到小世界，请检查服务是否启动和当前接口地址'));
+        },
+      }),
+    ),
   );
 }
 export async function uploadFile(filePath: string, path = '/assets'): Promise<Asset> {
