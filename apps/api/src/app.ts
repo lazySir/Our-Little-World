@@ -17,6 +17,8 @@ import {AssetsService} from './assets';
 import {ResourcesService} from './resources';
 import {schemas} from './validation';
 import type { AuthenticatedRequest, AssetQuery } from './types';
+import {Mutex} from 'async-mutex';
+import {makeBackupController} from './backup';
 
 // Explicit decorators keep dynamically registered resource controllers compact.
 function route(klass: any, method: any, name: string, url: string, parameters: ParameterDecorator[] = [], secure = true){
@@ -51,6 +53,8 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   auth=new AuthService(db);
   const assets=new AssetsService(db);
   const resources=new ResourcesService(db,assets);
+  const mutex=new Mutex();
+  let backupTimer:ReturnType<typeof setInterval>|undefined;
   class AuthController {
     status(){return auth.status();}
     setup(body){return auth.setup(body);}
@@ -108,12 +112,25 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   route(AssetsController,Get,'file',':id/file',[Param('id'),Query(),Res()],false);
   controllers.push(AssetsController);
   // Backup controller is added separately so archive handling stays isolated.
-  try{const {makeBackupController}=require('./backup');controllers.push(makeBackupController({db,assets,route,auth}));}catch(error){if(error.code!=='MODULE_NOT_FOUND')throw error;}
+  const BackupController=makeBackupController({db,assets,route,auth,mutex});
+  controllers.push(BackupController);
+  const backupHours=Number(process.env.AUTO_BACKUP_HOURS||24);
+  if(Number.isFinite(backupHours)&&backupHours>0){backupTimer=setInterval(()=>{(BackupController as any).runAutomatic().catch((e:Error)=>console.error('自动备份失败:',e.message));},backupHours*3600000);backupTimer.unref();}
   class AppModule {}
-  Module({controllers,providers:[AuthGuard,{provide:'PRISMA',useValue:db},{provide:'WORLD_LIFECYCLE',useValue:{onModuleDestroy:async()=>{clearInterval(cleanup);await db.$disconnect();}}}]})(AppModule);
+  Module({controllers,providers:[AuthGuard,{provide:'PRISMA',useValue:db},{provide:'WORLD_LIFECYCLE',useValue:{onModuleDestroy:async()=>{clearInterval(cleanup);if(backupTimer)clearInterval(backupTimer);await db.$disconnect();}}}]})(AppModule);
   const app=await NestFactory.create<WorldApplication>(AppModule,{logger:options.logger===false?false:['log','error','warn'],bodyParser:false});
   app.use(helmet({contentSecurityPolicy:false,crossOriginResourcePolicy:{policy:'cross-origin'}}));
   app.use(compression());
+  // A single private SQLite writer also makes archive DB/data/file snapshots
+  // consistent, and prevents duplicate singleton profiles or mood upserts.
+  app.use(async(req:express.Request,res:express.Response,next:express.NextFunction)=>{
+    if(!req.path.startsWith('/api/')||(['GET','HEAD','OPTIONS'].includes(req.method)&&!req.path.startsWith('/api/backup/')))return next();
+    const release=await mutex.acquire();
+    if(res.destroyed){release();return;}
+    let released=false;
+    const done=()=>{if(!released){released=true;release();}};
+    res.once('finish',done);res.once('close',done);next();
+  });
   app.use(express.json({limit:'2mb'}));
   const allowed=(process.env.CORS_ORIGINS||'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174').split(',').filter(Boolean);
   app.enableCors({origin:(origin,cb)=>cb(null,!origin||allowed.includes(origin)),methods:['GET','POST','PATCH','PUT','DELETE','OPTIONS'],allowedHeaders:['Authorization','Content-Type']});
