@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig({
-  plugins: [vue(), VitePWA({
+  plugins: [vue(), tailwindcss(), VitePWA({
     registerType: 'autoUpdate',
     manifest: { name: '我们的小世界', short_name: '小世界', description: '两个人的私人生活手账', lang: 'zh-CN', theme_color: '#f8f5eb', background_color: '#f8f5eb', display: 'standalone', icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }] },
     workbox: { navigateFallbackDenylist: [/^\/api/], globPatterns: ['**/*.{js,css,html,svg,woff2}'], maximumFileSizeToCacheInBytes: 4000000 }

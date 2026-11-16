@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMoney, nextAnniversary, today, splitTags, groupLedger } from '../src/domain.js';
+import { parseMoney, nextAnniversary, today, splitTags, groupLedger } from '../src/domain.ts';
 test('money preserves cents and rejects negative and fractional cents', () => {
   assert.equal(parseMoney('12.30'), 1230);
   assert.equal(parseMoney('0.01'), 1);

@@ -1,0 +1,5 @@
+import type { User, Space, Session } from '../types';
+import { defineStore } from 'pinia';
+import { api,TOKEN_KEY } from '../api';
+let hydration: Promise<void> | undefined;
+export const useSession=defineStore('session',{state:()=>({user:null as User|null,space:null as Space|null,partner:null as User|null,ready:false}),getters:{authenticated:s=>!!s.user,isOwner:s=>s.user?.role==='owner'},actions:{async hydrate(){if(this.ready)return;if(!hydration)hydration=(async()=>{try{if(localStorage.getItem(TOKEN_KEY))Object.assign(this,await api.get('/auth/me'));}catch{localStorage.removeItem(TOKEN_KEY);}finally{this.ready=true;}})();await hydration;},accept(result: Session){localStorage.setItem(TOKEN_KEY,result.token);this.user=result.user;this.space=result.space;this.ready=true;hydration=null;},async refresh(){Object.assign(this,await api.get('/auth/me'));},clear(){localStorage.removeItem(TOKEN_KEY);this.$reset();this.ready=true;hydration=null;},async logout(){try{await api.post('/auth/logout');}finally{this.clear();}}}});
