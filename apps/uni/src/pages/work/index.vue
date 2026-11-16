@@ -48,6 +48,7 @@
       v-model="editor"
       :title="editing ? '编辑工作手记' : '写一篇工作手记'"
       :saving="saving"
+      :uploading="uploading"
       :error="formError"
       @save="saveForm"
     >
@@ -66,7 +67,7 @@
         placeholder="项目，灵感，复盘"
         hint="多个标签用逗号分开"
       />
-      <PhotoPicker v-model="form.assets" />
+      <PhotoPicker v-model="form.assets" :disabled="saving" @busy="uploading = $event" />
     </EditorSheet>
   </view>
 </template>
@@ -85,6 +86,7 @@ const { session, items, loading, error, saving, editor, formError, save, remove 
   query = ref(''),
   tagsText = ref(''),
   editing = ref(null),
+  uploading = ref(false),
   form = reactive({ title: '', date: today(), content: '', assets: [] });
 const filtered = computed(() =>
   items.value

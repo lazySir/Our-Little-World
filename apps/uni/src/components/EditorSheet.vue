@@ -2,11 +2,11 @@
   <wd-popup
     :model-value="modelValue"
     position="bottom"
-    closable
+    :closable="!saving && !uploading"
     safe-area-inset-bottom
-    :close-on-click-modal="!saving"
+    :close-on-click-modal="!saving && !uploading"
     :z-index="1200"
-    @update:model-value="$emit('update:modelValue', $event)"
+    @update:model-value="setVisible"
   >
     <view class="sheet">
       <view class="sheet-header">
@@ -17,10 +17,12 @@
         <view v-if="error" class="error-box">{{ error }}</view>
       </scroll-view>
       <view class="sheet-footer">
-        <wd-button block plain :disabled="saving" @click="$emit('update:modelValue', false)"
+        <wd-button block plain :disabled="saving || uploading" @click="setVisible(false)"
           >先放一放</wd-button
         >
-        <wd-button block :loading="saving" @click="$emit('save')">{{ saveText }}</wd-button>
+        <wd-button block :loading="saving" :disabled="uploading" @click="submit">{{
+          saveText
+        }}</wd-button>
       </view>
     </view>
   </wd-popup>
@@ -31,6 +33,7 @@ const props = defineProps({
   modelValue: Boolean,
   title: String,
   saving: Boolean,
+  uploading: Boolean,
   error: String,
   saveText: { type: String, default: '保存这一刻' },
 });
@@ -60,5 +63,12 @@ watch(
   },
 );
 onBeforeUnmount(restoreTabBar);
-defineEmits(['update:modelValue', 'save']);
+const emit = defineEmits(['update:modelValue', 'save']);
+function setVisible(visible: boolean) {
+  if (!visible && (props.saving || props.uploading)) return;
+  emit('update:modelValue', visible);
+}
+function submit() {
+  if (!props.saving && !props.uploading) emit('save');
+}
 </script>

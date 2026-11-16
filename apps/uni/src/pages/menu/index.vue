@@ -98,6 +98,7 @@
       v-model="editor"
       :title="editing ? '编辑菜单' : '添一道想吃的'"
       :saving="saving"
+      :uploading="uploading"
       :error="formError"
       @save="saveForm"
       ><FormField
@@ -123,6 +124,8 @@
       /><FormField v-model="form.favorite" label="加入收藏" kind="switch" /><PhotoPicker
         v-model="photos"
         :max="1"
+        :disabled="saving"
+        @busy="uploading = $event"
       /><view v-if="editing" class="text-action delete" @click="remove(editing)"
         >删除这项菜单</view
       ></EditorSheet
@@ -148,6 +151,7 @@ const { session, items, loading, error, saving, editor, formError, load, save, r
   editing = ref(null),
   priceText = ref('0'),
   photos = ref([]),
+  uploading = ref(false),
   cart = reactive<Record<string, number>>({}),
   orders = ref([]),
   orderNote = ref(''),

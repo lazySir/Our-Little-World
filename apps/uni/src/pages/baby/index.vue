@@ -100,6 +100,7 @@
       v-model="profileEditor"
       title="宝宝的小档案"
       :saving="profileSaving"
+      :uploading="profileUploading"
       :error="profileError"
       @save="saveBaby"
     >
@@ -113,12 +114,18 @@
         placeholder="想为宝宝记住的事"
       />
       <view class="form-label">宝宝的照片</view>
-      <PhotoPicker v-model="profilePhotos" :max="1" />
+      <PhotoPicker
+        v-model="profilePhotos"
+        :max="1"
+        :disabled="profileSaving"
+        @busy="profileUploading = $event"
+      />
     </EditorSheet>
     <EditorSheet
       v-model="editor"
       :title="editing ? '编辑成长记录' : '记下一点点长大'"
       :saving="saving"
+      :uploading="uploading"
       :error="formError"
       @save="saveForm"
     >
@@ -145,7 +152,10 @@
         v-if="form.type === 'sleep'"
         v-model="form.durationMinutes"
         label="时长（分钟，选填）"
-        kind="number" /><PhotoPicker v-model="form.assets" /></EditorSheet
+        kind="number" /><PhotoPicker
+        v-model="form.assets"
+        :disabled="saving"
+        @busy="uploading = $event" /></EditorSheet
   ></view>
 </template>
 <script setup lang="ts">
@@ -164,11 +174,13 @@ const { session, items, loading, error, saving, editor, formError, save, remove 
   baby = ref(null),
   profileEditor = ref(false),
   profileSaving = ref(false),
+  profileUploading = ref(false),
   profileError = ref(''),
   profilePhotos = ref([]),
   query = ref(''),
   filter = ref('all'),
   editing = ref(null);
+const uploading = ref(false);
 const types = [
     { value: 'growth', label: '身高体重' },
     { value: 'feeding', label: '喂养' },

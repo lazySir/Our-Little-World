@@ -8,9 +8,9 @@
           mode="aspectFill"
           @click="previewPhotos(modelValue, index)"
         />
-        <view class="remove-photo" @click="remove(index)">×</view>
+        <view v-if="!busy && !disabled" class="remove-photo" @click="remove(index)">×</view>
       </view>
-      <view v-if="modelValue.length < max" class="upload-tile" @click="add">
+      <view v-if="modelValue.length < max && !disabled" class="upload-tile" @click="add">
         <view>{{ busy ? '上传中…' : '＋ 添加照片' }}<view class="small">相册 / 拍摄</view> </view>
       </view>
     </view>
@@ -26,6 +26,7 @@ const props = withDefaults(
   defineProps<{
     modelValue?: Asset[];
     max?: number;
+    disabled?: boolean;
   }>(),
   { modelValue: () => [], max: 9 },
 );
@@ -33,7 +34,7 @@ const emit = defineEmits(['update:modelValue', 'busy']);
 const busy = ref(false),
   error = ref('');
 async function add() {
-  if (busy.value) return;
+  if (busy.value || props.disabled) return;
   error.value = '';
   busy.value = true;
   emit('busy', true);
@@ -52,6 +53,7 @@ async function add() {
   }
 }
 function remove(index) {
+  if (busy.value || props.disabled) return;
   emit(
     'update:modelValue',
     props.modelValue.filter((_, i) => i !== index),

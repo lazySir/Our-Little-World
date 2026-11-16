@@ -58,6 +58,7 @@
       v-model="editor"
       :title="editing ? '编辑这段回忆' : '收藏一个今天'"
       :saving="saving"
+      :uploading="uploading"
       :error="formError"
       @save="saveForm"
       ><FormField
@@ -76,7 +77,10 @@
         v-model="tagsText"
         label="贴几个标签"
         placeholder="旅行，夏天，第一次"
-        hint="用逗号分开多个标签" /><PhotoPicker v-model="form.assets" /></EditorSheet
+        hint="用逗号分开多个标签" /><PhotoPicker
+        v-model="form.assets"
+        :disabled="saving"
+        @busy="uploading = $event" /></EditorSheet
   ></view>
 </template>
 <script setup lang="ts">
@@ -95,6 +99,7 @@ const query = ref(''),
   kind = ref('all'),
   editing = ref(null),
   tagsText = ref('');
+const uploading = ref(false);
 const tabs = [
   { value: 'all', label: '全部回忆' },
   { value: 'couple', label: '我们的日子' },
