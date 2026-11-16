@@ -34,9 +34,23 @@ async function dataset(db: PrismaClient, user: any, includeCredentials = false) 
   };
 }
 export function makeBackupController({ db, assets, route, mutex }: BackupContext) {
-  async function archive(user: any) {
+  async function archive(user: any, { allowMissingAssets = false } = {}) {
     const data = await dataset(db, user, true);
     const zip = new AdmZip();
+    const missingAssets: { id: string; filename: string }[] = [];
+    zip.addFile('data.json', Buffer.from(JSON.stringify(data)));
+    for (const asset of data.assets) {
+      if (!safeFilename.test(asset.filename)) fail(500, '附件文件名无效');
+      try {
+        const bytes = await fs.readFile(path.join(assets.directory, asset.filename));
+        zip.addFile(`uploads/${asset.filename}`, bytes);
+      } catch (error: any) {
+        if (!allowMissingAssets && error.code === 'ENOENT')
+          fail(409, '有照片文件缺失，请先使用以前保存的完整备份恢复，再重新备份');
+        if (!allowMissingAssets || error.code !== 'ENOENT') throw error;
+        missingAssets.push({ id: asset.id, filename: asset.filename });
+      }
+    }
     zip.addFile(
       'manifest.json',
       Buffer.from(
@@ -45,15 +59,11 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
           version: VERSION,
           createdAt: data.exportedAt,
           format: 'logical-sqlite',
+          complete: missingAssets.length === 0,
+          missingAssets,
         }),
       ),
     );
-    zip.addFile('data.json', Buffer.from(JSON.stringify(data)));
-    for (const asset of data.assets) {
-      if (!safeFilename.test(asset.filename)) fail(500, '附件文件名无效');
-      const bytes = await fs.readFile(path.join(assets.directory, asset.filename));
-      zip.addFile(`uploads/${asset.filename}`, bytes);
-    }
     // SQLite snapshot plus logical data makes the archive useful for both
     // direct offline recovery and safe in-process restore without replacing handles.
     const snapshot = path.join(config.storage, `snapshot-${crypto.randomUUID()}.db`);
@@ -63,7 +73,7 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
     } finally {
       await fs.unlink(snapshot).catch(() => {});
     }
-    return zip.toBuffer();
+    return { buffer: zip.toBuffer(), missingAssets };
   }
   class BackupController {
     async export(req: any, res: any) {
@@ -85,13 +95,14 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
     }
     async download(req: any, res: any) {
       if (req.user.role !== 'owner') fail(403, '只有创建者可以备份整个空间');
+      const backup = await archive(req.user);
       res
         .set({
           'Content-Type': 'application/zip',
           'Content-Disposition': 'attachment; filename="little-world-backup.zip"',
           'Cache-Control': 'no-store',
         })
-        .send(await archive(req.user));
+        .send(backup.buffer);
     }
     async restore(req: any, file: any) {
       if (req.user.role !== 'owner') fail(403, '只有创建者可以恢复空间');
@@ -121,6 +132,8 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
         }
         const manifest = JSON.parse(zip.readAsText('manifest.json'));
         data = JSON.parse(zip.readAsText('data.json'));
+        if (manifest.complete === false)
+          fail(400, '此恢复前保护副本缺少附件，不能作为完整备份恢复');
         if (
           manifest.product !== 'our-little-world' ||
           manifest.version !== VERSION ||
@@ -221,7 +234,8 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
       const backups = path.join(config.storage, 'backups');
       await fs.mkdir(backups, { recursive: true });
       const safetyName = `before-restore-${Date.now()}.zip`;
-      await fs.writeFile(path.join(backups, safetyName), await archive(req.user));
+      const safety = await archive(req.user, { allowMissingAssets: true });
+      await fs.writeFile(path.join(backups, safetyName), safety.buffer);
       await fs.mkdir(assets.directory, { recursive: true });
       const added: string[] = [];
       const replaced = new Map<string, Buffer>();
@@ -282,7 +296,12 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
         await Promise.all([...replaced].map(([p, bytes]) => fs.writeFile(p, bytes)));
         throw error;
       }
-      return { ok: true, restartRequired: false, safetyBackup: safetyName };
+      return {
+        ok: true,
+        restartRequired: false,
+        safetyBackup: safetyName,
+        safetyMissingAssets: safety.missingAssets.length,
+      };
     }
   }
   Controller('backup')(BackupController);
@@ -301,7 +320,8 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
       if (!owner) return;
       const directory = path.join(config.storage, 'backups');
       await fs.mkdir(directory, { recursive: true });
-      await fs.writeFile(path.join(directory, `auto-${Date.now()}.zip`), await archive(owner));
+      const backup = await archive(owner);
+      await fs.writeFile(path.join(directory, `auto-${Date.now()}.zip`), backup.buffer);
       const files = (await fs.readdir(directory))
         .filter((f) => /^auto-\d+\.zip$/.test(f))
         .sort()
