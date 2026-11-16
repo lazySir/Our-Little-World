@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Space {
+  id        String   @id @default(cuid())
+  name      String
+  startDate String
+  theme     String   @default("cream")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+  entries   Entry[]
+  assets    Asset[]
+  invites   Invite[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  nickname     String
+  passwordHash String
+  role         String   @default("member")
+  spaceId      String
+  space        Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  sessions     Session[]
+  entries      Entry[]
+  @@index([spaceId])
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId])
+}
+
+model Invite {
+  id        String   @id
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([spaceId])
+}
+
+// Domain payloads are independently validated by Zod resource schemas.
+// Shared envelope centralizes tenancy, authorship, dates and portable exports.
+model Entry {
+  id        String   @id @default(cuid())
+  kind      String
+  data      String
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([spaceId, kind, createdAt])
+}
+
+model Asset {
+  id           String   @id @default(cuid())
+  spaceId      String
+  space        Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  filename     String   @unique
+  originalName String
+  mime         String
+  size         Int
+  createdAt    DateTime @default(now())
+  @@index([spaceId])
+}
