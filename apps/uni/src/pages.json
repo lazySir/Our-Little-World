@@ -1,0 +1,27 @@
+{
+  "easycom":{"autoscan":true,"custom":{"^wd-(.*)":"@/uni_modules/wot-design-uni/components/wd-$1/wd-$1.vue"}},
+  "pages":[
+    {"path":"pages/home/index","style":{"navigationBarTitleText":"我们的小世界","enablePullDownRefresh":true}},
+    {"path":"pages/wishes/index","style":{"navigationBarTitleText":"一起做","enablePullDownRefresh":true}},
+    {"path":"pages/memories/index","style":{"navigationBarTitleText":"回忆相册","enablePullDownRefresh":true}},
+    {"path":"pages/more/index","style":{"navigationBarTitleText":"我们的日常"}},
+    {"path":"pages/auth/index","style":{"navigationBarTitleText":"欢迎回家"}},
+    {"path":"pages/menu/index","style":{"navigationBarTitleText":"今天吃什么","enablePullDownRefresh":true}},
+    {"path":"pages/ledger/index","style":{"navigationBarTitleText":"共同账本","enablePullDownRefresh":true}},
+    {"path":"pages/anniversaries/index","style":{"navigationBarTitleText":"纪念日","enablePullDownRefresh":true}},
+    {"path":"pages/baby/index","style":{"navigationBarTitleText":"宝宝成长","enablePullDownRefresh":true}},
+    {"path":"pages/work/index","style":{"navigationBarTitleText":"工作手记","enablePullDownRefresh":true}},
+    {"path":"pages/letters/index","style":{"navigationBarTitleText":"时光信箱","enablePullDownRefresh":true}},
+    {"path":"pages/settings/index","style":{"navigationBarTitleText":"我们的设置"}}
+  ],
+  "globalStyle":{"navigationBarTextStyle":"black","navigationBarTitleText":"我们的小世界","navigationBarBackgroundColor":"#faf5ec","backgroundColor":"#faf5ec","backgroundTextStyle":"dark"},
+  "tabBar":{
+    "color":"#918a7c","selectedColor":"#b8776e","backgroundColor":"#fffdf8","borderStyle":"white",
+    "list":[
+      {"pagePath":"pages/home/index","text":"今天","iconPath":"static/home.png","selectedIconPath":"static/home-active.png"},
+      {"pagePath":"pages/wishes/index","text":"一起做","iconPath":"static/wish.png","selectedIconPath":"static/wish-active.png"},
+      {"pagePath":"pages/memories/index","text":"回忆","iconPath":"static/memory.png","selectedIconPath":"static/memory-active.png"},
+      {"pagePath":"pages/more/index","text":"我们","iconPath":"static/us.png","selectedIconPath":"static/us-active.png"}
+    ]
+  }
+}

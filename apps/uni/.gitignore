@@ -1,0 +1,7 @@
+node_modules/
+dist/
+src/uni_modules/
+build-*.log
+.env.local
+.runtime-test/
+test-results/

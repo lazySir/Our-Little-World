@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target":"ES2022","module":"ESNext","moduleResolution":"Bundler","lib":["ES2022","DOM"],
+    "strict":false,"skipLibCheck":true,"resolveJsonModule":true,"esModuleInterop":true,
+    "allowImportingTsExtensions":true,"types":["@dcloudio/types","vite/client"],"noEmit":true
+  },
+  "include":["src/**/*.ts","src/**/*.vue","vite.config.ts"],
+  "exclude":["src/uni_modules","node_modules","dist"]
+}
