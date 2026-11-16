@@ -116,7 +116,8 @@ export class ResourcesService {
       existing &&
       Object.keys(input).every((k) => k === 'status' || k === 'note')
     ) {
-      const patch = schemas.orders.pick({ status: true, note: true }).partial().parse(input);
+      // Validate against the saved values so defaults cannot erase omitted PATCH fields.
+      const patch = schemas.orders.pick({ status: true, note: true }).parse(merged);
       data = { ...JSON.parse(existing.data), ...patch };
     } else data = await this.validate(kind, merged, user, existing);
     if (kind === 'moods' && !id) {

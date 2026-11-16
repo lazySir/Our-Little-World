@@ -135,6 +135,63 @@ test('orders use server prices and immutable snapshots', async () => {
   assert.equal(done.status, 200);
   assert.equal(done.body.totalCents, 3600);
 });
+for (const scenario of [
+  {
+    name: 'status only',
+    status: 'pending',
+    patch: { status: 'done' },
+    expectedStatus: 'done',
+    expectedNote: '少放辣椒',
+  },
+  {
+    name: 'note only',
+    status: 'done',
+    patch: { note: '多放青菜' },
+    expectedStatus: 'done',
+    expectedNote: '多放青菜',
+  },
+  {
+    name: 'empty patch',
+    status: 'done',
+    patch: {},
+    expectedStatus: 'done',
+    expectedNote: '少放辣椒',
+  },
+  {
+    name: 'explicitly empty note',
+    status: 'done',
+    patch: { note: '' },
+    expectedStatus: 'done',
+    expectedNote: '',
+  },
+]) {
+  test(`order ${scenario.name} preserves other fields and the deleted menu snapshot`, async () => {
+    const menu = await api.post('/api/menu').set(auth()).send({ name: '青菜面', priceCents: 1800 });
+    assert.equal(menu.status, 201);
+    const order = await api
+      .post('/api/orders')
+      .set(auth())
+      .send({
+        items: [{ menuItemId: menu.body.id, quantity: 2 }],
+        status: scenario.status,
+        note: '少放辣椒',
+      });
+    assert.equal(order.status, 201);
+    assert.equal((await api.delete(`/api/menu/${menu.body.id}`).set(auth())).status, 200);
+    const edited = await api.patch(`/api/orders/${order.body.id}`).set(auth()).send(scenario.patch);
+    assert.equal(edited.status, 200, JSON.stringify(edited.body));
+    assert.equal(edited.body.status, scenario.expectedStatus);
+    assert.equal(edited.body.note, scenario.expectedNote);
+    assert.equal(edited.body.totalCents, order.body.totalCents);
+    assert.deepEqual(edited.body.items, order.body.items);
+    const persisted = (await api.get('/api/orders').set(auth())).body.find(
+      (row: any) => row.id === order.body.id,
+    );
+    assert.equal(persisted.status, scenario.expectedStatus);
+    assert.equal(persisted.note, scenario.expectedNote);
+  });
+}
+
 test('future letters hide content for both members and enforce authorship', async () => {
   const letter = await api
     .post('/api/letters')
