@@ -1,12 +1,13 @@
 import {test,before,after} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,mkdir,readdir,writeFile,readFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import request from 'supertest';
 import sharp from 'sharp';
 import AdmZip from 'adm-zip';
+import {Mutex} from 'async-mutex';
 let app:any,api:any,directory:string,token:string,partnerToken:string;
 const auth=()=>({Authorization:`Bearer ${token}`});
 before(async()=>{
@@ -14,6 +15,7 @@ before(async()=>{
   process.env.DATABASE_URL=`file:${path.join(directory,'test.db').replace(/\\/g,'/')}`;
   process.env.STORAGE_DIR=path.join(directory,'storage');
   process.env.ASSET_SECRET='resource-tests-long-secret-1234567890';
+  process.env.CORS_ORIGINS='http://localhost:5175';
   process.env.RUST_LOG ||= 'info';
   execFileSync(process.execPath,[require.resolve('prisma/build/index.js'),'migrate','deploy'],{cwd:path.join(__dirname,'..'),stdio:'pipe',env:{...process.env,RUST_LOG:'info'}});
   const {createApp}=await import('../src/app');app=await createApp({logger:false});await app.init();api=request(app.getHttpServer());
@@ -97,4 +99,30 @@ test('backup restores a real roundtrip, preserves login and rejects malformed zi
   assert.equal((await api.get('/api/auth/me').set(auth())).status,200);
   assert.equal((await api.post('/api/backup/restore').set(auth()).attach('file',Buffer.from('not zip'),{filename:'bad.zip'})).status,400);
   assert.equal((await api.get('/api/backup/download').set({Authorization:`Bearer ${partnerToken}`})).status,403);
+});
+
+test('automatic archives contain data and retain only seven scheduled copies',async()=>{
+  const {PrismaClient}=await import('@prisma/client');
+  const {makeBackupController}=await import('../src/backup');
+  const db=new PrismaClient();
+  try{
+    const backups=path.join(directory,'storage','backups');await mkdir(backups,{recursive:true});
+    for(let i=0;i<8;i++)await writeFile(path.join(backups,`auto-${1000000000000+i}.zip`),'old');
+    const controller=makeBackupController({db,assets:{directory:path.join(directory,'storage','uploads')},route:()=>{},auth:{},mutex:new Mutex()});
+    await (controller as any).runAutomatic();
+    const files=(await readdir(backups)).filter(f=>f.startsWith('auto-')).sort();
+    assert.equal(files.length,7);
+    const zip=new AdmZip(await readFile(path.join(backups,files.at(-1)!)));
+    assert.ok(zip.getEntry('database.sqlite'));assert.ok(zip.getEntry('data.json'));
+    assert.ok((await readdir(backups)).some(f=>f.startsWith('before-restore-')),'restore safety copy is retained');
+  }finally{await db.$disconnect();}
+});
+
+test('native mobile and local H5 origins can call the API',async()=>{
+  for(const origin of ['http://localhost','capacitor://localhost','http://localhost:5175']){
+    const response=await api.get('/api/health').set('Origin',origin);
+    assert.equal(response.headers['access-control-allow-origin'],origin);
+  }
+  const blocked=await api.get('/api/health').set('Origin','https://unrelated.example');
+  assert.equal(blocked.headers['access-control-allow-origin'],undefined);
 });

@@ -20,15 +20,6 @@ import type { AuthenticatedRequest, AssetQuery } from './types';
 import {Mutex} from 'async-mutex';
 import {makeBackupController} from './backup';
 
-// Explicit decorators keep dynamically registered resource controllers compact.
-function route(klass: any, method: any, name: string, url: string, parameters: ParameterDecorator[] = [], secure = true){
-  const descriptor=Object.getOwnPropertyDescriptor(klass.prototype,name)!;
-  method(url)(klass.prototype,name,descriptor);
-  parameters.forEach((parameter,index)=>parameter(klass.prototype,name,index));
-  if(secure) UseGuards(AuthGuard)(klass.prototype,name,descriptor);
-}
-let auth: AuthService;
-class AuthGuard implements CanActivate {async canActivate(context: ExecutionContext){await auth.authenticate(context.switchToHttp().getRequest());return true;}}
 class ErrorFilter implements ExceptionFilter {
   catch(error: any, host: ArgumentsHost){
     const res=host.switchToHttp().getResponse();
@@ -50,7 +41,15 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   await db.$connect();
   await db.$queryRawUnsafe('PRAGMA journal_mode = WAL');
   await db.$queryRawUnsafe('PRAGMA busy_timeout = 5000');
-  auth=new AuthService(db);
+  const auth=new AuthService(db);
+  class AuthGuard implements CanActivate {async canActivate(context: ExecutionContext){await auth.authenticate(context.switchToHttp().getRequest());return true;}}
+  // Bind guards and routes to this server instance, including test instances.
+  function route(klass: any, method: any, name: string, url: string, parameters: ParameterDecorator[] = [], secure = true){
+    const descriptor=Object.getOwnPropertyDescriptor(klass.prototype,name)!;
+    method(url)(klass.prototype,name,descriptor);
+    parameters.forEach((parameter,index)=>parameter(klass.prototype,name,index));
+    if(secure) UseGuards(AuthGuard)(klass.prototype,name,descriptor);
+  }
   const assets=new AssetsService(db);
   const resources=new ResourcesService(db,assets);
   const mutex=new Mutex();
@@ -132,7 +131,7 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
     res.once('finish',done);res.once('close',done);next();
   });
   app.use(express.json({limit:'2mb'}));
-  const allowed=(process.env.CORS_ORIGINS||'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174').split(',').filter(Boolean);
+  const allowed=['http://localhost','capacitor://localhost',...(process.env.CORS_ORIGINS||'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175').split(',').filter(Boolean)];
   app.enableCors({origin:(origin,cb)=>cb(null,!origin||allowed.includes(origin)),methods:['GET','POST','PATCH','PUT','DELETE','OPTIONS'],allowedHeaders:['Authorization','Content-Type']});
   // Short-lived in-memory buckets bound login/setup/join brute force and uploads.
   const buckets=new Map<string, { count: number; reset: number }>();
