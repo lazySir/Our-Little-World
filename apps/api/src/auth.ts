@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { HttpException } from '@nestjs/common';
 import type { PrismaClient, User } from '@prisma/client';
 import type { AuthenticatedRequest, SpaceUser } from './types';
-import {z,text,date,credentials} from './validation';
+import {z,text,date,credentials,passwordInput} from './validation';
 export function fail(status: number, message: string): never { throw new HttpException(message,status); }
 export const digest = (s: string) => createHash('sha256').update(s).digest('hex');
 export const publicUser = ({id,username,nickname,role}: Pick<User, 'id' | 'username' | 'nickname' | 'role'>) => ({id,username,nickname,role});
@@ -35,7 +35,7 @@ export class AuthService {
     return this.session(user);
   }
   async login(body: unknown) {
-    const input=z.object({username:z.string().trim().toLowerCase().max(100),password:z.string().max(128)}).parse(body);
+    const input=z.object({username:z.string().trim().toLowerCase().max(100),password:passwordInput}).parse(body);
     const user=await this.db.user.findUnique({where:{username:input.username}});
     // Equal-cost comparison for absent accounts avoids username enumeration by timing.
     const valid=await bcrypt.compare(input.password,user?.passwordHash || '$2b$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW');
@@ -73,7 +73,7 @@ export class AuthService {
     return publicUser(await this.db.user.update({where:{id:user.id},data:{nickname}}));
   }
   async password(user: SpaceUser, sessionId: string, body: unknown) {
-    const {currentPassword,newPassword}=z.object({currentPassword:z.string().max(128),newPassword:credentials.password}).parse(body);
+    const {currentPassword,newPassword}=z.object({currentPassword:passwordInput,newPassword:credentials.password}).parse(body);
     if (!await bcrypt.compare(currentPassword,user.passwordHash)) fail(400,'原密码不正确');
     const hash=await bcrypt.hash(newPassword,12);
     await this.db.$transaction([this.db.user.update({where:{id:user.id},data:{passwordHash:hash}}),this.db.session.deleteMany({where:{userId:user.id,id:{not:sessionId}}})]);

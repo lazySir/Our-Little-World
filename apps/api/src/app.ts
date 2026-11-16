@@ -19,6 +19,7 @@ import {schemas} from './validation';
 import type { AuthenticatedRequest, AssetQuery } from './types';
 import {Mutex} from 'async-mutex';
 import {makeBackupController} from './backup';
+import {from,lastValueFrom} from 'rxjs';
 
 class ErrorFilter implements ExceptionFilter {
   catch(error: any, host: ArgumentsHost){
@@ -122,14 +123,12 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   app.use(compression());
   // A single private SQLite writer also makes archive DB/data/file snapshots
   // consistent, and prevents duplicate singleton profiles or mood upserts.
-  app.use(async(req:express.Request,res:express.Response,next:express.NextFunction)=>{
-    if(!req.path.startsWith('/api/')||(['GET','HEAD','OPTIONS'].includes(req.method)&&!req.path.startsWith('/api/backup/')))return next();
-    const release=await mutex.acquire();
-    if(res.destroyed){release();return;}
-    let released=false;
-    const done=()=>{if(!released){released=true;release();}};
-    res.once('finish',done);res.once('close',done);next();
-  });
+  app.useGlobalInterceptors({intercept(context,next){
+    const req=context.switchToHttp().getRequest<express.Request>();
+    if(['GET','HEAD','OPTIONS'].includes(req.method)&&!req.path.startsWith('/api/backup/'))return next.handle();
+    // Hold the lock until the actual handler settles, even if its client leaves.
+    return from(mutex.runExclusive(()=>lastValueFrom(next.handle(),{defaultValue:undefined})));
+  }});
   app.use(express.json({limit:'2mb'}));
   const allowed=['http://localhost','capacitor://localhost',...(process.env.CORS_ORIGINS||'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175').split(',').filter(Boolean)];
   app.enableCors({origin:(origin,cb)=>cb(null,!origin||allowed.includes(origin)),methods:['GET','POST','PATCH','PUT','DELETE','OPTIONS'],allowedHeaders:['Authorization','Content-Type']});

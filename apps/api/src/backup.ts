@@ -7,6 +7,7 @@ import {Controller,Get,Post,Req,Res,UploadedFile,UseInterceptors} from '@nestjs/
 import {FileInterceptor} from '@nestjs/platform-express';
 import {Mutex} from 'async-mutex';
 import {z,date,schemas,text} from './validation';
+import {today} from './resources';
 const {fail}=require('./auth');
 const config=require('./config');
 
@@ -52,7 +53,7 @@ export function makeBackupController({db,assets,route,mutex}:BackupContext){
       data.entries=data.entries.map(e=>{
         if(e.kind!=='letters')return e;
         const payload=JSON.parse(e.data);
-        if(payload.unlockDate>new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Shanghai'}))delete payload.content;
+        if(payload.unlockDate>today())delete payload.content;
         return {...e,data:JSON.stringify(payload)};
       });
       res.set({'Content-Type':'application/json','Content-Disposition':'attachment; filename="little-world-export.json"','Cache-Control':'no-store'}).send(JSON.stringify(data,null,2));
@@ -115,10 +116,16 @@ export function makeBackupController({db,assets,route,mutex}:BackupContext){
       await fs.writeFile(path.join(backups,safetyName),await archive(req.user));
       await fs.mkdir(assets.directory,{recursive:true});
       const added:string[]=[];
+      const replaced=new Map<string,Buffer>();
       try{
         for(const asset of data.assets){
           const destination=path.join(assets.directory,asset.filename);
-          try{await fs.access(destination);}catch{await fs.writeFile(destination,zip.readFile(`uploads/${asset.filename}`));added.push(destination);}
+          const restored=zip.readFile(`uploads/${asset.filename}`);
+          let previous:Buffer|undefined;
+          try{previous=await fs.readFile(destination);}catch(error:any){if(error.code!=='ENOENT')throw error;}
+          if(previous?.equals(restored))continue;
+          if(previous)replaced.set(destination,previous);else added.push(destination);
+          await fs.writeFile(destination,restored);
         }
         await db.$transaction(async tx=>{
           await tx.entry.deleteMany({where:{spaceId:req.user.spaceId}});
@@ -128,7 +135,11 @@ export function makeBackupController({db,assets,route,mutex}:BackupContext){
           for(const e of data.entries)await tx.entry.create({data:{id:e.id,kind:e.kind,data:e.data,spaceId:req.user.spaceId,authorId:e.authorId,createdAt:new Date(e.createdAt),updatedAt:new Date(e.updatedAt)}});
           await tx.invite.deleteMany({where:{spaceId:req.user.spaceId}});
         });
-      }catch(error){await Promise.all(added.map(p=>fs.unlink(p).catch(()=>{})));throw error;}
+      }catch(error){
+        await Promise.all(added.map(p=>fs.unlink(p).catch(()=>{})));
+        await Promise.all([...replaced].map(([p,bytes])=>fs.writeFile(p,bytes)));
+        throw error;
+      }
       return {ok:true,restartRequired:false,safetyBackup:safetyName};
     }
   }

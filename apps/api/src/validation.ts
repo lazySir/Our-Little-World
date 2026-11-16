@@ -9,7 +9,8 @@ const assets = z.array(id).max(12).default([]);
 const tags = z.array(text(30).min(1)).max(10).default([]);
 const positive = z.number().finite().positive();
 const optional = <T extends z.ZodType>(s: T) => s.nullable().default(null);
-const credentials = { username: z.string().trim().toLowerCase().regex(/^[a-z0-9_.-]{3,32}$/, '账号为3–32位字母、数字、点或下划线'), password: z.string().min(8,'密码至少8位').max(128) };
+const passwordInput=z.string().max(128).refine(value=>Buffer.byteLength(value,'utf8')<=72,'密码过长，请缩短（最多72个英文字符或24个汉字）');
+const credentials = { username: z.string().trim().toLowerCase().regex(/^[a-z0-9_.-]{3,32}$/, '账号为3–32位字母、数字、点或下划线'), password: passwordInput.min(8,'密码至少8位') };
 const schemas = {
   wishes: z.object({ title,description:note,category:z.enum(['travel','food','life','other']).default('life'),status:z.enum(['todo','done']).default('todo'),targetDate:optional(date),completedAt:optional(z.string().max(40)) }),
   menu: z.object({name:title,category:z.enum(['dish','drink','restaurant']).default('dish'),description:note,priceCents:z.number().int().min(0).max(100000000).default(0),assetId:optional(id),favorite:z.boolean().default(false)}),
@@ -23,4 +24,4 @@ const schemas = {
   moods:z.object({mood:z.enum(['great','good','okay','low','tired']),note:text(500).default(''),date}),
   baby:z.object({name:title,birthday:optional(date),gender:z.enum(['unknown','girl','boy']).default('unknown'),notes:note,avatarId:optional(id)})
 };
-export {z,text,title,date,credentials,schemas};
+export {z,text,title,date,credentials,passwordInput,schemas};
