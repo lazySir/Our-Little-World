@@ -2,9 +2,39 @@
   "name": "our-little-world",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "test:shared": "npm run test --workspace=@our-little-world/shared"
+    "init": "npm run build:shared && node --experimental-strip-types scripts/init.mts",
+    "dev": "npm run build:shared && node --experimental-strip-types scripts/dev.mts",
+    "start": "node --experimental-strip-types scripts/start.mts",
+    "health": "node --experimental-strip-types scripts/health.mts",
+    "build:shared": "npm run build --workspace=@our-little-world/shared",
+    "build:api": "npm run build:shared && npm run build --workspace=@our-little-world/api",
+    "build:web": "npm run build --workspace=@our-little-world/web",
+    "build:uni:h5": "npm run build:h5 --workspace=@our-little-world/uni",
+    "build:mp-weixin": "npm run build:mp-weixin --workspace=@our-little-world/uni",
+    "build": "npm run build:api && npm run build:web && npm run build:mp-weixin",
+    "test:shared": "npm run test --workspace=@our-little-world/shared",
+    "test:api": "npm run test --workspace=@our-little-world/api",
+    "test:web": "npm run test --workspace=@our-little-world/web",
+    "test:uni": "npm run test --workspace=@our-little-world/uni",
+    "test:scripts": "node --experimental-strip-types --test scripts/test/*.test.mts",
+    "test": "npm run build:shared && npm run test:shared && npm run test:api && npm run test:web && npm run test:uni && npm run test:scripts",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json",
+    "db:generate": "npm run db:generate --workspace=@our-little-world/api",
+    "db:migrate": "npm run db:migrate --workspace=@our-little-world/api",
+    "demo": "npm run build:shared && node --experimental-strip-types scripts/demo.mts",
+    "format": "prettier --write apps/**/src packages/shared/src scripts docs *.json *.md",
+    "test:e2e": "playwright test --config=e2e/web.config.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "tsx": "^4.23.0",
+    "prettier": "^3.7.4",
+    "@playwright/test": "^1.56.1"
   },
   "engines": {
     "node": ">=22.12.0",

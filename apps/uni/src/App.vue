@@ -1,11 +1,8 @@
 <script lang="ts">
 export default {
-    onLaunch() { },
+  onLaunch() {},
 };
 </script>
 <style lang="scss">
 @import './style.scss';
 </style>
-
-
-

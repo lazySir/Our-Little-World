@@ -8,25 +8,21 @@
     "predev": "npm run prepare:components",
     "predev:h5": "npm run prepare:components",
     "predev:mp-weixin": "npm run prepare:components",
-    "predev:app": "npm run prepare:components",
     "prebuild": "npm run prepare:components",
     "prebuild:h5": "npm run prepare:components",
     "prebuild:mp-weixin": "npm run prepare:components",
-    "prebuild:app": "npm run prepare:components",
     "dev": "uni",
     "dev:h5": "uni",
     "dev:mp-weixin": "uni -p mp-weixin",
-    "dev:app": "uni -p app-plus",
     "build": "uni build",
     "build:h5": "uni build",
     "build:mp-weixin": "uni build -p mp-weixin",
-    "build:app": "uni build -p app-plus",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@our-little-world/shared": "*",
     "@dcloudio/uni-app": "3.0.0-5030420261029002",
-    "@dcloudio/uni-app-plus": "3.0.0-5030420261029002",
     "@dcloudio/uni-components": "3.0.0-5030420261029002",
     "@dcloudio/uni-h5": "3.0.0-5030420261029002",
     "@dcloudio/uni-mp-weixin": "3.0.0-5030420261029002",
@@ -52,4 +48,3 @@
     "vite": "5.2.8"
   }
 }
-

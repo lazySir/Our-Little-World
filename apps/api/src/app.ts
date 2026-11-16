@@ -277,8 +277,6 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   });
   app.use(express.json({ limit: '2mb' }));
   const allowed = [
-    'http://localhost',
-    'capacitor://localhost',
     ...(
       process.env.CORS_ORIGINS ||
       'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175'

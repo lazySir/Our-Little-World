@@ -26,26 +26,22 @@ before(async () => {
   app = await createApp({ logger: false });
   await app.init();
   api = request(app.getHttpServer());
-  const setup = await api
-    .post('/api/auth/setup')
-    .send({
-      username: 'owner',
-      password: 'resource-password-123',
-      nickname: '小林',
-      spaceName: '我们',
-      startDate: '2024-01-01',
-    });
+  const setup = await api.post('/api/auth/setup').send({
+    username: 'owner',
+    password: 'resource-password-123',
+    nickname: '小林',
+    spaceName: '我们',
+    startDate: '2024-01-01',
+  });
   assert.equal(setup.status, 201, JSON.stringify(setup.body));
   token = setup.body.token;
   const invite = await api.post('/api/auth/invite').set(auth());
-  const partner = await api
-    .post('/api/auth/join')
-    .send({
-      code: invite.body.code,
-      username: 'partner',
-      password: 'partner-password-123',
-      nickname: '小禾',
-    });
+  const partner = await api.post('/api/auth/join').send({
+    code: invite.body.code,
+    username: 'partner',
+    password: 'partner-password-123',
+    nickname: '小禾',
+  });
   partnerToken = partner.body.token;
 });
 after(async () => {
@@ -96,16 +92,13 @@ test('all domain modules persist, update, list and delete records', async () => 
 test('validation rejects bad calendar dates, fractions of cents and missing assets', async () => {
   assert.equal(
     (
-      await api
-        .post('/api/ledger')
-        .set(auth())
-        .send({
-          type: 'expense',
-          amountCents: 1.2,
-          category: '餐饮',
-          date: '2026-02-30',
-          payer: '我',
-        })
+      await api.post('/api/ledger').set(auth()).send({
+        type: 'expense',
+        amountCents: 1.2,
+        category: '餐饮',
+        date: '2026-02-30',
+        payer: '我',
+      })
     ).status,
     400,
   );
@@ -299,8 +292,8 @@ test('automatic archives contain data and retain only seven scheduled copies', a
   }
 });
 
-test('native mobile and local H5 origins can call the API', async () => {
-  for (const origin of ['http://localhost', 'capacitor://localhost', 'http://localhost:5175']) {
+test('configured browser origins can call the API', async () => {
+  for (const origin of ['http://localhost:5175']) {
     const response = await api.get('/api/health').set('Origin', origin);
     assert.equal(response.headers['access-control-allow-origin'], origin);
   }

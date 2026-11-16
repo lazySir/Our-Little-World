@@ -1,0 +1,124 @@
+# 我们的小世界
+
+供两个人使用的私人生活空间，可部署在自己的电脑、NAS 或常开小主机上。Web 与微信小程序共用一套 API 与 SQLite 数据，Web 同时适配电脑和手机浏览器。界面采用奶油色、手账卡片和暖色插画。
+
+## 功能
+
+| 模块 | 主要操作 |
+| --- | --- |
+| 双人空间 | 首次建号、登录、邀请码加入、双人上限、个人资料与密码 |
+| 首页 | 在一起天数、今日心情、待办愿望、回忆、纪念日、当月账本 |
+| 一起做 | 愿望增删改查、分类、完成与重开、目标日期 |
+| 今天吃什么 | 菜品/饮品/餐厅、收藏、搜索、购物篮、下单与完成 |
+| 共同账本 | 收支记录、付款人、分类、月份筛选与统计 |
+| 纪念日 | 自定义日期、每年重复、倒数，闰日按非闰年 2 月 28 日计算 |
+| 回忆相册 | 文字、多图、日期、标签与图片预览 |
+| 宝宝成长 | 可选档案、身高体重、喂养、睡眠、健康备注、里程碑 |
+| 工作手记 | 按日期、标签整理文字和图片 |
+| 时光信箱 | 写信、未来日期解锁，服务端隐藏未解锁内容 |
+| 设置 | 空间信息、主题、邀请、接口地址、资料、导出与备份恢复 |
+
+这是家庭记录工具，健康内容仅用于个人记录。聊天、实时定位、公开社区和第三方 AI 服务不在当前范围内。
+
+## 本地启动
+
+需要 Node.js **22.12 或更新版本**（推荐仍受支持的 LTS 版本）和 npm 10+。在仓库根目录运行：
+
+```sh
+npm ci
+npm run init
+npm run build:api
+npm run build:web
+npm start
+```
+
+浏览器打开 `http://localhost:3000`。第一次进入时，**自行填写用户名、密码、昵称、空间名与在一起日期**。项目没有预设账号或通用密码。创建后，在设置中生成邀请码给另一半；第二个人通过加入入口注册自己的账号。邀请码有时效且只能使用一次。
+
+`npm run init` 创建根 `.env`、生成私密附件签名密钥、创建数据目录、生成 Prisma Client，并应用仓库内的数据库迁移。重复运行不会清空数据或覆盖已设置的密钥。
+
+Windows 可以直接在 PowerShell 运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-local.ps1
+```
+
+脚本在当前窗口安装依赖、初始化、构建并启动；按 `Ctrl+C` 停止。它不弹出额外后台窗口。已装过依赖时可加 `-SkipInstall`，开发模式加 `-Dev`。
+
+开发时运行：
+
+```sh
+npm run init
+npm run dev
+```
+
+Web 默认 `http://localhost:5173`，API 默认 `http://localhost:3000/api`。开发启动器同时运行两个服务，`Ctrl+C` 一起停止。
+
+## 项目目录与技术
+
+```text
+apps/api          NestJS 11 / TypeScript / Prisma 6 / SQLite
+apps/web          Vue 3 / TypeScript / Vite / Element Plus / Tailwind / Pinia / ECharts
+apps/uni          Vue 3 / TypeScript / Vite / uni-app / Wot Design Uni
+packages/shared   日期、金额与共享领域逻辑
+scripts           初始化、并行开发、生产启动与运行检查
+data              本机 SQLite 数据（不提交）
+storage           本机附件与备份（不提交）
+```
+
+根 `.env` 的相对路径统一从仓库根目录解释；使用根脚本启动。只运行 `apps/api` 内部命令时需要自行配置该目录的环境，不能把两个位置的相对路径混用。
+
+## 构建与验证
+
+```sh
+npm run test:shared
+npm run test:scripts
+npm run test --workspace=@our-little-world/api
+npm run test --workspace=@our-little-world/web
+npm run test --workspace=@our-little-world/uni
+npm run build:api
+npm run build:web
+npm run build:uni:h5
+npm run build:mp-weixin
+npm run health
+node --experimental-strip-types scripts/verify-demo.mts
+```
+
+Web 产物在 `apps/web/dist`；微信小程序产物在 `apps/uni/dist/build/mp-weixin`。`apps/uni/dist/build/h5` 保留用于小程序页面的浏览器联调。Web 构建由 Nest 服务提供，生产访问只需要一个 `3000` 端口。
+
+演示数据仅由 `npm run demo` 显式生成。它只接受没有空间的数据库，不会覆盖现有账号；运行后保存终端中随机生成的临时密码。实际使用请在空数据库的首次运行页创建自己的空间。不要把带真实数据的 SQLite、照片、`.env` 或备份提交到 Git。
+
+`scripts/verify-demo.mts` 在临时数据库和附件目录中验证首次生成及再次运行拒绝覆盖，结束后清理临时数据，不改动本机实际空间。
+
+## 局域网与双端
+
+同一 Wi-Fi 下，电脑保持运行，手机访问 `http://电脑局域网IP:3000`。例如电脑 IP 为 `192.168.1.50`，地址就是 `http://192.168.1.50:3000`。在 Windows 防火墙中仅为需要的私人网络允许 TCP `3000`。手机上的 `localhost` 指手机自身。
+
+微信小程序的设置页可以填写 API 地址，开发期例如 `http://192.168.1.50:3000/api`。Web 使用同源 `/api`，手机浏览器直接访问同一站点。电脑关机、睡眠、切换网络或 IP 变化后，其他设备会暂时无法连接。
+
+微信小程序需要自己的 AppID，在 `apps/uni/src/manifest.json` 和微信开发者工具中配置。将 `mp-weixin` 构建目录导入开发者工具后调试。开发者工具的“不校验合法域名”只用于开发；正式真机/发布需要在微信后台配置符合要求的 HTTPS 请求、上传和下载域名，并完成自己的主体、域名及发布流程。仅本地端口不能作为远程发布入口。
+
+## Docker
+
+需要 Docker Engine 或 Docker Desktop，并启用 Compose。首次生成本机配置，然后构建启动：
+
+```sh
+node --experimental-strip-types scripts/init.mts --config-only
+docker compose up -d --build
+docker compose logs -f world
+```
+
+访问 `http://localhost:3000`。容器启动时应用数据库迁移，数据库和附件分别保存在 `world-data`、`world-storage` 命名卷。`.env` 中的 `ASSET_SECRET` 由 Compose 传入容器。停机可用 `docker compose down`；**不要加 `-v`，否则会删除数据卷**。
+
+容器与直接 Node 运行默认使用不同数据位置；切换部署方式需保留原账号身份，按部署说明中的离线迁移步骤操作。仓库包含 Docker 构建与 Compose 配置；当前开发机未安装 Docker，未验证镜像构建或容器运行。
+
+## 数据与备份
+
+设置里的 **JSON 导出**用于可读的数据携带，不包含登录密码、会话和图片文件；完整迁移应使用 **ZIP 备份**，同时保存数据库和附件。恢复前先下载一次当前 ZIP，使用空间所有者账号操作。恢复会替换当前空间记录，保留当前账号与密码；成功后刷新即可，不需要重启服务。
+
+服务默认每 24 小时在 `storage/backups` 自动保存一次 ZIP，仅保留最新 7 份自动备份；恢复前的保护副本单独保留。根 `.env` 的 `AUTO_BACKUP_HOURS=24` 可调整间隔，正数范围为 1–596 小时，`0` 关闭。首次自动备份需服务连续运行一个完整间隔；请定期将备份复制到另一块磁盘。
+
+上传图片会去除元数据、限制尺寸并转为 WebP。备份保存的是服务内的图片版本；需要保留相机原片时，请另行保存。ZIP 中包含可用于离线恢复的数据库，因此也包含账号密码哈希，应作为私人文件保管。
+
+`.env` 中持久密钥也应私下备份。最稳妥的离线保全方式是先停止服务，再一起复制 `data`、`storage` 与 `.env`。SQLite 启动时可能有 `-wal`/`-shm` 文件，运行中不要只复制主 `.db`。至少做一次真实恢复检查，确认照片和记录能打开。
+
+完整的路径、HTTPS、升级、恢复和故障处理见 [部署说明](docs/DEPLOYMENT.md)。

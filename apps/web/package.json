@@ -11,21 +11,22 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "vue": "^3.5.22",
-    "vue-router": "^4.6.3",
-    "pinia": "^3.0.4",
-    "element-plus": "^2.11.8",
     "@element-plus/icons-vue": "^2.3.2",
-    "echarts": "^6.0.0"
+    "@our-little-world/shared": "*",
+    "echarts": "^6.0.0",
+    "element-plus": "^2.11.8",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.22",
+    "vue-router": "^4.6.3"
   },
   "devDependencies": {
-    "vite": "^7.2.2",
-    "@vitejs/plugin-vue": "^6.0.2",
-    "vite-plugin-pwa": "^1.1.0",
-    "typescript": "^5.9.3",
-    "vue-tsc": "^3.1.4",
+    "@tailwindcss/vite": "^4.1.17",
     "@types/node": "^24.10.0",
+    "@vitejs/plugin-vue": "^6.0.2",
     "tailwindcss": "^4.1.17",
-    "@tailwindcss/vite": "^4.1.17"
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "vite-plugin-pwa": "^1.1.0",
+    "vue-tsc": "^3.1.4"
   }
 }

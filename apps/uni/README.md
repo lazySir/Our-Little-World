@@ -1,4 +1,4 @@
-# 多端客户端
+# 微信小程序与 H5 联调
 
 Vue 3 + TypeScript + Pinia + uni-app + Wot Design Uni；Tailwind CSS 3 负责通用布局，手账主题使用可复用的 rpx 样式。`weapp-tailwindcss` 在微信构建中把工具类和 rem 转换为小程序可用样式。
 
@@ -11,12 +11,11 @@ npm run dev:h5 --workspace=@our-little-world/uni
 npm run dev:mp-weixin --workspace=@our-little-world/uni
 npm run build:h5 --workspace=@our-little-world/uni
 npm run build:mp-weixin --workspace=@our-little-world/uni
-npm run build:app --workspace=@our-little-world/uni
 npm run typecheck --workspace=@our-little-world/uni
 npm run test --workspace=@our-little-world/uni
 ```
 
-产物分别位于 `dist/build/h5`、`dist/build/mp-weixin`、`dist/build/app`。构建前会从 npm 锁定的 Wot 依赖同步组件源码到被忽略的 `src/uni_modules`，避免 monorepo 中提升依赖导致小程序组件文件生成到应用目录之外；无需手动复制或修改第三方代码。
+微信小程序产物位于 `dist/build/mp-weixin`；`dist/build/h5` 用于浏览器联调。面向日常电脑和手机浏览器使用的 Web 位于 `apps/web`。构建前会从 npm 锁定的 Wot 依赖同步组件源码到被忽略的 `src/uni_modules`，避免 monorepo 中提升依赖导致小程序组件文件生成到应用目录之外；无需手动复制或修改第三方代码。
 
 ## 第一次连接
 
@@ -26,13 +25,11 @@ npm run test --workspace=@our-little-world/uni
 
 ## 微信小程序
 
-`src/manifest.json` 的 `mp-weixin.appid` 有意留空，未绑定或冒充用户 AppID。导入构建目录前填写自己的 AppID。开发者工具在局域网开发时可以临时关闭合法域名校验；真机正式发布需要在微信后台配置 request、uploadFile、downloadFile 的 HTTPS 合法域名，并确保图片签名地址的域名一致。原生账号为应用自己的双人账号，不依赖微信登录。
+`src/manifest.json` 的 `mp-weixin.appid` 有意留空，未绑定或冒充用户 AppID。导入构建目录前填写自己的 AppID。开发者工具在局域网开发时可以临时关闭合法域名校验；真机正式发布需要在微信后台配置 request、uploadFile、downloadFile 的 HTTPS 合法域名，并确保图片签名地址的域名一致。登录使用本项目自己的双人账号，不依赖微信登录。
 
-## App
+## 图片与备份
 
-`build:app` 使用 `app-plus` 编译器输出 HBuilderX 可导入的 App 资源，和 H5、微信产物相互独立。`manifest.json` 顶层 DCloud AppID 留空，打包前在 HBuilderX 中申请/填写自己的 AppID。Android APK 和 iOS IPA 需要 HBuilderX 原生打包、应用标识与签名资料；编译出的 App 资源本身不是已签名安装包。
-
-照片使用 `uni.chooseImage`、`uni.uploadFile` 和 `uni.previewImage`。完整备份在 Web 使用浏览器下载，微信保存后可分享文件，App 使用原生文件保存。恢复在微信选择聊天文件、Web 选择文件、App 调用 Android/iOS 系统文件选择器。原生权限、系统选择器与真机签名运行需要在对应设备验证；命令行编译不等同于完成真机验收。
+照片使用 `uni.chooseImage`、`uni.uploadFile` 和 `uni.previewImage`。完整备份在 H5 使用浏览器下载，微信保存后可分享文件。恢复在微信选择聊天文件，在 H5 选择本机文件。微信中的图片选择、权限和文件操作需要通过开发者工具和手机微信验证；命令行编译与 H5 联调不能代替微信环境验收。
 
 ## 页面
 

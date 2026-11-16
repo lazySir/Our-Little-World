@@ -2,7 +2,7 @@
 
 ## 目标与依据
 
-为一对伴侣提供可部署在个人电脑、NAS 或小主机上的完整私人生活空间。参考用户提供的 158 秒视频，采用温暖的奶油色、手账卡片和粉彩插画视觉。所有主要操作必须真实持久化；不以静态演示数据代替功能。三个入口是桌面/手机 Web、微信小程序、Android/iOS App。
+为一对伴侣提供可部署在个人电脑、NAS 或小主机上的完整私人生活空间。参考用户提供的 158 秒视频，采用温暖的奶油色、手账卡片和粉彩插画视觉。所有主要操作必须真实持久化；不以静态演示数据代替功能。两个入口是支持桌面和手机响应式布局的 Web，以及微信小程序。
 
 用户已明确要求自动完成、不提问；具体设计、依赖和实施选择由开发方自主决定。每完成一个功能模块独立提交，提交格式为 emoji + conventional type + 中文描述。
 
@@ -26,20 +26,22 @@
 - Web 使用 Element Plus；uni-app 使用 Wot Design Uni；表单、确认、通知、空状态优先使用组件库。
 - 每次保存有进行中状态、成功提示和明确错误；删除需要确认；空空间提供引导。
 - 默认数据为空，通过显式 demo 命令建立独立演示空间；不提交口令、用户图片或数据库。
-- 自动备份包含 SQLite 与原图；恢复先验证格式并自动备份旧数据。
+- 完整 ZIP 备份包含 SQLite 与服务内图片；上传图片经尺寸限制和 WebP 转换，相机原片另行保存。默认每 24 小时自动备份，保留最新 7 份自动备份；恢复先验证格式并自动备份旧数据。
 - 不包含即时聊天、实时定位、公开社区、AI 或第三方付费服务。
 
 ## 架构
 
-Npm workspaces：apps/web（Vue 3/Vite/Element Plus/Pinia/Router/ECharts），apps/uni（Vue 3/uni-app/Vite/Wot Design Uni），apps/api（NestJS 原生 JavaScript/Prisma/SQLite），packages/shared（日期、金额、类别常量）。Web 可安装为 PWA；uni-app 输出微信小程序和 App 资源。Android 如环境允许生成可安装 APK；iOS 签名需要个人 Apple 账号并在交付中注明。
+Npm workspaces，业务源码统一 TypeScript：apps/web（Vue 3/Vite/Element Plus/Tailwind/Pinia/Router/ECharts），apps/uni（Vue 3/uni-app/Vite/Wot Design Uni/Tailwind + weapp-tailwindcss），apps/api（NestJS 11/TypeScript/Prisma 6/SQLite），packages/shared（日期、金额、类别常量）。部署脚本采用 TypeScript `.mts`，Windows 入口采用 PowerShell。
+
+Web 支持电脑和手机浏览器，也可在浏览器支持时添加到主屏幕。uni-app 输出微信小程序，并保留 H5 构建用于浏览器联调。两端使用相同的业务接口和持久化数据。
 
 NestJS 提供统一 /api。数据库及附件只由服务端访问；每项资源均限定当前空间。密码哈希、随机会话、限流、参数校验、上传类型/大小校验、附件签名访问、授权备份。SQLite 使用 WAL，Prisma 管理版本迁移。
 
 ## 部署与发布边界
 
-默认本地 0.0.0.0:3000，Nest 托管 Web 生产构建，同一地址覆盖电脑和手机浏览器。提供 Windows 启动脚本、Docker Compose、环境样例、备份恢复和外网 HTTPS 指引。微信发布需用户自己的 AppID/主体与域名配置；发布账号和应用签名不能凭空创建，提供可编译源代码与导入产物并如实核对。没有部署到公网上或提交到应用商店的默认授权。
+默认本地 0.0.0.0:3000，Nest 托管 Web 生产构建，同一地址覆盖电脑和手机浏览器。提供 Windows 启动脚本、Docker Compose、环境样例、备份恢复和外网 HTTPS 指引。微信发布需用户自己的 AppID、主体与域名配置，交付可编译源代码与开发者工具导入产物。公网部署与微信正式发布按用户明确授权执行。
 
 ## 验收
 
-真实数据库 API 集成测试涵盖账号、双人配对、访问控制、各模块 CRUD、未来信件隐藏、上传和备份。共享日期/金额逻辑单元测试。Web 浏览器端完成首次创建、核心模块操作、刷新持久化、移动适配。Web、微信小程序、App 各自构建；产品交付前检查 Git 提交、干净工作区和完整启动文档。
+真实数据库 API 集成测试涵盖账号、双人配对、访问控制、各模块 CRUD、未来信件隐藏、上传和备份。共享日期/金额逻辑单元测试。Web 浏览器端完成首次创建、核心模块操作、刷新持久化、手机响应式布局。Web 与微信小程序分别构建，H5 用于小程序页面联调；产品交付前检查 Git 提交、干净工作区和完整启动文档。
 

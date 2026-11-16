@@ -1,7 +1,6 @@
 node_modules
 **/dist
 **/uni_modules
-apps/mobile/android
 data
 storage
 deliverables

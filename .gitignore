@@ -16,7 +16,6 @@ reference-review/
 .worktrees/
 .DS_Store
 Thumbs.db
-*.apk
-*.aab
-*.ipa
+.cache/
+deliverables/
 
