@@ -55,6 +55,24 @@ async function visit(page: Page, url: string, title: string) {
   await expect(page.locator('.el-skeleton')).toHaveCount(0);
 }
 
+test('the Web login page keeps its working endpoint after a failed connection change', async ({
+  page,
+}) => {
+  await page.goto('/auth');
+  await expect(page.locator('.auth-card .el-skeleton')).toHaveCount(0);
+  await page.getByRole('button', { name: '连接我的私人服务' }).click();
+  await dialog(page).locator('input').fill('/api/not-a-service');
+  const failed = page.waitForResponse((response) =>
+    response.url().endsWith('/api/not-a-service/auth/status'),
+  );
+  await dialog(page).getByRole('button', { name: '保存并连接' }).click();
+  expect((await failed).ok()).toBeFalsy();
+  await expect(page.locator('.el-alert')).toBeVisible();
+  await page.reload();
+  await expect(page.locator('.auth-card .el-skeleton')).toHaveCount(0);
+  await expect(page.locator('.el-alert')).toHaveCount(0);
+});
+
 test('two people can create, share and persist their complete little world', async ({
   page,
   browser,
@@ -274,6 +292,45 @@ test('two people can create, share and persist their complete little world', asy
     '这段秘密必须留在未来',
   );
   expect(errors).toEqual([]);
+});
+
+test('Web settings preserve the current endpoint and session when the new service fails', async ({
+  page,
+  request,
+}) => {
+  await request.post('http://127.0.0.1:3001/api/auth/setup', {
+    data: {
+      username: 'web_owner',
+      password: 'little-world-e2e-123',
+      nickname: '小林',
+      spaceName: '连接回归',
+      startDate: '2024-02-29',
+    },
+  });
+  const login = await request.post('http://127.0.0.1:3001/api/auth/login', {
+    data: { username: 'web_owner', password: 'little-world-e2e-123' },
+  });
+  expect(login.ok()).toBeTruthy();
+  const { token } = await login.json();
+  await page.goto('/auth');
+  await page.evaluate((value) => localStorage.setItem('little-world-token', value), token);
+  await visit(page, '/settings', '我们的小设置');
+  await page.locator('.endpoint-row input').fill('/api/not-a-service');
+  await page.locator('.endpoint-row').getByRole('button', { name: '保存并连接' }).click();
+  await expect(page.locator('.el-message--error')).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '我们的小设置' })).toBeVisible();
+  await expect(page.locator('.endpoint-row input')).toHaveValue('/api');
+  await page.locator('.endpoint-row input').fill('http://127.0.0.1:3001/api');
+  const probe = page.waitForRequest('http://127.0.0.1:3001/api/auth/status');
+  await page.locator('.endpoint-row').getByRole('button', { name: '保存并连接' }).click();
+  expect((await probe).headers().authorization).toBeUndefined();
+  await expect(page).toHaveURL(/\/auth$/);
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('little-world-token')))
+    .toBeNull();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '好久不见，欢迎回家' })).toBeVisible();
 });
 
 test('all pages fit a small phone and the server address stays reachable', async ({

@@ -132,4 +132,6 @@ export interface Dashboard {
 export interface ApiOptions extends Omit<RequestInit, 'body'> {
   body?: object | FormData;
   binary?: boolean;
+  base?: string;
+  anonymous?: boolean;
 }

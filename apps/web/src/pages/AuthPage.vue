@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { api, getBase, setBase } from '../api';
+import { api, getBase, connectBase } from '../api';
 import { today } from '../domain';
 import { useSession } from '../stores/session';
 import HouseArt from '../components/HouseArt.vue';
@@ -16,6 +16,7 @@ const session = useSession(),
   initialized = ref(true),
   formRef = ref<any>(),
   addressOpen = ref(false),
+  connecting = ref(false),
   address = ref(getBase());
 const form = reactive({
   username: '',
@@ -84,13 +85,18 @@ async function submit() {
     loading.value = false;
   }
 }
-function saveAddress() {
+async function saveAddress() {
+  if (connecting.value) return;
+  connecting.value = true;
   try {
-    setBase(address.value);
+    await connectBase(address.value);
     addressOpen.value = false;
-    check();
+    await check();
   } catch (e) {
+    error.value = e.message;
     ElMessage.error(e.message);
+  } finally {
+    connecting.value = false;
   }
 }
 onMounted(check);
@@ -199,8 +205,9 @@ onMounted(check);
               }}<AppIcon name="arrow" :size="18" /></el-button
           ></el-form>
           <div class="auth-mode" v-if="initialized">
-            <span>{{ mode === 'join' ? '已经是家里的一员？' : '收到另一半的邀请？' }}</span
-            ><el-button
+            <span>{{
+              mode === 'join' ? '已经是家里的一员？' : '收到另一半的邀请？'
+            }}</span><el-button
               link
               type="primary"
               @click="
@@ -219,7 +226,9 @@ onMounted(check);
       ><p class="muted">同一台设备部署可使用 /api。连接家中的电脑或 NAS，请填写完整接口地址。</p>
       <el-input v-model="address" placeholder="http://192.168.1.10:3000/api" /><template #footer
         ><el-button @click="addressOpen = false">取消</el-button
-        ><el-button type="primary" @click="saveAddress">保存并连接</el-button></template
+        ><el-button type="primary" :loading="connecting" @click="saveAddress"
+          >保存并连接</el-button
+        ></template
       ></el-dialog
     >
   </div>

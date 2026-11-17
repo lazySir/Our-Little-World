@@ -3,17 +3,22 @@ export const TOKEN_KEY = 'little-world-token';
 export const BASE_KEY = 'little-world-api';
 export const getBase = () =>
   localStorage.getItem(BASE_KEY) || import.meta.env?.VITE_API_BASE || '/api';
-export function setBase(value: string) {
+function normalizeBase(value: string) {
   const base = value.trim().replace(/\/$/, '');
   if (base && !/^(https?:\/\/[^\s]+|\/[^\s]*)$/.test(base))
     throw new Error('请输入 /api 或完整的 http / https 接口地址');
+  return base;
+}
+export function setBase(value: string) {
+  const base = normalizeBase(value);
   if (base) localStorage.setItem(BASE_KEY, base);
   else localStorage.removeItem(BASE_KEY);
 }
 export async function request<T = any>(path: string, options: ApiOptions = {}): Promise<T> {
+  const { base = getBase(), anonymous = false, binary = false, ...fetchOptions } = options;
   const headers = new Headers(options.headers);
   const token = localStorage.getItem(TOKEN_KEY);
-  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (token && !anonymous) headers.set('Authorization', `Bearer ${token}`);
   let body: BodyInit | null | undefined = options.body as BodyInit;
   if (body && !(body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
@@ -22,8 +27,8 @@ export async function request<T = any>(path: string, options: ApiOptions = {}): 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);
   try {
-    const response = await fetch(`${getBase()}${path}`, {
-      ...options,
+    const response = await fetch(`${base}${path}`, {
+      ...fetchOptions,
       body,
       headers,
       signal: options.signal || controller.signal,
@@ -37,7 +42,7 @@ export async function request<T = any>(path: string, options: ApiOptions = {}): 
         window.dispatchEvent(new Event('session-expired'));
       throw new Error(details?.message || `请求失败（${response.status}）`);
     }
-    if (options.binary) return response.blob() as Promise<T>;
+    if (binary) return response.blob() as Promise<T>;
     return response.status === 204 ? null : response.json();
   } catch (error) {
     if (error.name === 'AbortError') throw new Error('连接超时，请检查网络与接口地址');
@@ -46,6 +51,17 @@ export async function request<T = any>(path: string, options: ApiOptions = {}): 
   } finally {
     clearTimeout(timer);
   }
+}
+export async function connectBase(value: string) {
+  const candidate = normalizeBase(value) || import.meta.env?.VITE_API_BASE || '/api';
+  const status = await request<{ initialized: boolean }>('/auth/status', {
+    base: candidate,
+    anonymous: true,
+  });
+  if (typeof status?.initialized !== 'boolean')
+    throw new Error('服务地址没有返回小世界数据，请检查接口地址');
+  setBase(value);
+  return status;
 }
 export const api = {
   get: <T = any>(path: string) => request<T>(path),

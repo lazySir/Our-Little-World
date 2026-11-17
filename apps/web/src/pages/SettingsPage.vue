@@ -3,7 +3,7 @@ import { reactive, ref, computed } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRouter } from 'vue-router';
 import { useSession } from '../stores/session';
-import { api, getBase, setBase, download, request } from '../api';
+import { api, getBase, connectBase, download, request } from '../api';
 import { today } from '../domain';
 const session = useSession(),
   router = useRouter();
@@ -107,12 +107,23 @@ async function savePassword() {
   );
 }
 async function saveEndpoint() {
+  if (busy.value) return;
+  busy.value = 'endpoint';
+  const previous = getBase();
   try {
-    setBase(endpoint.value);
-    ElMessage.success('接口地址已保存，正在连接');
-    await session.refresh();
+    await connectBase(endpoint.value);
+    if (previous !== getBase()) {
+      session.clear();
+      await router.replace('/auth');
+      ElMessage.success('已连接到新服务，请登录这个空间的账号');
+    } else {
+      await session.refresh();
+      ElMessage.success('已连接到小世界');
+    }
   } catch (e) {
     ElMessage.error(e.message);
+  } finally {
+    busy.value = '';
   }
 }
 async function exportData(kind: string) {
