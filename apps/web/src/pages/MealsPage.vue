@@ -57,7 +57,9 @@ const total = computed(() => cartRows.value.reduce((sum, i) => sum + i.priceCent
 const visibleOrders = computed(() =>
   showAllOrders.value ? orders.value : orders.value.slice(0, 6),
 );
+const editorBusy = computed(() => uploading.value || saving.value);
 function edit(item: MenuItem | null = null) {
+  if (editorBusy.value) return;
   editing.value = item;
   Object.assign(
     form,
@@ -79,6 +81,7 @@ function edit(item: MenuItem | null = null) {
     .catch(() => {});
 }
 async function submit() {
+  if (editorBusy.value) return;
   if (!form.name.trim()) {
     ElMessage.warning('给美味起个名字吧');
     return;
@@ -256,8 +259,10 @@ onMounted(fetchOrders);
         <p v-if="item.description" class="body-text">{{ item.description }}</p>
         <div class="meal-price" v-if="item.priceCents">¥ {{ money(item.priceCents) }}</div>
         <div class="card-footer">
-          <span class="muted">{{ item.favorite ? '我们都喜欢' : '加入今晚的选择' }}</span
-          ><el-button size="small" type="primary" @click="add(item)"
+          <span class="muted">{{ item.favorite ? '我们都喜欢' : '加入今晚的选择' }}</span><el-button
+            size="small"
+            type="primary"
+            @click="add(item)"
             ><AppIcon name="plus" :size="14" />加入购物篮</el-button
           >
         </div>
@@ -294,13 +299,19 @@ onMounted(fetchOrders);
           class="order-row"
         >
           <div>
-            <strong>{{ order.items.map((i) => `${i.name} ×${i.quantity}`).join('、') }}</strong
-            ><small>{{ order.createdAt?.slice(0, 10) }} · {{ order.note || '没有备注' }}</small>
+            <strong>{{
+              order.items.map((i) => `${i.name} ×${i.quantity}`).join('、')
+            }}</strong><small
+              >{{ order.createdAt?.slice(0, 10) }} · {{ order.note || '没有备注' }}</small
+            >
           </div>
           <span class="tag" :class="order.status === 'done' ? 'green' : ''">{{
             order.status === 'done' ? '已完成' : '等开饭'
-          }}</span
-          ><el-button v-if="order.status !== 'done'" text size="small" @click="completeOrder(order)"
+          }}</span><el-button
+            v-if="order.status !== 'done'"
+            text
+            size="small"
+            @click="completeOrder(order)"
             ><AppIcon name="check" :size="14" />完成</el-button
           ><button class="icon-button" title="修改点单备注" @click="editOrder(order)">
             <AppIcon name="edit" :size="16" /></button
@@ -309,8 +320,14 @@ onMounted(fetchOrders);
           </button>
         </div>
       </div></section></LoadState
-  ><el-dialog v-model="dialog" :title="editing ? '修改收藏' : '添加美味'" width="min(500px,94vw)"
-    ><el-form :model="form" label-position="top"
+  ><el-dialog
+    v-model="dialog"
+    :title="editing ? '修改收藏' : '添加美味'"
+    width="min(500px,94vw)"
+    :show-close="!editorBusy"
+    :close-on-click-modal="!editorBusy"
+    :close-on-press-escape="!editorBusy"
+    ><el-form :model="form" :disabled="saving" label-position="top" @submit.prevent="submit"
       ><el-form-item label="名称" required
         ><el-input
           v-model="form.name"
@@ -346,10 +363,11 @@ onMounted(fetchOrders);
           v-model="menuPhoto"
           :assets="[...assets, ...(editing?.asset ? [editing.asset] : [])]"
           :limit="1"
+          :disabled="saving"
           @busy="uploading = $event" /></el-form-item
       ><el-form-item label="加入收藏"><el-switch v-model="form.favorite" /></el-form-item>
       <div class="dialog-footer">
-        <el-button @click="dialog = false">取消</el-button
+        <el-button :disabled="editorBusy" @click="dialog = false">取消</el-button
         ><el-button type="primary" :loading="saving" :disabled="uploading" @click="submit"
           >保存</el-button
         >

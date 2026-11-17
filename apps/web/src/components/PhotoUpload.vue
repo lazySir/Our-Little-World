@@ -4,7 +4,7 @@ import { computed, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { upload, assetUrl } from '../api';
 const props = withDefaults(
-  defineProps<{ modelValue?: string[]; assets?: Asset[]; limit?: number }>(),
+  defineProps<{ modelValue?: string[]; assets?: Asset[]; limit?: number; disabled?: boolean }>(),
   { modelValue: () => [], assets: () => [], limit: 12 },
 );
 const emit = defineEmits(['update:modelValue', 'uploaded', 'busy']);
@@ -16,7 +16,9 @@ const photos = computed(() =>
     .filter(Boolean),
 );
 async function choose(event: Event) {
+  if (busy.value || props.disabled) return;
   const files = Array.from((event.target as HTMLInputElement).files || []);
+  if (!files.length) return;
   if (files.length + props.modelValue.length > props.limit) {
     ElMessage.warning(`最多选择 ${props.limit} 张照片`);
     (event.target as HTMLInputElement).value = '';
@@ -60,6 +62,7 @@ async function choose(event: Event) {
           type="button"
           class="photo-remove"
           aria-label="移除照片"
+          :disabled="busy || disabled"
           @click="
             emit(
               'update:modelValue',
@@ -76,7 +79,7 @@ async function choose(event: Event) {
           type="file"
           accept="image/jpeg,image/png,image/webp,image/gif"
           :multiple="limit > 1"
-          :disabled="busy"
+          :disabled="busy || disabled"
           @change="choose"
       /></label>
     </div>

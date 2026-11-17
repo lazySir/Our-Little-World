@@ -90,6 +90,7 @@ const dialog = ref(false);
 const editing = ref<any>(null);
 const assets = ref<Asset[]>([]);
 const uploaded = ref(false);
+const editorBusy = computed(() => uploaded.value || saving.value);
 const form = reactive<any>({
   title: '',
   description: '',
@@ -115,6 +116,7 @@ const categoryOptions = [
   { label: '其他期待', value: 'other' },
 ];
 function resetForm(item: any = null) {
+  if (editorBusy.value) return;
   editing.value = item;
   Object.assign(
     form,
@@ -147,6 +149,7 @@ function resetForm(item: any = null) {
   dialog.value = true;
 }
 async function submit() {
+  if (editorBusy.value) return;
   if (!form.title.trim()) {
     ElMessage.warning('先写一个标题吧');
     return;
@@ -333,8 +336,7 @@ async function convertToMemory(item) {
           />
         </div>
         <div v-if="kind === 'anniversaries'" class="anniversary-count">
-          <strong>{{ Math.abs(nextAnniversary(item).days) }}</strong
-          ><span>{{
+          <strong>{{ Math.abs(nextAnniversary(item).days) }}</strong><span>{{
             nextAnniversary(item).days === 0
               ? '就是今天'
               : nextAnniversary(item).days < 0
@@ -367,8 +369,11 @@ async function convertToMemory(item) {
           >
         </div>
         <div v-if="kind === 'anniversaries'" class="card-footer">
-          <span class="muted">{{ item.description || '每年都要记得这一天' }}</span
-          ><AppIcon name="heart" :size="17" class="card-heart" />
+          <span class="muted">{{ item.description || '每年都要记得这一天' }}</span><AppIcon
+            name="heart"
+            :size="17"
+            class="card-heart"
+          />
         </div>
         <div v-if="kind === 'letters'" class="card-footer">
           <span class="muted"
@@ -392,6 +397,9 @@ async function convertToMemory(item) {
     v-model="dialog"
     :title="editing ? '编辑记录' : config.action"
     width="min(580px, 94vw)"
+    :show-close="!editorBusy"
+    :close-on-click-modal="!editorBusy"
+    :close-on-press-escape="!editorBusy"
     destroy-on-close
     ><div class="dialog-tip">
       <AppIcon :name="config.icon" :size="16" />
@@ -401,7 +409,12 @@ async function convertToMemory(item) {
           : '慢慢写，不着急。这里的每一笔都会成为我们的小故事。'
       }}
     </div>
-    <el-form :model="form" label-position="top" size="default" @submit.prevent="submit"
+    <el-form
+      :model="form"
+      :disabled="saving"
+      label-position="top"
+      size="default"
+      @submit.prevent="submit"
       ><el-form-item label="标题" required
         ><el-input
           v-model="form.title"
@@ -516,10 +529,11 @@ async function convertToMemory(item) {
             v-model="form.assetIds"
             :assets="[...assets, ...(editing?.assets || [])]"
             :limit="12"
+            :disabled="saving"
             @busy="uploaded = $event" /></el-form-item
       ></template>
       <div class="flex justify-end gap-2.5 pt-4">
-        <el-button @click="dialog = false">取消</el-button
+        <el-button :disabled="editorBusy" @click="dialog = false">取消</el-button
         ><el-button type="primary" :loading="saving" :disabled="uploaded === true" @click="submit"
           >保存到小世界</el-button
         >

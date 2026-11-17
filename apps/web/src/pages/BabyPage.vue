@@ -40,6 +40,8 @@ const filtered = computed(() =>
     .filter((i) => tab.value === 'all' || i.type === tab.value)
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
+const editorBusy = computed(() => uploading.value || saving.value);
+const profileBusy = computed(() => profileUploading.value || profileSaving.value);
 const latestGrowth = computed(
   () =>
     [...items.value]
@@ -70,6 +72,7 @@ async function getAssets() {
   } catch {}
 }
 function editProfile() {
+  if (profileBusy.value) return;
   Object.assign(
     profile,
     baby.value
@@ -86,6 +89,7 @@ function editProfile() {
   getAssets();
 }
 async function saveProfile() {
+  if (profileBusy.value) return;
   if (!profile.name.trim()) {
     ElMessage.warning('给宝宝填写一个名字吧');
     return;
@@ -102,6 +106,7 @@ async function saveProfile() {
   }
 }
 function edit(item: Growth | null = null) {
+  if (editorBusy.value) return;
   editing.value = item;
   Object.assign(
     form,
@@ -123,6 +128,7 @@ function edit(item: Growth | null = null) {
   getAssets();
 }
 async function submit() {
+  if (editorBusy.value) return;
   if (!form.title.trim() || !form.date) {
     ElMessage.warning('请填写标题和日期');
     return;
@@ -262,7 +268,14 @@ onMounted(loadBaby);
     v-model="profileOpen"
     :title="baby ? '宝宝的小档案' : '欢迎，小小家人'"
     width="min(520px,94vw)"
-    ><el-form label-position="top" :model="profile"
+    :show-close="!profileBusy"
+    :close-on-click-modal="!profileBusy"
+    :close-on-press-escape="!profileBusy"
+    ><el-form
+      label-position="top"
+      :model="profile"
+      :disabled="profileSaving"
+      @submit.prevent="saveProfile"
       ><el-form-item label="宝宝的名字" required
         ><el-input v-model="profile.name" maxlength="40" placeholder="小名、大名，都很好听"
       /></el-form-item>
@@ -284,12 +297,13 @@ onMounted(loadBaby);
           v-model="avatarIds"
           :assets="assets"
           :limit="1"
+          :disabled="profileSaving"
           @busy="profileUploading = $event" /></el-form-item
       ><el-form-item label="想说的话"
         ><el-input v-model="profile.notes" type="textarea" :rows="3" maxlength="500"
       /></el-form-item>
       <div class="flex justify-end gap-2.5 pt-4">
-        <el-button @click="profileOpen = false">取消</el-button
+        <el-button :disabled="profileBusy" @click="profileOpen = false">取消</el-button
         ><el-button
           type="primary"
           :loading="profileSaving"
@@ -303,7 +317,10 @@ onMounted(loadBaby);
     v-model="dialog"
     :title="editing ? '修改成长记录' : '记录成长的这一刻'"
     width="min(580px,94vw)"
-    ><el-form label-position="top" :model="form"
+    :show-close="!editorBusy"
+    :close-on-click-modal="!editorBusy"
+    :close-on-press-escape="!editorBusy"
+    ><el-form label-position="top" :model="form" :disabled="saving" @submit.prevent="submit"
       ><el-form-item label="记录类型"
         ><el-select v-model="form.type"
           ><el-option
@@ -359,10 +376,11 @@ onMounted(loadBaby);
         ><PhotoUpload
           v-model="form.assetIds"
           :assets="[...assets, ...(editing?.assets || [])]"
+          :disabled="saving"
           @busy="uploading = $event"
       /></el-form-item>
       <div class="flex justify-end gap-2.5 pt-4">
-        <el-button @click="dialog = false">取消</el-button
+        <el-button :disabled="editorBusy" @click="dialog = false">取消</el-button
         ><el-button type="primary" :loading="saving" :disabled="uploading" @click="submit"
           >收藏这份成长</el-button
         >

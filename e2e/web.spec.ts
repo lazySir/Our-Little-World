@@ -422,3 +422,211 @@ test('older meal orders remain reachable and manageable beyond the recent six', 
   await expect(rows).toHaveCount(6);
   await expect(section.getByRole('button', { name: /查看全部点单|收起点单/ })).toHaveCount(0);
 });
+
+test('photo editors keep pending uploads attached and release controls after failures', async ({
+  page,
+  request,
+}) => {
+  const apiBase = 'http://127.0.0.1:3001/api';
+  const status = await (await request.get(`${apiBase}/auth/status`)).json();
+  const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
+    data: {
+      username: 'web_owner',
+      password: 'little-world-e2e-123',
+      nickname: '小林',
+      spaceName: '照片上传测试',
+      startDate: '2024-02-29',
+    },
+  });
+  expect(signedIn.ok(), await signedIn.text()).toBeTruthy();
+  const { token } = await signedIn.json();
+  const headers = { Authorization: `Bearer ${token}` };
+  const baby = await request.put(`${apiBase}/baby`, { headers, data: { name: '小太阳' } });
+  expect(baby.ok(), await baby.text()).toBeTruthy();
+  await page.addInitScript((value) => localStorage.setItem('little-world-token', value), token);
+
+  for (const scenario of [
+    {
+      url: '/memories',
+      title: '回忆相册',
+      open: '收藏一个瞬间',
+      label: '标题',
+      save: '保存到小世界',
+      endpoint: '/memories',
+      method: 'POST',
+      key: 'assetIds',
+    },
+    {
+      url: '/work',
+      title: '工作手记',
+      open: '写一篇手记',
+      label: '标题',
+      save: '保存到小世界',
+      endpoint: '/work',
+      method: 'POST',
+      key: 'assetIds',
+    },
+    {
+      url: '/meals',
+      title: '今天吃什么',
+      open: '添加收藏',
+      label: '名称',
+      save: '保存',
+      endpoint: '/menu',
+      method: 'POST',
+      key: 'assetId',
+    },
+    {
+      url: '/baby',
+      title: '宝宝成长',
+      open: '记下成长',
+      label: '标题',
+      save: '收藏这份成长',
+      endpoint: '/growth',
+      method: 'POST',
+      key: 'assetIds',
+    },
+    {
+      url: '/baby',
+      title: '宝宝成长',
+      open: '编辑宝宝档案',
+      label: '宝宝的名字',
+      save: '保存小档案',
+      endpoint: '/baby',
+      method: 'PUT',
+      key: 'avatarId',
+    },
+  ]) {
+    await test.step(`${scenario.endpoint} waits for its photo before saving`, async () => {
+      await visit(page, scenario.url, scenario.title);
+      await page.getByRole('button', { name: scenario.open, exact: true }).first().click();
+      await fill(dialog(page), scenario.label, `上传中的记录 ${scenario.endpoint} ${stamp}`);
+      let releaseUpload!: () => void;
+      const uploadGate = new Promise<void>((resolve) => {
+        releaseUpload = resolve;
+      });
+      let uploadStarted!: () => void;
+      const started = new Promise<void>((resolve) => {
+        uploadStarted = resolve;
+      });
+      const uploadTasks: Promise<void>[] = [];
+      const uploadRoute = (route: import('@playwright/test').Route) => {
+        const task = (async () => {
+          if (route.request().method() === 'POST') {
+            uploadStarted();
+            await uploadGate;
+          }
+          await route.continue();
+        })();
+        uploadTasks.push(task);
+        return task;
+      };
+      await page.route('**/api/assets', uploadRoute);
+      let writes = 0;
+      const trackWrites = (req: import('@playwright/test').Request) => {
+        if (req.url().endsWith(`/api${scenario.endpoint}`) && req.method() === scenario.method)
+          writes++;
+      };
+      page.on('request', trackWrites);
+      try {
+        await dialog(page)
+          .locator('input[type=file]')
+          .setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: pixel });
+        await started;
+        await expect(
+          dialog(page).getByRole('button', { name: scenario.save, exact: true }),
+        ).toBeDisabled();
+        await expect(
+          dialog(page).getByRole('button', { name: '取消', exact: true }),
+        ).toBeDisabled();
+        await expect(dialog(page).locator('.el-dialog__headerbtn')).toHaveCount(0);
+        await page.keyboard.press('Escape');
+        await expect(dialog(page)).toBeVisible();
+        await page.locator('.el-overlay:visible').click({ position: { x: 2, y: 2 }, force: true });
+        await expect(dialog(page)).toBeVisible();
+        // ResourcePage also accepts native form submission via Enter.
+        await dialog(page)
+          .locator('form')
+          .evaluate((form) =>
+            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+          );
+        expect(writes).toBe(0);
+        const uploaded = page.waitForResponse(
+          (response) =>
+            response.url().endsWith('/api/assets') && response.request().method() === 'POST',
+        );
+        releaseUpload();
+        const photoResponse = await uploaded;
+        expect(photoResponse.ok(), await photoResponse.text()).toBeTruthy();
+        const photo = await photoResponse.json();
+        await expect(dialog(page).locator('.upload-photo')).toHaveCount(1);
+        await expect(
+          dialog(page).getByRole('button', { name: scenario.save, exact: true }),
+        ).toBeEnabled();
+
+        let releaseSave!: () => void;
+        const saveGate = new Promise<void>((resolve) => {
+          releaseSave = resolve;
+        });
+        const saveRoute = async (route: import('@playwright/test').Route) => {
+          if (route.request().method() === scenario.method) await saveGate;
+          await route.continue();
+        };
+        await page.route(`**/api${scenario.endpoint}`, saveRoute);
+        try {
+          const saveRequest = page.waitForRequest(
+            (req) =>
+              req.url().endsWith(`/api${scenario.endpoint}`) && req.method() === scenario.method,
+          );
+          await dialog(page).getByRole('button', { name: scenario.save, exact: true }).click();
+          const payload = (await saveRequest).postDataJSON();
+          expect(payload[scenario.key]).toEqual(
+            scenario.key === 'assetIds' ? [photo.id] : photo.id,
+          );
+          await expect(
+            dialog(page).getByRole('button', { name: '取消', exact: true }),
+          ).toBeDisabled();
+          await expect(
+            dialog(page).getByRole('button', { name: '移除照片', exact: true }),
+          ).toBeDisabled();
+          const saved = page.waitForResponse(
+            (response) =>
+              response.url().endsWith(`/api${scenario.endpoint}`) &&
+              response.request().method() === scenario.method,
+          );
+          releaseSave();
+          const saveResponse = await saved;
+          expect(saveResponse.ok(), await saveResponse.text()).toBeTruthy();
+          await expect(dialog(page)).toHaveCount(0);
+        } finally {
+          releaseSave();
+          await page.unroute(`**/api${scenario.endpoint}`, saveRoute);
+        }
+      } finally {
+        releaseUpload();
+        await Promise.allSettled(uploadTasks);
+        page.off('request', trackWrites);
+        await page.unroute('**/api/assets', uploadRoute);
+      }
+    });
+  }
+
+  await visit(page, '/memories', '回忆相册');
+  await page.getByRole('button', { name: '收藏一个瞬间', exact: true }).first().click();
+  await page.route('**/api/assets', (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: '照片连接中断，请重试' }),
+    }),
+  );
+  await dialog(page)
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: pixel });
+  await expect(page.locator('.el-message')).toContainText('照片连接中断，请重试');
+  await expect(
+    dialog(page).getByRole('button', { name: '保存到小世界', exact: true }),
+  ).toBeEnabled();
+  await dialog(page).getByRole('button', { name: '取消', exact: true }).click();
+  await expect(dialog(page)).toHaveCount(0);
+});
