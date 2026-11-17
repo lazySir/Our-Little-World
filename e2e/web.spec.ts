@@ -569,6 +569,73 @@ test('older meal orders remain reachable and manageable beyond the recent six', 
   await expect(section.getByRole('button', { name: /查看全部点单|收起点单/ })).toHaveCount(0);
 });
 
+test('ledger saves keep the active draft locked and recover after a failed request', async ({
+  page,
+  request,
+}) => {
+  const apiBase = 'http://127.0.0.1:3001/api';
+  const status = await (await request.get(`${apiBase}/auth/status`)).json();
+  const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
+    data: {
+      username: 'web_owner',
+      password: 'little-world-e2e-123',
+      nickname: '小林',
+      spaceName: '小林与小禾的小世界',
+      startDate: '2024-02-29',
+    },
+  });
+  expect(signedIn.ok(), await signedIn.text()).toBeTruthy();
+  const { token } = await signedIn.json();
+  await page.addInitScript((value) => localStorage.setItem('little-world-token', value), token);
+  await visit(page, '/ledger', '共同账本');
+  await page.getByRole('button', { name: '记一笔', exact: true }).click();
+  const note = `保存锁回归 ${stamp}`;
+  await fill(dialog(page), '金额（元）', '23.45');
+  await fill(dialog(page), '备注', note);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  let started!: () => void;
+  const pending = new Promise<void>((resolve) => (started = resolve));
+  const tasks: Promise<void>[] = [];
+  const routeHandler = (route: import('@playwright/test').Route) => {
+    const task = (async () => {
+      if (route.request().method() === 'POST') {
+        started();
+        await gate;
+        await route.fulfill({ status: 503, json: { message: '记账服务暂时中断，请重试' } });
+      } else await route.continue();
+    })();
+    tasks.push(task);
+    return task;
+  };
+  await page.route('**/api/ledger', routeHandler);
+  try {
+    await dialog(page).getByRole('button', { name: '记进账本', exact: true }).click();
+    await pending;
+    await expect(dialog(page).getByRole('button', { name: '取消', exact: true })).toBeDisabled();
+    await expect(field(dialog(page), '金额（元）').locator('input')).toBeDisabled();
+    await expect(field(dialog(page), '备注').locator('textarea')).toBeDisabled();
+    await expect(dialog(page).locator('.el-dialog__headerbtn')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(dialog(page)).toBeVisible();
+    await page.locator('.el-overlay:visible').click({ position: { x: 2, y: 2 }, force: true });
+    await expect(dialog(page)).toBeVisible();
+    release();
+    await expect(page.locator('.el-message')).toContainText('记账服务暂时中断，请重试');
+    await expect(field(dialog(page), '金额（元）').locator('input')).toBeEnabled();
+    await expect(field(dialog(page), '备注').locator('textarea')).toHaveValue(note);
+    await expect(dialog(page).getByRole('button', { name: '取消', exact: true })).toBeEnabled();
+  } finally {
+    release();
+    await Promise.allSettled(tasks);
+    await page.unroute('**/api/ledger', routeHandler);
+  }
+  await save(page, 'ledger', '记进账本');
+  await expect(page.locator('.ledger-list')).toContainText(note);
+  await page.reload();
+  await expect(page.locator('.ledger-list')).toContainText(note);
+});
+
 test('photo editors keep pending uploads attached and release controls after failures', async ({
   page,
   request,

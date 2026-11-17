@@ -38,6 +38,7 @@ const members = computed(() =>
   [session.user?.nickname, session.partner?.nickname, '共同账户'].filter(Boolean),
 );
 function edit(item: LedgerRecord | null = null) {
+  if (saving.value) return;
   editing.value = item;
   Object.assign(
     form,
@@ -55,6 +56,7 @@ function edit(item: LedgerRecord | null = null) {
   dialog.value = true;
 }
 async function submit() {
+  if (saving.value) return;
   let cents;
   try {
     cents = parseMoney(form.amount);
@@ -179,7 +181,10 @@ async function submit() {
     v-model="dialog"
     :title="editing ? '修改这笔账' : '记一笔小账'"
     width="min(520px,94vw)"
-    ><el-form label-position="top" :model="form"
+    :close-on-click-modal="!saving"
+    :close-on-press-escape="!saving"
+    :show-close="!saving"
+    ><el-form label-position="top" :model="form" :disabled="saving" @submit.prevent="submit"
       ><el-form-item label="收支类型"
         ><el-radio-group
           v-model="form.type"
@@ -220,7 +225,7 @@ async function submit() {
           placeholder="给这笔账留一句话"
       /></el-form-item>
       <div class="flex justify-end gap-2.5 pt-4">
-        <el-button @click="dialog = false">取消</el-button
+        <el-button :disabled="saving" @click="dialog = false">取消</el-button
         ><el-button type="primary" :loading="saving" @click="submit">记进账本</el-button>
       </div></el-form
     ></el-dialog
