@@ -57,3 +57,30 @@ test('API errors preserve server validation messages and malformed success rejec
   assert.throws(() => decodeResponse(200, '<html>'), /服务地址/);
   assert.deepEqual(decodeResponse(200, { ok: true }), { ok: true });
 });
+
+for (const [status, message] of [
+  [413, '数据超出网页备份或恢复范围，请停止服务后复制 data、storage 与 .env 进行离线备份或迁移'],
+  [400, '备份文件无效或版本不匹配'],
+  [415, '文件不是可读取的图片'],
+] as const)
+  test(`upload JSON text preserves the server guidance for HTTP ${status}`, () => {
+    assert.throws(
+      () => decodeResponse(status, JSON.stringify({ message })),
+      (error: Error & { status?: number }) => {
+        assert.equal(error.message, message);
+        assert.equal(error.status, status);
+        return true;
+      },
+    );
+  });
+
+test('a non-JSON HTTP error preserves its status without reporting an invalid success response', () => {
+  assert.throws(
+    () => decodeResponse(500, '<html>Server error</html>'),
+    (error: Error & { status?: number }) => {
+      assert.equal(error.message, '请求失败（500）');
+      assert.equal(error.status, 500);
+      return true;
+    },
+  );
+});

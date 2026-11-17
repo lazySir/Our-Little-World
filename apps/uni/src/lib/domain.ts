@@ -45,17 +45,18 @@ export function buildOrderItems(
     });
 }
 export function decodeResponse(status: number, data: any) {
-  if (status < 200 || status >= 300) {
+  const successful = status >= 200 && status < 300;
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      if (successful) throw new Error('服务地址没有返回数据，请检查接口地址是否以 /api 结尾');
+    }
+  }
+  if (!successful) {
     const error: ApiError = new Error(data?.message || `请求失败（${status}）`);
     error.status = status;
     throw error;
-  }
-  if (typeof data === 'string') {
-    try {
-      return JSON.parse(data);
-    } catch {
-      throw new Error('服务地址没有返回数据，请检查接口地址是否以 /api 结尾');
-    }
   }
   return data;
 }

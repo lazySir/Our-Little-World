@@ -20,11 +20,12 @@ function loadApi(platform: 'mp-weixin' | 'h5', runtime: Record<string, any>) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   const module = { exports: {} as typeof import('../src/lib/api') };
-  new Function('require', 'module', 'exports', 'uni', output)(
+  new Function('require', 'module', 'exports', 'uni', 'fetch', output)(
     (specifier: string) => (specifier === './domain' ? domain : transport),
     module,
     module.exports,
     runtime,
+    runtime.fetch || globalThis.fetch,
   );
   return module.exports;
 }
@@ -91,4 +92,62 @@ test('an unsupported WeChat version explains how to download without starting a 
   const api = loadApi('mp-weixin', view.runtime);
   await assert.rejects(api.downloadArchive('/backup/download', 'our-world.zip'), /更新微信.*网页/);
   assert.equal(view.downloads.length, 0);
+});
+
+for (const [status, message] of [
+  [409, '有照片文件缺失，请先恢复完整备份'],
+  [413, '数据超出备份范围，请停止服务后进行离线备份'],
+] as const)
+  test(`WeChat backup download preserves HTTP ${status} server guidance without sharing its error file`, async () => {
+    const view = wechat();
+    view.file.statusCode = status;
+    let reads = 0;
+    const runtime = {
+      ...view.runtime,
+      getFileSystemManager: () => ({
+        readFile(options: any) {
+          reads++;
+          assert.equal(options.filePath, view.file.tempFilePath);
+          assert.equal(options.encoding, 'utf8');
+          options.success({ data: JSON.stringify({ message }) });
+        },
+      }),
+    };
+    const api = loadApi('mp-weixin', runtime);
+    await assert.rejects(
+      api.downloadArchive('/backup/download', 'our-world.zip'),
+      (error: Error & { status?: number }) => {
+        assert.equal(error.message, message);
+        assert.equal(error.status, status);
+        return true;
+      },
+    );
+    assert.equal(reads, 1);
+    assert.equal(view.shares.length, 0);
+  });
+
+test('WeChat backup download retains its HTTP status when the error file cannot be read', async () => {
+  const view = wechat();
+  view.file.statusCode = 500;
+  const api = loadApi('mp-weixin', {
+    ...view.runtime,
+    getFileSystemManager: () => ({
+      readFile: (options: any) => options.fail({ errMsg: 'readFile:fail' }),
+    }),
+  });
+  await assert.rejects(api.downloadArchive('/backup/download', 'our-world.zip'), /500/);
+  assert.equal(view.shares.length, 0);
+});
+
+test('H5 backup download decodes a failed temporary response instead of saving an error as a ZIP', async () => {
+  const view = wechat();
+  view.file.statusCode = 413;
+  const api = loadApi('h5', {
+    ...view.runtime,
+    fetch: async (path: string) => {
+      assert.equal(path, view.file.tempFilePath);
+      return new Response(JSON.stringify({ message: '请停止服务后进行离线备份' }));
+    },
+  });
+  await assert.rejects(api.downloadArchive('/backup/download', 'our-world.zip'), /离线备份/);
 });

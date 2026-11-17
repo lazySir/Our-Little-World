@@ -141,11 +141,30 @@ export async function downloadArchive(
       url: `${getBase()}${path}`,
       header: { Authorization: `Bearer ${getToken()}` },
       timeout: 120000,
-      success: (res) =>
-        res.statusCode === 200 ? resolve(res) : reject(new Error('下载失败，请确认权限')),
+      success: resolve,
       fail: () => reject(new Error('下载失败，请检查网络')),
     }),
   );
+  if (file.statusCode !== 200) {
+    let details: unknown;
+    try {
+      // #ifdef MP-WEIXIN
+      details = await new Promise<string | ArrayBuffer>((resolve, reject) =>
+        uni.getFileSystemManager().readFile({
+          filePath: file.tempFilePath,
+          encoding: 'utf8',
+          success: (result) => resolve(result.data),
+          fail: reject,
+        }),
+      );
+      // #endif
+      // #ifdef H5
+      details = await (await fetch(file.tempFilePath)).text();
+      // #endif
+    } catch {}
+    decodeResponse(file.statusCode, details);
+    throw new Error(`下载失败（${file.statusCode}）`);
+  }
   // #ifdef H5
   const anchor = document.createElement('a');
   anchor.href = file.tempFilePath;

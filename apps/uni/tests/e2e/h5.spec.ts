@@ -250,6 +250,25 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   expect(backup.suggestedFilename()).toMatch(/\.zip$/);
   const backupPath = await backup.path();
   expect(backupPath).toBeTruthy();
+  const invalidChooser = page.waitForEvent('filechooser');
+  await click(page, '选择 ZIP 并恢复');
+  await (
+    await invalidChooser
+  ).setFiles({
+    name: 'invalid.zip',
+    mimeType: 'application/zip',
+    buffer: Buffer.from('not a ZIP'),
+  });
+  await expect(page.getByText('恢复完整备份', { exact: true })).toBeVisible();
+  const invalidRestore = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/api/backup/restore') && response.request().method() === 'POST',
+  );
+  await page.getByText('确定', { exact: true }).last().click();
+  const invalidResponse = await invalidRestore;
+  expect(invalidResponse.ok()).toBeFalsy();
+  const invalidDetails = await invalidResponse.json();
+  await expect(page.locator('.error-box')).toHaveText(invalidDetails.message);
   const afterBackupWish = `备份后新增 ${stamp}`;
   await visit(page, 'wishes', '一起做');
   await click(page, '＋ 添加');
@@ -272,6 +291,14 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await expect(page.locator('.card-title').filter({ hasText: names.wish })).toBeVisible();
   await visit(page, 'settings', '我们的设置');
   const missingPhoto = await removeTestPhoto(backupPath!, 'uni', 'damaged');
+  const rejectedBackup = page.waitForResponse((response) =>
+    response.url().endsWith('/api/backup/download'),
+  );
+  await click(page, '下载完整 ZIP');
+  const rejectedResponse = await rejectedBackup;
+  expect(rejectedResponse.status()).toBe(409);
+  const rejectedDetails = await rejectedResponse.json();
+  await expect(page.locator('.error-box')).toHaveText(rejectedDetails.message);
   const warningChooser = page.waitForEvent('filechooser');
   await click(page, '选择 ZIP 并恢复');
   await (await warningChooser).setFiles(backupPath!);
