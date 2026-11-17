@@ -30,7 +30,6 @@ export class AssetsService {
       await this.db.asset.findMany({
         where: { spaceId: user.spaceId },
         orderBy: { createdAt: 'desc' },
-        take: 1000,
       })
     ).map((a) => this.shape(a));
   }
