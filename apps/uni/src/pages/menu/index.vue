@@ -74,6 +74,7 @@
         ></view
       ><FormField
         v-model="orderNote"
+        :disabled="orderSaving"
         label="给这一单留个备注"
         placeholder="例如：少糖，今晚一起吃" /></view
     ><view class="section-head"
@@ -175,6 +176,7 @@ const cartCount = computed(() => Object.values(cart).reduce((a, b) => a + b, 0))
     items.value.reduce((sum, item) => sum + (cart[item.id] || 0) * item.priceCents, 0),
   );
 function change(id, amount) {
+  if (orderSaving.value) return;
   cart[id] = Math.max(0, Math.min(99, (cart[id] || 0) + amount));
 }
 function openNew() {
@@ -228,6 +230,7 @@ async function loadOrders() {
   }
 }
 async function submitOrder() {
+  if (orderSaving.value) return;
   orderSaving.value = true;
   try {
     const orderItems = buildOrderItems(items.value, cart);

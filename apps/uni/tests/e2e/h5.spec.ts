@@ -154,18 +154,80 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await save(page, 'menu');
   const food = page.locator('.card').filter({ hasText: names.menu }).first();
   await food.locator('.quantity-btn').last().click();
-  const order = page.waitForResponse(
-    (response) => response.url().endsWith('/api/orders') && response.request().method() === 'POST',
-  );
-  await click(page, '提交点单');
-  expect((await order).ok()).toBeTruthy();
+  await fill(page.locator('.sticky-cart'), '给这一单留个备注', '保存期间保留的点单备注');
+  let releaseOrder!: () => void;
+  const orderGate = new Promise<void>((resolve) => (releaseOrder = resolve));
+  const orderTasks: Promise<void>[] = [];
+  const holdOrder = (route: import('@playwright/test').Route) => {
+    const task = (async () => {
+      if (route.request().method() === 'POST') await orderGate;
+      await route.continue();
+    })();
+    orderTasks.push(task);
+    return task;
+  };
+  await page.route('**/api/orders', holdOrder);
+  try {
+    const started = page.waitForRequest(
+      (req) => req.url().endsWith('/api/orders') && req.method() === 'POST',
+    );
+    await click(page, '提交点单');
+    await started;
+    await expect(
+      field(page.locator('.sticky-cart'), '给这一单留个备注').locator('input'),
+    ).toBeDisabled();
+    await food.locator('.quantity-btn').last().click();
+    await expect(page.locator('.sticky-cart .card-title')).toContainText('1 份');
+    const order = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/orders') && response.request().method() === 'POST',
+    );
+    releaseOrder();
+    expect((await order).ok()).toBeTruthy();
+  } finally {
+    releaseOrder();
+    await Promise.allSettled(orderTasks);
+    await page.unroute('**/api/orders', holdOrder);
+  }
   await expect(page.getByText('等着开饭', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('.card').filter({ hasText: '保存期间保留的点单备注' })).toContainText(
+    '× 1',
+  );
 
   await visit(page, 'ledger', '共同账本');
   await click(page, '＋ 记一笔');
   await fill(sheet(page), '金额（元）', '18.50');
   await fill(sheet(page), '备注', `两个人的晚餐 ${stamp}`);
-  await save(page, 'ledger');
+  let releaseLedger!: () => void;
+  const ledgerGate = new Promise<void>((resolve) => (releaseLedger = resolve));
+  const ledgerTasks: Promise<void>[] = [];
+  const holdLedger = (route: import('@playwright/test').Route) => {
+    const task = (async () => {
+      if (route.request().method() === 'POST') await ledgerGate;
+      await route.continue();
+    })();
+    ledgerTasks.push(task);
+    return task;
+  };
+  await page.route('**/api/ledger', holdLedger);
+  try {
+    const started = page.waitForRequest(
+      (req) => req.url().endsWith('/api/ledger') && req.method() === 'POST',
+    );
+    const saving = save(page, 'ledger');
+    await started;
+    await expect(field(sheet(page), '金额（元）').locator('input')).toBeDisabled();
+    await expect(field(sheet(page), '备注').locator('textarea')).toBeDisabled();
+    await expect(sheet(page).locator('uni-button').filter({ hasText: '先放一放' })).toHaveClass(
+      /is-disabled/,
+    );
+    releaseLedger();
+    await saving;
+  } finally {
+    releaseLedger();
+    await Promise.allSettled(ledgerTasks);
+    await page.unroute('**/api/ledger', holdLedger);
+  }
   await expect(page.locator('.card').filter({ hasText: `两个人的晚餐 ${stamp}` })).toContainText(
     '18.50',
   );

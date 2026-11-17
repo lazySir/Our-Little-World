@@ -636,6 +636,86 @@ test('ledger saves keep the active draft locked and recover after a failed reque
   await expect(page.locator('.ledger-list')).toContainText(note);
 });
 
+test('ordering locks the submitted basket and preserves it after a failed request', async ({
+  page,
+  request,
+}) => {
+  const apiBase = 'http://127.0.0.1:3001/api';
+  const status = await (await request.get(`${apiBase}/auth/status`)).json();
+  const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
+    data: {
+      username: 'web_owner',
+      password: 'little-world-e2e-123',
+      nickname: '小林',
+      spaceName: '小林与小禾的小世界',
+      startDate: '2024-02-29',
+    },
+  });
+  expect(signedIn.ok(), await signedIn.text()).toBeTruthy();
+  const { token } = await signedIn.json();
+  const name = `慢网络点单 ${stamp}`;
+  const menu = await request.post(`${apiBase}/menu`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { name, category: 'dish', priceCents: 800 },
+  });
+  expect(menu.ok(), await menu.text()).toBeTruthy();
+  await page.addInitScript((value) => localStorage.setItem('little-world-token', value), token);
+  await visit(page, '/meals', '今天吃什么');
+  const dish = page.locator('article').filter({ hasText: name });
+  await dish.getByRole('button', { name: '加入购物篮' }).click();
+  await page
+    .locator('.header-actions')
+    .getByRole('button', { name: /购物篮/ })
+    .click();
+  const note = `保留点单备注 ${stamp}`;
+  await page.getByPlaceholder('给今晚留一句备注，例如：记得加辣').fill(note);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  let started!: () => void;
+  const pending = new Promise<void>((resolve) => (started = resolve));
+  const tasks: Promise<void>[] = [];
+  const handler = (route: import('@playwright/test').Route) => {
+    const task = (async () => {
+      if (route.request().method() === 'POST') {
+        started();
+        await gate;
+        await route.fulfill({ status: 503, json: { message: '点单暂时中断，请重试' } });
+      } else await route.continue();
+    })();
+    tasks.push(task);
+    return task;
+  };
+  await page.route('**/api/orders', handler);
+  try {
+    await dialog(page).getByRole('button', { name: '一起下单', exact: true }).click();
+    await pending;
+    await expect(dialog(page).getByRole('button', { name: '再选选', exact: true })).toBeDisabled();
+    await expect(dialog(page).locator('textarea')).toBeDisabled();
+    for (const button of await dialog(page).locator('.quantity').all())
+      await expect(button).toBeDisabled();
+    await expect(dish.getByRole('button', { name: '加入购物篮' })).toBeDisabled();
+    await expect(dialog(page).locator('.el-dialog__headerbtn')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(dialog(page)).toBeVisible();
+    await page.locator('.el-overlay:visible').click({ position: { x: 2, y: 2 }, force: true });
+    await expect(dialog(page)).toBeVisible();
+    release();
+    await expect(page.locator('.el-message')).toContainText('点单暂时中断，请重试');
+    await expect(dialog(page).locator('textarea')).toBeEnabled();
+    await expect(dialog(page).locator('textarea')).toHaveValue(note);
+    await expect(dialog(page).locator('.cart-row')).toContainText(name);
+  } finally {
+    release();
+    await Promise.allSettled(tasks);
+    await page.unroute('**/api/orders', handler);
+  }
+  await save(page, 'orders', '一起下单');
+  await expect(page.locator('.orders-list')).toContainText(note);
+  await expect(
+    page.locator('.header-actions').getByRole('button', { name: /购物篮/ }),
+  ).toBeDisabled();
+});
+
 test('photo editors keep pending uploads attached and release controls after failures', async ({
   page,
   request,

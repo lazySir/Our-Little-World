@@ -106,6 +106,7 @@ async function submit() {
   }
 }
 function add(i: MenuItem) {
+  if (orderBusy.value) return;
   if ((cart[i.id] || 0) >= 99) {
     ElMessage.warning('每项最多选择 99 份');
     return;
@@ -113,6 +114,7 @@ function add(i: MenuItem) {
   cart[i.id] = (cart[i.id] || 0) + 1;
 }
 function minus(i: MenuItem) {
+  if (orderBusy.value) return;
   if (!cart[i.id]) return;
   if (cart[i.id] === 1) delete cart[i.id];
   else cart[i.id]--;
@@ -262,6 +264,7 @@ onMounted(fetchOrders);
           <span class="muted">{{ item.favorite ? '我们都喜欢' : '加入今晚的选择' }}</span><el-button
             size="small"
             type="primary"
+            :disabled="orderBusy"
             @click="add(item)"
             ><AppIcon name="plus" :size="14" />加入购物篮</el-button
           >
@@ -373,19 +376,27 @@ onMounted(fetchOrders);
         >
       </div></el-form
     ></el-dialog
-  ><el-dialog v-model="orderDialog" title="今晚吃什么" width="min(500px,94vw)"
+  ><el-dialog
+    v-model="orderDialog"
+    title="今晚吃什么"
+    width="min(500px,94vw)"
+    :close-on-click-modal="!orderBusy"
+    :close-on-press-escape="!orderBusy"
+    :show-close="!orderBusy"
     ><div class="cart-list">
       <div v-for="i in cartRows" :key="i.id" class="cart-row">
         <span>{{ i.name }}</span>
         <div>
-          <button class="quantity" @click="minus(i)">−</button><strong>{{ i.quantity }}</strong
-          ><button class="quantity" @click="add(i)">＋</button>
+          <button class="quantity" :disabled="orderBusy" @click="minus(i)">−</button
+          ><strong>{{ i.quantity }}</strong
+          ><button class="quantity" :disabled="orderBusy" @click="add(i)">＋</button>
         </div>
         <strong>¥ {{ money(i.priceCents * i.quantity) }}</strong>
       </div>
     </div>
     <el-input
       v-model="orderNote"
+      :disabled="orderBusy"
       type="textarea"
       :rows="3"
       placeholder="给今晚留一句备注，例如：记得加辣"
@@ -394,7 +405,7 @@ onMounted(fetchOrders);
       合计 <strong>¥ {{ money(total) }}</strong>
     </div>
     <template #footer
-      ><el-button @click="orderDialog = false">再选选</el-button
+      ><el-button :disabled="orderBusy" @click="orderDialog = false">再选选</el-button
       ><el-button type="primary" :loading="orderBusy" @click="submitOrder"
         >一起下单</el-button
       ></template
