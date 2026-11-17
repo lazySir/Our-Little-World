@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { request, getToken, setToken } from '../lib/api';
+import { request, getBase, getToken, setToken } from '../lib/api';
 import type { Member, Space, SessionData } from '../types';
 export const useSession = defineStore('session', {
   state: () => ({
@@ -10,12 +10,20 @@ export const useSession = defineStore('session', {
   }),
   getters: { theme: (state) => state.space?.theme || 'cream' },
   actions: {
+    clear() {
+      setToken('');
+      this.$reset();
+    },
     async load() {
+      const base = getBase(),
+        token = getToken();
       if (!getToken()) {
+        this.$reset();
         uni.reLaunch({ url: '/pages/auth/index' });
         return false;
       }
       const data = await request<SessionData>('/auth/me');
+      if (base !== getBase() || token !== getToken()) return false;
       Object.assign(this, data, { loaded: true });
       return true;
     },
@@ -31,8 +39,7 @@ export const useSession = defineStore('session', {
       try {
         await request('/auth/logout', 'POST');
       } finally {
-        setToken('');
-        this.$reset();
+        this.clear();
         uni.reLaunch({ url: '/pages/auth/index' });
       }
     },

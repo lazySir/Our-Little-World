@@ -150,7 +150,7 @@ import { useSession } from '../../stores/session';
 import {
   request,
   getBase,
-  setBase,
+  connectBase,
   notify,
   confirm,
   copy,
@@ -177,6 +177,7 @@ const themes = [
   { value: 'sage', label: '鼠尾草绿', background: '#e2ead9', color: '#6f8974' },
 ];
 async function action(key: string, work: () => Promise<void>) {
+  if (busy.value) return;
   busy.value = key;
   error.value = '';
   try {
@@ -212,13 +213,13 @@ async function invite() {
 async function saveServer() {
   await action('server', async () => {
     const previous = getBase();
-    setBase(apiBase.value);
-    try {
-      await request('/auth/status', 'GET', undefined, true);
+    await connectBase(apiBase.value);
+    if (previous !== getBase()) {
+      session.clear();
+      uni.reLaunch({ url: '/pages/auth/index' });
+      notify('已连接到新服务，请登录这个空间的账号');
+    } else {
       notify('已经连接到服务');
-    } catch (e) {
-      setBase(previous);
-      throw e;
     }
   });
 }
@@ -276,6 +277,7 @@ async function restore() {
   });
 }
 async function logout() {
+  if (busy.value) return;
   if (await confirm('退出这个设备？你们的记录仍保存在服务中。')) await session.logout();
 }
 onShow(async () => {

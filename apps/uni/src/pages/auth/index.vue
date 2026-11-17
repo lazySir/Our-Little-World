@@ -12,10 +12,7 @@
         :key="tab.value"
         class="chip"
         :class="{ active: mode === tab.value }"
-        @click="
-          mode = tab.value;
-          error = '';
-        "
+        @click="selectMode(tab.value)"
         >{{ tab.label }}</view
       >
     </view>
@@ -67,7 +64,7 @@
           :max="today()"
         /> </template
       ><view v-if="error" class="error-box">{{ error }}</view
-      ><wd-button block :loading="saving" @click="submit">{{
+      ><wd-button block :loading="saving" :disabled="connecting" @click="submit">{{
         mode === 'setup' ? '创建我们的小世界' : mode === 'join' ? '加入对方的世界' : '回家啦'
       }}</wd-button></view
     ><view class="auth-bottom" @click="showServer = !showServer"
@@ -79,7 +76,9 @@
         label="小世界服务地址"
         placeholder="http://192.168.1.10:3000/api"
         hint="手机请填写部署电脑的局域网 IP；微信正式版需要合法的 HTTPS 域名。"
-      /><wd-button block plain @click="saveBase">保存地址并检查连接</wd-button></view
+      /><wd-button block plain :loading="connecting" :disabled="saving" @click="saveBase"
+        >保存地址并检查连接</wd-button
+      ></view
     ><view class="auth-bottom"
       >记录存放在你自己的服务中<br />愿这里装下你们的每一种日常 ✧</view
     ></view
@@ -90,12 +89,13 @@ import { reactive, ref, computed } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import FormField from '../../components/FormField.vue';
 import { useSession } from '../../stores/session';
-import { getBase, setBase, getToken, request, notify } from '../../lib/api';
+import { getBase, connectBase, validateStatus, getToken, request, notify } from '../../lib/api';
 import { today } from '../../lib/domain';
 const session = useSession(),
   mode = ref('login'),
   initialized = ref(true),
   saving = ref(false),
+  connecting = ref(false),
   error = ref(''),
   showServer = ref(false),
   apiBase = ref(getBase());
@@ -112,42 +112,61 @@ const tabs = computed(() => [
   { value: 'login', label: '回到小世界' },
   { value: 'join', label: '加入另一半' },
 ]);
+function selectMode(value: string) {
+  if (connecting.value || saving.value) return;
+  mode.value = value;
+  error.value = '';
+}
+function applyStatus(result: { initialized: boolean }) {
+  initialized.value = result.initialized;
+  mode.value = result.initialized ? 'login' : 'setup';
+  error.value = '';
+}
 async function check() {
+  const base = getBase();
   try {
-    const result = await request('/auth/status', 'GET', undefined, true);
-    initialized.value = result.initialized;
-    mode.value = result.initialized ? 'login' : 'setup';
-    error.value = '';
+    const result = validateStatus(await request('/auth/status', 'GET', undefined, true, base));
+    if (base !== getBase() || connecting.value || saving.value) return false;
+    applyStatus(result);
     return true;
   } catch (e) {
+    if (base !== getBase() || connecting.value || saving.value) return false;
     error.value = e.message;
     showServer.value = true;
     return false;
   }
 }
 onLoad(async () => {
+  const base = getBase();
   if (getToken()) {
     try {
       if (await session.load()) {
+        if (connecting.value || saving.value || base !== getBase()) return;
         uni.switchTab({ url: '/pages/home/index' });
         return;
       }
     } catch {}
   }
+  if (connecting.value || saving.value || base !== getBase()) return;
   await check();
 });
 async function saveBase() {
+  if (connecting.value || saving.value) return;
+  connecting.value = true;
   const previous = getBase();
   try {
-    setBase(apiBase.value);
-    if (await check()) notify('服务地址已保存');
-    else setBase(previous);
+    const status = await connectBase(apiBase.value);
+    if (previous !== getBase()) session.clear();
+    applyStatus(status);
+    notify('服务地址已保存');
   } catch (e) {
-    setBase(previous);
     error.value = e.message;
+  } finally {
+    connecting.value = false;
   }
 }
 async function submit() {
+  if (saving.value || connecting.value) return;
   error.value = '';
   if (!form.username.trim() || !form.password) {
     error.value = '请填写账号和密码';

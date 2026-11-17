@@ -69,6 +69,43 @@ test('uni H5 keeps a working server address when a new connection check fails', 
   await expect(page.locator('.auth-bottom').filter({ hasText: '连接设置' })).toContainText(api);
 });
 
+test('uni H5 rejects an unrelated JSON service and keeps the working address during its probe', async ({
+  page,
+}) => {
+  await page.goto('/#/pages/auth/index');
+  await expect(page.locator('.title')).toContainText('欢迎来到我们的小世界');
+  const server = field(page.locator('.auth-page'), '小世界服务地址');
+  if (!(await server.isVisible()))
+    await page.locator('.auth-bottom').filter({ hasText: '连接设置' }).click();
+  const unrelated = `${api}/unrelated-json/api`;
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(`${unrelated}/auth/status`, async (route) => {
+    await gate;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+  });
+  await fill(page.locator('.auth-page'), '小世界服务地址', unrelated);
+  const requested = page.waitForRequest(`${unrelated}/auth/status`);
+  await click(page, '保存地址并检查连接');
+  await requested;
+  try {
+    expect(
+      (await page.evaluate(() => localStorage.getItem('little-world-api'))) || '',
+    ).not.toContain('unrelated-json');
+    await expect(page.locator('uni-button').filter({ hasText: '保存地址并检查连接' })).toHaveClass(
+      /is-loading/,
+    );
+  } finally {
+    release();
+  }
+  await expect(page.locator('.error-box')).toContainText('服务地址没有返回小世界数据');
+  await page.reload();
+  await expect(page.locator('.auth-bottom').filter({ hasText: '连接设置' })).toContainText(api);
+  await expect(page.locator('.error-box')).toHaveCount(0);
+});
+
 test('uni H5 connects to a chosen server and persists real daily workflows including two photos', async ({
   page,
   request,
@@ -309,5 +346,24 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await page.getByText('知道了', { exact: true }).click();
   await expect(page.locator('.title')).toHaveText('今天，也在好好生活');
   expect(await readFile(missingPhoto.target)).toEqual(missingPhoto.bytes);
+
+  await visit(page, 'settings', '我们的设置');
+  const alternate = `${api}/alternate-service/api`;
+  const sentTokens: string[] = [];
+  await page.route(`${alternate}/auth/status`, async (route) => {
+    sentTokens.push(route.request().headers().authorization || '');
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ initialized: false }),
+    });
+  });
+  await fill(page.locator('.page'), '接口地址', alternate);
+  await click(page, '检查并保存地址');
+  await expect(page.locator('.title')).toContainText('欢迎来到我们的小世界');
+  await expect(page.getByText('创建我们的小世界', { exact: true })).toBeVisible();
+  expect(sentTokens.length).toBeGreaterThan(0);
+  expect(sentTokens.every((token) => token === '')).toBeTruthy();
+  expect(await page.evaluate(() => localStorage.getItem('little-world-token'))).toBeNull();
   expect(errors).toEqual([]);
 });

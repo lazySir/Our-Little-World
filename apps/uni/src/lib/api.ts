@@ -27,23 +27,25 @@ export async function request<T = any>(
   method: ApiMethod = 'GET',
   data?: unknown,
   anonymous = false,
+  base = getBase(),
 ): Promise<T> {
+  const token = getToken();
   return new Promise((resolve, reject) =>
     uni.request(
       toUniRequest({
-        url: `${getBase()}${path}`,
+        url: `${base}${path}`,
         method,
         data: data as UniApp.RequestOptions['data'],
         timeout: 20000,
         header: {
           'Content-Type': 'application/json',
-          ...(!anonymous && getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+          ...(!anonymous && token ? { Authorization: `Bearer ${token}` } : {}),
         },
         success(response) {
           try {
             resolve(decodeResponse(response.statusCode, response.data));
           } catch (error) {
-            if (error.status === 401 && !anonymous) {
+            if (error.status === 401 && !anonymous && base === getBase() && token === getToken()) {
               setToken('');
               uni.$emit('session-expired');
               uni.reLaunch({ url: '/pages/auth/index' });
@@ -57,6 +59,17 @@ export async function request<T = any>(
       }),
     ),
   );
+}
+export function validateStatus(value: unknown): { initialized: boolean } {
+  if (typeof (value as { initialized?: unknown } | null)?.initialized !== 'boolean')
+    throw new Error('服务地址没有返回小世界数据，请检查接口地址');
+  return value as { initialized: boolean };
+}
+export async function connectBase(value: string) {
+  const candidate = normalizeBase(value);
+  const status = validateStatus(await request('/auth/status', 'GET', undefined, true, candidate));
+  setBase(candidate);
+  return status;
 }
 export async function uploadFile<T = Asset>(filePath: string, path = '/assets'): Promise<T> {
   return new Promise((resolve, reject) =>
