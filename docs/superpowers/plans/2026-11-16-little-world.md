@@ -42,7 +42,7 @@
 
 ## Workstream 5 — delivery and independent review
 
-- [x] Root scripts for init/dev/start/demo, Docker multi-stage configuration and Compose volumes, .env.example, Windows local start, runtime health; script regression checks pass. Docker is unavailable on this development host, so container build/run remains unverified.
+- [x] Root scripts for init/dev/start/demo, Docker multi-stage configuration and Compose volumes, .env.example, Windows local start, runtime health; script regression checks pass. Docker image build, isolated runtime/restart/ZIP recovery and Compose health/volumes were verified on 2026-11-17.
 - [x] Chinese README with quick start, local/LAN/HTTPS, ports, credentials created by user, responsive mobile Web, WeChat AppID/domain requirements, and backup restore.
 - [x] Independent spec review then quality/security review; fix confirmed findings with regression tests and commits. Subsequent findings are tracked in docs/VERIFICATION.md.
 - [x] Run all API/shared tests and Web/uni H5/mp-weixin builds. Browser E2E creates owner, joins partner, creates and reloads records, uploads image, checks mobile width and main flows.
@@ -57,6 +57,8 @@
 - Latest full suite: API 38, shared 12, Web 4, uni 16 and scripts 7 tests passed (77 total); root TypeScript check passed. Full browser runs passed Web 4/4 and uni H5 1/1. Independent cleanup checks passed 2/2. Shared/API/Web/mp-weixin/H5 production builds passed; the final Web-only edit was rebuilt and its affected checks repeated.
 - Confirmed and repaired WeChat PATCH transport, upload-before-save race, restore login continuity, older order access, omitted order PATCH fields, missing/damaged-photo recovery, the 1000-record history/statistics and 1000-photo truncation, and backup size-limit consistency. Web photo forms now prevent cancellation/ESC/overlay closure and Enter submission while uploading, and lock photo changes while saving; real browser regression covers all five editors.
 - Local production uses port 3003 because another application owns 3000. Health, empty first-run API, desktop/mobile production rendering, no horizontal overflow and no page errors were verified without creating a real account.
+- Additional uni archive regressions passed 20/20 with typecheck, both platform builds and H5 E2E; temporary-path sharing avoids permanent cache accumulation, cancellation is neutral and failures provide readable guidance.
+- Docker Desktop 29.8.1 real image build and isolated runtime passed: migration, UID 1000, production desktop/mobile Web, real account/record/photo writes, restart persistence, existing session/login, ZIP restore. Actual Compose named volumes and container health also passed. Disposable validation resources were removed; normal Node service/data and other containers were preserved.
 
 ## Commit discipline
 

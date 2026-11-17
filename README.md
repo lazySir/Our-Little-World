@@ -116,7 +116,7 @@ docker compose logs -f world
 
 访问 `http://localhost:3000`。容器启动时应用数据库迁移，数据库和附件分别保存在 `world-data`、`world-storage` 命名卷。`.env` 中的 `ASSET_SECRET` 由 Compose 传入容器。停机可用 `docker compose down`；**不要加 `-v`，否则会删除数据卷**。
 
-容器与直接 Node 运行默认使用不同数据位置；切换部署方式需保留原账号身份，按部署说明中的离线迁移步骤操作。仓库包含 Docker 构建与 Compose 配置；当前开发机未安装 Docker，未验证镜像构建或容器运行。
+容器与直接 Node 运行默认使用不同数据位置；切换部署方式需保留原账号身份，按部署说明中的离线迁移步骤操作。2026-11-17 已实际验证镜像构建、Compose 启动、健康检查、重启后记录与照片持久化，以及 ZIP 备份恢复，详见 `docs/VERIFICATION.md`。
 
 ## 数据与备份
 
