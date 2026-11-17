@@ -236,11 +236,11 @@ async function changePassword() {
 }
 async function download(kind: string) {
   await action(kind, async () => {
-    await downloadArchive(
+    const result = await downloadArchive(
       kind === 'export' ? '/backup/export' : '/backup/download',
       `little-world-${today()}.${kind === 'export' ? 'json' : 'zip'}`,
     );
-    notify('已生成并保存');
+    if (result) notify('备份已导出，请在接收位置确认文件');
   });
 }
 async function restore() {

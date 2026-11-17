@@ -128,7 +128,14 @@ export function navigate(url: string) {
     uni.switchTab({ url });
   else uni.navigateTo({ url });
 }
-export async function downloadArchive(path, filename) {
+export async function downloadArchive(
+  path: string,
+  filename: string,
+): Promise<UniApp.DownloadSuccessData | null> {
+  // #ifdef MP-WEIXIN
+  if (typeof uni.shareFileMessage !== 'function' || !uni.canIUse('shareFileMessage'))
+    throw new Error('请更新微信后重试，或使用网页下载备份');
+  // #endif
   const file = await new Promise<UniApp.DownloadSuccessData>((resolve, reject) =>
     uni.downloadFile({
       url: `${getBase()}${path}`,
@@ -146,20 +153,18 @@ export async function downloadArchive(path, filename) {
   anchor.click();
   // #endif
   // #ifdef MP-WEIXIN
-  await new Promise((resolve, reject) =>
-    uni.saveFile({
-      tempFilePath: file.tempFilePath,
-      success: (result) => {
-        uni.shareFileMessage({
-          filePath: result.savedFilePath,
-          fileName: filename,
-          success: resolve,
-          fail: reject,
-        });
+  const shared = await new Promise<boolean>((resolve, reject) =>
+    uni.shareFileMessage({
+      filePath: file.tempFilePath,
+      fileName: filename,
+      success: () => resolve(true),
+      fail: (error) => {
+        if (/cancel/i.test(error.errMsg || '')) resolve(false);
+        else reject(new Error('文件分享失败，请重试或使用网页下载备份'));
       },
-      fail: reject,
     }),
   );
+  if (!shared) return null;
   // #endif
   return file;
 }
