@@ -35,26 +35,29 @@
 
 - [x] Vue3/Vite/TypeScript preset; Wot Design Uni, Pinia, Tailwind and weapp-tailwindcss. Default empty AppID with documented configuration.
 - [x] Token/API persistence, setup/login/join, bottom navigation and warm styling.
-- [x] Implement matching API pages, chooseImage/uploadFile/previewImage, forms and confirmation via Wot; verify TypeScript and 7 domain tests.
+- [x] Implement matching API pages, chooseImage/uploadFile/previewImage, forms and confirmation via Wot; verify TypeScript and 16 client regression tests.
 - [x] Compile H5 and mp-weixin separately to `apps/uni/dist/build/{h5,mp-weixin}`.
-- [ ] Complete uni H5 browser integration and WeChat image-picker/permission acceptance.
+- [x] Complete uni H5 browser integration: real records, two-photo upload, pending-upload lock, anniversary/baby flows, themes, export and ZIP restore with session continuity and missing-photo recovery.
+- [ ] WeChat image-picker/permission/file-sharing acceptance on a real device; requires the actual AppID, allowed HTTPS domains and WeChat environment.
 
 ## Workstream 5 — delivery and independent review
 
 - [x] Root scripts for init/dev/start/demo, Docker multi-stage configuration and Compose volumes, .env.example, Windows local start, runtime health; script regression checks pass. Docker is unavailable on this development host, so container build/run remains unverified.
 - [x] Chinese README with quick start, local/LAN/HTTPS, ports, credentials created by user, responsive mobile Web, WeChat AppID/domain requirements, and backup restore.
-- [ ] Independent spec review then quality/security review; fix meaningful findings with regression tests and commits.
-- [ ] Run all API/shared tests and Web/uni H5/mp-weixin builds. Browser E2E creates owner, joins partner, creates and reloads records, uploads image, checks mobile width and main flows.
-- [ ] Inspect git log/status, push to supplied remote if existing auth permits, report delivery and real platform limitations accurately.
+- [x] Independent spec review then quality/security review; fix confirmed findings with regression tests and commits. Subsequent findings are tracked in docs/VERIFICATION.md.
+- [x] Run all API/shared tests and Web/uni H5/mp-weixin builds. Browser E2E creates owner, joins partner, creates and reloads records, uploads image, checks mobile width and main flows.
+- [x] Inspect git log/status and push implementation to supplied remote; local and remote develop matched at b147b15 before the final verification-document commit. Platform limitations are explicitly recorded in docs/VERIFICATION.md.
 
 ## Recorded verification — 2026-11-17
 
 - Shared domain tests: 12 passed; deployment script tests: 7 passed; scripts TypeScript and PowerShell syntax checks passed.
 - Current shared/API TypeScript production build passed. A temporary production instance served Web, `/api/health` and the empty first-run response; managed Windows tree cleanup was denied, then the known test processes were stopped directly. This does not establish Docker or device acceptance.
 - `node --experimental-strip-types scripts/verify-demo.mts` passed against disposable storage: 1 space, 2 users, 16 records; repeat initialization refused without changing any record.
-- uni client TypeScript check, 7 domain tests and H5/WeChat builds passed. Browser integration and WeChat environment acceptance remain separate pending items above.
+- uni client TypeScript check, 16 client tests and H5/WeChat builds passed. H5 browser workflow passed; actual WeChat environment acceptance remains separate.
+- Latest full suite: API 38, shared 12, Web 4, uni 16 and scripts 7 tests passed (77 total); root TypeScript check passed. Full browser runs passed Web 4/4 and uni H5 1/1. Independent cleanup checks passed 2/2. Shared/API/Web/mp-weixin/H5 production builds passed; the final Web-only edit was rebuilt and its affected checks repeated.
+- Confirmed and repaired WeChat PATCH transport, upload-before-save race, restore login continuity, older order access, omitted order PATCH fields, missing/damaged-photo recovery, the 1000-record history/statistics and 1000-photo truncation, and backup size-limit consistency. Web photo forms now prevent cancellation/ESC/overlay closure and Enter submission while uploading, and lock photo changes while saving; real browser regression covers all five editors.
+- Local production uses port 3003 because another application owns 3000. Health, empty first-run API, desktop/mobile production rendering, no horizontal overflow and no page errors were verified without creating a real account.
 
 ## Commit discipline
 
 Each worker stages only their owned files, never `git add .` in shared repo. Root serializes commits on request to avoid index locks. No video, database, uploads, tokens, node_modules or build output committed. Destructive filesystem operations limited to verified workspace temporary/generated paths.
-
