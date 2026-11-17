@@ -35,7 +35,7 @@
 
 - [x] Vue3/Vite/TypeScript preset; Wot Design Uni, Pinia, Tailwind and weapp-tailwindcss. Default empty AppID with documented configuration.
 - [x] Token/API persistence, setup/login/join, bottom navigation and warm styling.
-- [x] Implement matching API pages, chooseImage/uploadFile/previewImage, forms and confirmation via Wot; verify TypeScript and 16 client regression tests.
+- [x] Implement matching API pages, chooseImage/uploadFile/previewImage, forms and confirmation via Wot; verify TypeScript and client regression tests.
 - [x] Compile H5 and mp-weixin separately to `apps/uni/dist/build/{h5,mp-weixin}`.
 - [x] Complete uni H5 browser integration: real records, two-photo upload, pending-upload lock, anniversary/baby flows, themes, export and ZIP restore with session continuity and missing-photo recovery.
 - [ ] WeChat image-picker/permission/file-sharing acceptance on a real device; requires the actual AppID, allowed HTTPS domains and WeChat environment.
@@ -46,18 +46,18 @@
 - [x] Chinese README with quick start, local/LAN/HTTPS, ports, credentials created by user, responsive mobile Web, WeChat AppID/domain requirements, and backup restore.
 - [x] Independent spec review then quality/security review; fix confirmed findings with regression tests and commits. Subsequent findings are tracked in docs/VERIFICATION.md.
 - [x] Run all API/shared tests and Web/uni H5/mp-weixin builds. Browser E2E creates owner, joins partner, creates and reloads records, uploads image, checks mobile width and main flows.
-- [x] Inspect git log/status and push implementation to supplied remote; local and remote develop matched at b147b15 before the final verification-document commit. Platform limitations are explicitly recorded in docs/VERIFICATION.md.
+- [x] Inspect git log/status and push each completed module to supplied remote; latest business changes on local and remote develop matched at 71d7704 before the current verification-document update. Platform limitations are explicitly recorded in docs/VERIFICATION.md.
 
 ## Recorded verification — 2026-11-17
 
-- Shared domain tests: 12 passed; deployment script tests: 7 passed; scripts TypeScript and PowerShell syntax checks passed.
-- Current shared/API TypeScript production build passed. A temporary production instance served Web, `/api/health` and the empty first-run response; managed Windows tree cleanup was denied, then the known test processes were stopped directly. This does not establish Docker or device acceptance.
+- Latest complete unit suite: 142 passed (shared 12, API 43, Web 23, uni 55, deployment scripts 9); root TypeScript check passed. Script tests cover environment paths, initialization, Windows process cleanup and configurable Web test ports.
+- Shared/API/Web/mp-weixin/H5 production builds passed after the midnight correction. The final editor/order changes were rebuilt for Web and both uni targets; root TypeScript was repeated successfully.
 - `node --experimental-strip-types scripts/verify-demo.mts` passed against disposable storage: 1 space, 2 users, 16 records; repeat initialization refused without changing any record.
-- uni client TypeScript check, 16 client tests and H5/WeChat builds passed. H5 browser workflow passed; actual WeChat environment acceptance remains separate.
-- Latest full suite: API 38, shared 12, Web 4, uni 16 and scripts 7 tests passed (77 total); root TypeScript check passed. Full browser runs passed Web 4/4 and uni H5 1/1. Independent cleanup checks passed 2/2. Shared/API/Web/mp-weixin/H5 production builds passed; the final Web-only edit was rebuilt and its affected checks repeated.
+- Full browser runs passed Web 10/10 and uni H5 3/3, including real photo/ZIP recovery and delayed save requests. Independent cleanup checks passed 2/2 when run after browser tests. Web uses local port 5184 via WEB_E2E_BASE because 5174 belongs to another project.
 - Confirmed and repaired WeChat PATCH transport, upload-before-save race, restore login continuity, older order access, omitted order PATCH fields, missing/damaged-photo recovery, the 1000-record history/statistics and 1000-photo truncation, and backup size-limit consistency. Web photo forms now prevent cancellation/ESC/overlay closure and Enter submission while uploading, and lock photo changes while saving; real browser regression covers all five editors.
-- Local production uses port 3003 because another application owns 3000. Health, empty first-run API, desktop/mobile production rendering, no horizontal overflow and no page errors were verified without creating a real account.
-- Additional uni archive regressions passed 20/20 with typecheck, both platform builds and H5 E2E; temporary-path sharing avoids permanent cache accumulation, cancellation is neutral and failures provide readable guidance.
+- Later independent review repaired stale connection/status/session races, service-date inconsistencies, cached midnight mood writes, stale next-day mood inputs, duplicate ledger/order submissions and drafts lost during saves. New regressions were observed failing before each fix; the exact 10MiB photo boundary already worked and received coverage without production changes.
+- Local production was updated on port 3003 while retaining its existing space (`initialized: true`). Health, desktop/mobile login rendering, no horizontal overflow and no page errors passed; the host can also reach the LAN address 192.168.1.3:3003. No daily records were created by the validation.
+- uni archive branches verify temporary-path sharing, neutral cancellation and readable unsupported-version/transfer errors; real WeChat AppID, allowed HTTPS domains and device acceptance remain outstanding.
 - Docker Desktop 29.8.1 real image build and isolated runtime passed: migration, UID 1000, production desktop/mobile Web, real account/record/photo writes, restart persistence, existing session/login, ZIP restore. Actual Compose named volumes and container health also passed. Disposable validation resources were removed; normal Node service/data and other containers were preserved.
 
 ## Commit discipline
