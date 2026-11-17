@@ -118,9 +118,11 @@ async function check() {
     initialized.value = result.initialized;
     mode.value = result.initialized ? 'login' : 'setup';
     error.value = '';
+    return true;
   } catch (e) {
     error.value = e.message;
     showServer.value = true;
+    return false;
   }
 }
 onLoad(async () => {
@@ -135,11 +137,13 @@ onLoad(async () => {
   await check();
 });
 async function saveBase() {
+  const previous = getBase();
   try {
     setBase(apiBase.value);
-    await check();
-    notify('服务地址已保存');
+    if (await check()) notify('服务地址已保存');
+    else setBase(previous);
   } catch (e) {
+    setBase(previous);
     error.value = e.message;
   }
 }

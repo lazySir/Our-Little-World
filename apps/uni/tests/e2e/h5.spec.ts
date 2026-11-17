@@ -47,6 +47,28 @@ async function visit(page: Page, feature: string, title: string) {
   await expect(page.locator('.loading')).toHaveCount(0);
 }
 
+test('uni H5 keeps a working server address when a new connection check fails', async ({
+  page,
+}) => {
+  await page.goto('/#/pages/auth/index');
+  await expect(page.locator('.title')).toContainText('欢迎来到我们的小世界');
+  const server = field(page.locator('.auth-page'), '小世界服务地址');
+  if (!(await server.isVisible()))
+    await page.locator('.auth-bottom').filter({ hasText: '连接设置' }).click();
+  await fill(page.locator('.auth-page'), '小世界服务地址', api);
+  const working = page.waitForResponse(`${api}/auth/status`);
+  await click(page, '保存地址并检查连接');
+  expect((await working).ok()).toBeTruthy();
+  await expect(page.locator('.error-box')).toHaveCount(0);
+  await fill(page.locator('.auth-page'), '小世界服务地址', `${api}/not-a-service`);
+  await click(page, '保存地址并检查连接');
+  await expect(page.locator('.error-box')).toBeVisible();
+  await page.reload();
+  await expect(page.locator('.title')).toContainText('欢迎来到我们的小世界');
+  await expect(page.locator('.error-box')).toHaveCount(0);
+  await expect(page.locator('.auth-bottom').filter({ hasText: '连接设置' })).toContainText(api);
+});
+
 test('uni H5 connects to a chosen server and persists real daily workflows including two photos', async ({
   page,
   request,
