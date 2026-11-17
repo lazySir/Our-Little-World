@@ -121,6 +121,7 @@ export interface Growth extends BaseRecord {
   assets?: Asset[];
 }
 export interface Dashboard {
+  date: string;
   daysTogether: number;
   counts: Record<string, number>;
   monthly: { incomeCents: number; expenseCents: number; balanceCents: number };

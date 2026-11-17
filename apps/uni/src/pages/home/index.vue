@@ -136,6 +136,7 @@ const session = useSession(),
   moodSaving = ref(false),
   myMood = ref(''),
   moodNote = ref('');
+const dashboardDate = computed(() => dashboard.value?.date || today());
 const partnerMoods = computed(() =>
   (dashboard.value?.moods || []).filter((entry) => entry.authorId !== session.user?.id),
 );
@@ -195,7 +196,11 @@ async function saveMood() {
   }
   moodSaving.value = true;
   try {
-    await request('/moods', 'POST', { mood: myMood.value, note: moodNote.value, date: today() });
+    await request('/moods', 'POST', {
+      mood: myMood.value,
+      note: moodNote.value,
+      date: dashboardDate.value,
+    });
     notify('今天的心情收好啦');
     await load();
   } catch (e) {

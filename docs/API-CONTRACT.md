@@ -32,7 +32,7 @@ Every resource below supports `GET /<path>` array, `POST /<path>` object, `PATCH
 
 `GET /baby` → null or `{id,name,birthday:null|string,gender:'unknown|girl|boy',notes:'',avatarId:null|string}`. `PUT /baby` saves same writable shape. No delete endpoint needed; UI may reset through settings with confirmation later.
 
-`GET /dashboard` → `{daysTogether,counts:{wishes,memories,anniversaries,work},monthly:{incomeCents,expenseCents,balanceCents},recentMemories:[],upcomingAnniversaries:[],pendingWishes:[],moods:[]}`. Dashboard can also derive from resource endpoints if needed.
+`GET /dashboard` → `{date,daysTogether,counts:{wishes,memories,anniversaries,work},monthly:{incomeCents,expenseCents,balanceCents},recentMemories:[],upcomingAnniversaries:[],pendingWishes:[],moods:[]}`. `date` is the service's current calendar day (`YYYY-MM-DD`, configured by `TZ`, default `Asia/Shanghai`), captured once for the entire response. Days together, monthly totals, upcoming anniversaries and today's moods use this date. Home clients use it for mood submissions, date/month labels and anniversary countdowns; explicit record-date forms keep the user's selected calendar date. Dashboard can also derive from resource endpoints if needed.
 
 ## Assets
 
@@ -51,4 +51,3 @@ Every resource below supports `GET /<path>` array, `POST /<path>` object, `PATCH
 Complete ZIP download, automatic ZIP, safety archives and incoming restore use the same budgets: at most 10000 records, 10000 ZIP members (including 3 fixed files), 2 users, 10MiB per image, 250MiB expanded total and 100MiB ZIP. Over-limit current data returns 413 with offline copy guidance, before mutation or replacing existing automatic archives. Use a stopped-service copy of data/storage/.env for larger archives. A safety archive may retain missing or damaged current-image metadata in `manifest.json` (`complete:false`, `missingAssets`, `damagedAssets`) so a previous complete archive can repair current files; an incomplete safety archive is rejected as a complete restore source. Ordinary downloads refuse missing or size-inconsistent files.
 
 All client requests use environment configurable API base. Web default `/api`, Vite proxies to 3000. Uni initial default `http://127.0.0.1:3000/api` for development; settings allows LAN/HTTPS address persisted locally. Never pretend a developer AppID is a production AppID.
-

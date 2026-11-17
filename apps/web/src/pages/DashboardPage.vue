@@ -19,13 +19,16 @@ const shortcuts = [
   { to: '/ledger', name: '共同账本', detail: '柴米油盐也可爱', icon: 'wallet', tone: 'sage' },
   { to: '/memories', name: '回忆相册', detail: '把喜欢的瞬间留下', icon: 'photo', tone: 'blue' },
 ];
+const dashboardDate = computed(() => data.value?.date || today());
 const ownMood = computed(() =>
-  data.value?.moods?.find((m) => m.date === today() && m.authorId === session.user?.id),
+  data.value?.moods?.find((m) => m.date === dashboardDate.value && m.authorId === session.user?.id),
 );
-const moods = computed(() => data.value?.moods?.filter((m) => m.date === today()) || []);
+const moods = computed(
+  () => data.value?.moods?.filter((m) => m.date === dashboardDate.value) || [],
+);
 const upcoming = computed(() =>
   [...(data.value?.upcomingAnniversaries || [])]
-    .map((i) => ({ ...i, next: nextAnniversary(i) }))
+    .map((i) => ({ ...i, next: nextAnniversary(i, dashboardDate.value) }))
     .filter((i) => i.next.days >= 0)
     .sort((a, b) => a.next.days - b.next.days)
     .slice(0, 3),
@@ -48,7 +51,7 @@ async function load() {
 async function saveMood() {
   saving.value = true;
   try {
-    await api.post('/moods', { mood: mood.value, note: note.value, date: today() });
+    await api.post('/moods', { mood: mood.value, note: note.value, date: dashboardDate.value });
     ElMessage.success('今天的心情，已经传达给另一半');
     await load();
   } catch (e) {
@@ -87,7 +90,7 @@ onMounted(load);
       <section class="mood-panel panel">
         <div class="section-head">
           <h3><AppIcon name="sun" :size="18" />今天的心情</h3>
-          <span class="muted">{{ today().slice(5).replace('-', '.') }}</span>
+          <span class="muted">{{ dashboardDate.slice(5).replace('-', '.') }}</span>
         </div>
         <p class="mood-prompt">嗨，今天过得怎么样？</p>
         <div class="mood-options">
@@ -99,8 +102,7 @@ onMounted(load);
             :aria-pressed="mood === key"
             @click="mood = key"
           >
-            <span class="mood-face">{{ item.symbol }}</span
-            ><small>{{ item.label }}</small>
+            <span class="mood-face">{{ item.symbol }}</span><small>{{ item.label }}</small>
           </button>
         </div>
         <el-input v-model="note" maxlength="200" placeholder="留一句今天的小心情…" />
@@ -172,8 +174,9 @@ onMounted(load);
               ><small>{{ ann.next.date.replaceAll('-', '.') }}</small></span
             >
             <div class="countdown">
-              <strong>{{ Math.abs(ann.next.days) }}</strong
-              ><small>{{ ann.next.days < 0 ? '天前' : '天后' }}</small>
+              <strong>{{ Math.abs(ann.next.days) }}</strong><small>{{
+                ann.next.days < 0 ? '天前' : '天后'
+              }}</small>
             </div></router-link
           >
         </div>
@@ -191,7 +194,7 @@ onMounted(load);
       <div class="month-caption">
         <span class="shortcut-icon sage"><AppIcon name="wallet" :size="23" /></span>
         <div>
-          <h3>{{ Number(today().slice(5, 7)) }} 月的小账本</h3>
+          <h3>{{ Number(dashboardDate.slice(5, 7)) }} 月的小账本</h3>
           <p>一粥一饭，都是生活</p>
         </div>
       </div>

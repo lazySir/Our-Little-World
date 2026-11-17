@@ -145,13 +145,14 @@ export class ResourcesService {
     return this.save('baby', user, body, row?.id);
   }
   async dashboard(user: SpaceUser) {
+    const date = today();
     const space = await this.db.space.findUnique({ where: { id: user.spaceId } });
     const [wishes, memories, anniversaries, work, ledger, moods] = await Promise.all(
       ['wishes', 'memories', 'anniversaries', 'work', 'ledger', 'moods'].map((k) =>
         this.list(k, user),
       ),
     );
-    const month = today().slice(0, 7);
+    const month = date.slice(0, 7);
     const sum = (type) =>
       ledger
         .filter((e) => e.date.startsWith(month) && e.type === type)
@@ -160,7 +161,8 @@ export class ResourcesService {
       expenseCents = sum('expense');
     if (!space) fail(404, '空间不存在');
     return {
-      daysTogether: daysTogether(space.startDate, today()),
+      date,
+      daysTogether: daysTogether(space.startDate, date),
       counts: {
         wishes: wishes.length,
         memories: memories.length,
@@ -170,12 +172,12 @@ export class ResourcesService {
       monthly: { incomeCents, expenseCents, balanceCents: incomeCents - expenseCents },
       recentMemories: memories.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4),
       upcomingAnniversaries: anniversaries
-        .map((a) => ({ ...a, ...anniversaryInfo(a.date, today(), { recurring: a.recurring }) }))
+        .map((a) => ({ ...a, ...anniversaryInfo(a.date, date, { recurring: a.recurring }) }))
         .filter((a) => a.daysUntil >= 0)
         .sort((a, b) => a.daysUntil - b.daysUntil)
         .slice(0, 4),
       pendingWishes: wishes.filter((w) => w.status === 'todo').slice(0, 4),
-      moods: moods.filter((m) => m.date === today()),
+      moods: moods.filter((m) => m.date === date),
     };
   }
 }

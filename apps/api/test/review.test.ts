@@ -70,6 +70,64 @@ test('ordinary exports keep letters sealed across configured time zones', async 
   );
 });
 
+test('dashboard shares its configured calendar date with mood writes and monthly summaries', async (t) => {
+  // Los Angeles is still in October while a device in Shanghai is already in November.
+  t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 10, 1, 0, 30, 0) });
+  const initial = await api.get('/api/dashboard').set(owner());
+  assert.equal(initial.status, 200);
+  assert.equal(initial.body.date, '2026-10-31');
+  for (const [date, amountCents] of [
+    ['2026-10-31', 123],
+    ['2026-11-01', 999],
+  ] as const) {
+    const entry = await api
+      .post('/api/ledger')
+      .set(owner())
+      .send({ type: 'expense', amountCents, category: '餐饮', date, payer: '我' });
+    assert.equal(entry.status, 201, JSON.stringify(entry.body));
+  }
+  const anniversary = await api
+    .post('/api/anniversaries')
+    .set(owner())
+    .send({ title: '服务日的纪念日', date: initial.body.date, recurring: false });
+  assert.equal(anniversary.status, 201, JSON.stringify(anniversary.body));
+  const saved = await api
+    .post('/api/moods')
+    .set(owner())
+    .send({ mood: 'good', note: '跨时区也收好今天', date: initial.body.date });
+  assert.equal(saved.status, 201, JSON.stringify(saved.body));
+  const updated = await api
+    .post('/api/moods')
+    .set(owner())
+    .send({ mood: 'great', note: '更新同一天', date: initial.body.date });
+  assert.equal(updated.status, 201, JSON.stringify(updated.body));
+  assert.equal(updated.body.id, saved.body.id, 'the dashboard day must upsert the same mood');
+  const otherDate = await api
+    .post('/api/moods')
+    .set(owner())
+    .send({ mood: 'tired', note: '另一日的明确记录', date: '2026-11-01' });
+  assert.equal(otherDate.status, 201);
+
+  const result = await api.get('/api/dashboard').set(owner());
+  assert.equal(result.status, 200);
+  assert.equal(result.body.date, initial.body.date);
+  assert.equal(result.body.monthly.expenseCents, 123);
+  assert.equal(
+    result.body.daysTogether,
+    (Date.UTC(2026, 9, 31) - Date.UTC(2024, 1, 29)) / 86400000 + 1,
+  );
+  assert.deepEqual(
+    result.body.moods.map((row: any) => row.id),
+    [saved.body.id],
+  );
+  assert.equal(result.body.moods[0].mood, 'great');
+  const upcoming = result.body.upcomingAnniversaries.find(
+    (row: any) => row.id === anniversary.body.id,
+  );
+  assert.equal(upcoming.daysUntil, 0);
+  assert.equal(upcoming.nextDate, result.body.date);
+});
+
 test('restore repairs a damaged image even when its filename already exists', async () => {
   const image = await sharp({
     create: { width: 12, height: 12, channels: 3, background: '#e5bbaa' },

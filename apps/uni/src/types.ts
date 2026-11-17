@@ -83,6 +83,7 @@ export interface Baby {
   avatar?: Asset;
 }
 export interface Dashboard {
+  date: string;
   daysTogether: number;
   counts: Record<string, number>;
   monthly: {
