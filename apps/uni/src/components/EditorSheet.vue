@@ -28,7 +28,8 @@
   </wd-popup>
 </template>
 <script setup lang="ts">
-import { onBeforeUnmount, watch } from 'vue';
+import { computed, onBeforeUnmount, provide, watch } from 'vue';
+import { editorSavingKey } from './editor';
 const props = defineProps({
   modelValue: Boolean,
   title: String,
@@ -37,6 +38,10 @@ const props = defineProps({
   error: String,
   saveText: { type: String, default: '保存这一刻' },
 });
+provide(
+  editorSavingKey,
+  computed(() => props.saving),
+);
 let tabBarHidden = false;
 function restoreTabBar() {
   if (!tabBarHidden) return;
