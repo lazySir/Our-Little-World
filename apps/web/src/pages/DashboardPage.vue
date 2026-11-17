@@ -38,10 +38,8 @@ async function load() {
   error.value = '';
   try {
     data.value = await api.get('/dashboard');
-    if (ownMood.value) {
-      mood.value = ownMood.value.mood;
-      note.value = ownMood.value.note;
-    }
+    mood.value = ownMood.value?.mood || 'good';
+    note.value = ownMood.value?.note || '';
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -51,7 +49,7 @@ async function load() {
 async function saveMood() {
   saving.value = true;
   try {
-    await api.post('/moods', { mood: mood.value, note: note.value, date: dashboardDate.value });
+    await api.post('/moods', { mood: mood.value, note: note.value });
     ElMessage.success('今天的心情，已经传达给另一半');
     await load();
   } catch (e) {

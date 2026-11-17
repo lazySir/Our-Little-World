@@ -94,8 +94,9 @@ test('dashboard shares its configured calendar date with mood writes and monthly
   const saved = await api
     .post('/api/moods')
     .set(owner())
-    .send({ mood: 'good', note: '跨时区也收好今天', date: initial.body.date });
+    .send({ mood: 'good', note: '跨时区也收好今天' });
   assert.equal(saved.status, 201, JSON.stringify(saved.body));
+  assert.equal(saved.body.date, initial.body.date);
   const updated = await api
     .post('/api/moods')
     .set(owner())
@@ -126,6 +127,61 @@ test('dashboard shares its configured calendar date with mood writes and monthly
   );
   assert.equal(upcoming.daysUntil, 0);
   assert.equal(upcoming.nextDate, result.body.date);
+});
+
+test('moods without a date use the current service day after a cached dashboard crosses midnight', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 10, 18, 7, 59, 59) });
+  const initial = await api.get('/api/dashboard').set(owner());
+  assert.equal(initial.body.date, '2026-11-17');
+  const yesterday = await api
+    .post('/api/moods')
+    .set(owner())
+    .send({ mood: 'low', note: '保留昨天', date: initial.body.date });
+  assert.equal(yesterday.status, 201, JSON.stringify(yesterday.body));
+
+  t.mock.timers.tick(2000);
+  const saved = await api.post('/api/moods').set(owner()).send({ mood: 'good', note: '新一天' });
+  assert.equal(saved.status, 201, JSON.stringify(saved.body));
+  assert.equal(saved.body.date, '2026-11-18');
+  assert.notEqual(saved.body.id, yesterday.body.id);
+  const updated = await api
+    .post('/api/moods')
+    .set(owner())
+    .send({ mood: 'great', note: '更新今天' });
+  assert.equal(updated.status, 201, JSON.stringify(updated.body));
+  assert.equal(updated.body.id, saved.body.id);
+  const history = await api.get('/api/moods').set(owner());
+  assert.equal(history.body.find((row: any) => row.id === yesterday.body.id).note, '保留昨天');
+  const dashboard = await api.get('/api/dashboard').set(owner());
+  assert.equal(dashboard.body.date, '2026-11-18');
+  assert.equal(dashboard.body.moods[0].id, saved.body.id);
+  assert.equal(dashboard.body.moods[0].note, '更新今天');
+});
+
+test('mood default dates preserve explicit history, reject null and keep stored dates required', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 10, 20, 12) });
+  const { schemas } = await import('../src/validation');
+  assert.equal(schemas.moods.safeParse({ mood: 'good' }).success, false);
+  const invalid = await api.post('/api/moods').set(owner()).send({ mood: 'good', date: null });
+  assert.equal(invalid.status, 400);
+  const historical = await api
+    .post('/api/moods')
+    .set(owner())
+    .send({ mood: 'good', note: '历史记录', date: '2026-09-01' });
+  assert.equal(historical.status, 201, JSON.stringify(historical.body));
+  const updated = await api
+    .post('/api/moods')
+    .set(owner())
+    .send({ mood: 'great', note: '更新历史', date: '2026-09-01' });
+  assert.equal(updated.status, 201, JSON.stringify(updated.body));
+  assert.equal(updated.body.id, historical.body.id);
+  assert.equal(updated.body.date, '2026-09-01');
+  const patched = await api
+    .patch(`/api/moods/${historical.body.id}`)
+    .set(owner())
+    .send({ note: '部分更新仍保留原日' });
+  assert.equal(patched.status, 200, JSON.stringify(patched.body));
+  assert.equal(patched.body.date, '2026-09-01');
 });
 
 test('restore repairs a damaged image even when its filename already exists', async () => {

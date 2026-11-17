@@ -127,7 +127,7 @@ import { onShow, onPullDownRefresh } from '@dcloudio/uni-app';
 import EmptyState from '../../components/EmptyState.vue';
 import { useSession } from '../../stores/session';
 import { request, notify, navigate } from '../../lib/api';
-import { money, today } from '../../lib/domain';
+import { money } from '../../lib/domain';
 import type { Dashboard } from '../../types';
 const session = useSession(),
   dashboard = ref<Dashboard | null>(null),
@@ -136,7 +136,6 @@ const session = useSession(),
   moodSaving = ref(false),
   myMood = ref(''),
   moodNote = ref('');
-const dashboardDate = computed(() => dashboard.value?.date || today());
 const partnerMoods = computed(() =>
   (dashboard.value?.moods || []).filter((entry) => entry.authorId !== session.user?.id),
 );
@@ -175,10 +174,8 @@ async function load() {
     const mine = (dashboard.value.moods || []).find(
       (item) => item.authorId === session.user?.id || item.author?.id === session.user?.id,
     );
-    if (mine) {
-      myMood.value = mine.mood;
-      moodNote.value = mine.note || '';
-    }
+    myMood.value = mine?.mood || '';
+    moodNote.value = mine?.note || '';
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -199,7 +196,6 @@ async function saveMood() {
     await request('/moods', 'POST', {
       mood: myMood.value,
       note: moodNote.value,
-      date: dashboardDate.value,
     });
     notify('今天的心情收好啦');
     await load();

@@ -107,7 +107,11 @@ export class ResourcesService {
     const existing = id ? await this.get(kind, id, user) : null;
     if (existing && ['letters', 'moods'].includes(kind) && existing.authorId !== user.id)
       fail(403, '只能修改自己的记录');
-    const merged = existing ? { ...JSON.parse(existing.data), ...input } : input;
+    const merged = existing
+      ? { ...JSON.parse(existing.data), ...input }
+      : kind === 'moods' && input?.date === undefined
+        ? { ...input, date: today() }
+        : input;
     // Order status changes preserve the immutable snapshot if menu items were removed.
     let data;
     if (

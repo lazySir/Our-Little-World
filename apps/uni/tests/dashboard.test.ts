@@ -18,6 +18,7 @@ function setup(t: any, withDate = true) {
   t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 10, 1, 0, 30) });
   assert.equal(domain.today(), '2026-11-01');
   const date = withDate ? '2026-10-31' : domain.today();
+  let serviceDate = date;
   const dashboard: any = {
     ...(withDate ? { date } : {}),
     moods: [
@@ -43,7 +44,12 @@ function setup(t: any, withDate = true) {
       request: async (path: string, method?: string, body?: any) => {
         if (method === 'POST') {
           writes.push({ path, body });
-          if (body.date === date) Object.assign(dashboard.moods[0], body);
+          const savedDate = body.date === undefined ? serviceDate : body.date;
+          if (savedDate === serviceDate) {
+            const mine = dashboard.moods.find((entry: any) => entry.authorId === 'owner');
+            if (mine) Object.assign(mine, body, { date: savedDate });
+            else dashboard.moods.push({ id: 'mine', authorId: 'owner', ...body, date: savedDate });
+          }
           return {};
         }
         return structuredClone(dashboard);
@@ -61,10 +67,18 @@ function setup(t: any, withDate = true) {
     { stopPullDownRefresh() {} },
   );
   const view = module.exports.default.setup({}, { expose() {} });
-  return { view, writes };
+  return {
+    view,
+    writes,
+    nextServiceDay(date: string) {
+      serviceDate = date;
+      dashboard.date = date;
+      dashboard.moods = [];
+    },
+  };
 }
 
-test('home mood writes use the dashboard service date and remain visible after reload', async (t) => {
+test('home mood writes let the service choose its date and remain visible after reload', async (t) => {
   const s = setup(t);
   await s.view.load();
   assert.equal(s.view.moodNote.value, '服务日的心情');
@@ -72,7 +86,7 @@ test('home mood writes use the dashboard service date and remain visible after r
   s.view.myMood.value = 'great';
   s.view.moodNote.value = '跨时区更新';
   await s.view.saveMood();
-  assert.equal(s.writes[0].body.date, '2026-10-31');
+  assert.equal(Object.hasOwn(s.writes[0].body, 'date'), false);
   assert.equal(s.view.moodNote.value, '跨时区更新');
   assert.equal(s.view.myMood.value, 'great');
 });
@@ -81,6 +95,31 @@ test('home remains compatible with an older dashboard without a calendar date', 
   const s = setup(t, false);
   await s.view.load();
   await s.view.saveMood();
-  assert.equal(s.writes[0].body.date, '2026-11-01');
+  assert.equal(Object.hasOwn(s.writes[0].body, 'date'), false);
   assert.equal(s.view.myMood.value, 'good');
+});
+
+test('home saves after service midnight without sending its cached dashboard date', async (t) => {
+  const s = setup(t);
+  await s.view.load();
+  assert.equal(s.view.dashboard.value.date, '2026-10-31');
+  s.nextServiceDay('2026-11-01');
+  t.mock.timers.setTime(Date.UTC(2026, 10, 1, 8, 30));
+  s.view.myMood.value = 'great';
+  s.view.moodNote.value = '新的一天';
+  await s.view.saveMood();
+  assert.equal(Object.hasOwn(s.writes[0].body, 'date'), false);
+  assert.equal(s.view.dashboard.value.date, '2026-11-01');
+  assert.equal(s.view.moodNote.value, '新的一天');
+});
+
+test('home clears yesterday mood when the next service day has no mood record', async (t) => {
+  const s = setup(t);
+  await s.view.load();
+  assert.equal(s.view.myMood.value, 'good');
+  assert.equal(s.view.moodNote.value, '服务日的心情');
+  s.nextServiceDay('2026-11-01');
+  await s.view.load();
+  assert.equal(s.view.myMood.value, '');
+  assert.equal(s.view.moodNote.value, '');
 });
