@@ -73,6 +73,95 @@ test('the Web login page keeps its working endpoint after a failed connection ch
   await expect(page.locator('.el-alert')).toHaveCount(0);
 });
 
+test('a stale endpoint status cannot replace the newly connected login mode', async ({ page }) => {
+  let releaseOld!: () => void;
+  let sawOld!: () => void;
+  const pendingOld = new Promise<void>((resolve) => (releaseOld = resolve));
+  const oldStarted = new Promise<void>((resolve) => (sawOld = resolve));
+  await page.route('**/api/auth/status', async (route) => {
+    sawOld();
+    await pendingOld;
+    await route.fulfill({ json: { initialized: false } });
+  });
+  await page.route('**/new-api/auth/status', (route) =>
+    route.fulfill({ json: { initialized: true } }),
+  );
+  try {
+    await page.goto('/auth');
+    await oldStarted;
+    await page.getByRole('button', { name: '连接我的私人服务' }).click();
+    await dialog(page).locator('input').fill('/new-api');
+    await dialog(page).getByRole('button', { name: '保存并连接' }).click();
+    await expect(page.getByRole('heading', { name: '好久不见，欢迎回家' })).toBeVisible();
+    const oldResponse = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === '/api/auth/status',
+    );
+    releaseOld();
+    await oldResponse;
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('heading', { name: '好久不见，欢迎回家' })).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('little-world-api'))).toBe('/new-api');
+  } finally {
+    releaseOld();
+  }
+});
+
+test('a stale endpoint 401 cannot clear a session accepted by the new service', async ({
+  page,
+  request,
+}) => {
+  await request.post('http://127.0.0.1:3001/api/auth/setup', {
+    data: {
+      username: 'web_owner',
+      password: 'little-world-e2e-123',
+      nickname: '小林',
+      spaceName: '小林与小禾的小世界',
+      startDate: '2024-02-29',
+    },
+  });
+  const login = await request.post('http://127.0.0.1:3001/api/auth/login', {
+    data: { username: 'web_owner', password: 'little-world-e2e-123' },
+  });
+  expect(login.ok()).toBeTruthy();
+  const { token } = await login.json();
+  await page.goto('/auth');
+  await page.evaluate((value) => localStorage.setItem('little-world-token', value), token);
+  await visit(page, '/settings', '我们的小设置');
+  let releaseOld!: () => void;
+  let sawOld!: () => void;
+  const pendingOld = new Promise<void>((resolve) => (releaseOld = resolve));
+  const oldStarted = new Promise<void>((resolve) => (sawOld = resolve));
+  await page.route('**/api/stale-resource', async (route) => {
+    sawOld();
+    await pendingOld;
+    await route.fulfill({ status: 401, json: { message: '旧服务登录已过期' } });
+  });
+  try {
+    await page.evaluate(async () => {
+      const modulePath = '/src/api.ts';
+      const api = await import(/* @vite-ignore */ modulePath);
+      (window as any).oldEndpointRequest = api.request('/stale-resource').catch(() => undefined);
+    });
+    await oldStarted;
+    await page.locator('.endpoint-row input').fill('http://127.0.0.1:3001/api');
+    await page.locator('.endpoint-row').getByRole('button', { name: '保存并连接' }).click();
+    await expect(page).toHaveURL(/\/auth$/);
+    await fill(page.locator('.auth-card'), '账号', 'web_owner');
+    await fill(page.locator('.auth-card'), '密码', 'little-world-e2e-123');
+    await page.getByRole('button', { name: '回到小世界', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '平凡日子，也闪闪发光' })).toBeVisible();
+    const newToken = await page.evaluate(() => localStorage.getItem('little-world-token'));
+    expect(newToken).toBeTruthy();
+    expect(newToken).not.toBe(token);
+    releaseOld();
+    await page.evaluate(() => (window as any).oldEndpointRequest);
+    await expect(page.getByRole('heading', { name: '平凡日子，也闪闪发光' })).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('little-world-token'))).toBe(newToken);
+  } finally {
+    releaseOld();
+  }
+});
+
 test('two people can create, share and persist their complete little world', async ({
   page,
   browser,

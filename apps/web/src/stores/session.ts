@@ -1,7 +1,15 @@
 import type { User, Space, Session } from '../types';
 import { defineStore } from 'pinia';
-import { api, TOKEN_KEY } from '../api';
+import { api, getBase, TOKEN_KEY } from '../api';
 let hydration: Promise<void> | undefined;
+let generation = 0;
+function currentSession() {
+  const base = getBase(),
+    token = localStorage.getItem(TOKEN_KEY),
+    started = generation;
+  return () =>
+    started === generation && base === getBase() && token === localStorage.getItem(TOKEN_KEY);
+}
 export const useSession = defineStore('session', {
   state: () => ({
     user: null as User | null,
@@ -13,19 +21,33 @@ export const useSession = defineStore('session', {
   actions: {
     async hydrate() {
       if (this.ready) return;
-      if (!hydration)
+      if (!hydration) {
+        const current = currentSession();
         hydration = (async () => {
           try {
-            if (localStorage.getItem(TOKEN_KEY)) Object.assign(this, await api.get('/auth/me'));
+            if (localStorage.getItem(TOKEN_KEY)) {
+              const data = await api.get('/auth/me');
+              if (current()) Object.assign(this, data);
+            }
           } catch {
-            localStorage.removeItem(TOKEN_KEY);
+            if (current()) {
+              localStorage.removeItem(TOKEN_KEY);
+              this.ready = true;
+            }
           } finally {
-            this.ready = true;
+            if (current()) this.ready = true;
           }
         })();
-      await hydration;
+      }
+      const pending = hydration;
+      try {
+        await pending;
+      } finally {
+        if (hydration === pending) hydration = undefined;
+      }
     },
     accept(result: Session) {
+      generation++;
       localStorage.setItem(TOKEN_KEY, result.token);
       this.user = result.user;
       this.space = result.space;
@@ -33,9 +55,14 @@ export const useSession = defineStore('session', {
       hydration = null;
     },
     async refresh() {
-      Object.assign(this, await api.get('/auth/me'));
+      const current = currentSession();
+      const data = await api.get('/auth/me');
+      if (!current()) return false;
+      Object.assign(this, data);
+      return true;
     },
     clear() {
+      generation++;
       localStorage.removeItem(TOKEN_KEY);
       this.$reset();
       this.ready = true;

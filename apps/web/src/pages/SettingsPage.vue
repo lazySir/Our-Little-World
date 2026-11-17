@@ -30,6 +30,7 @@ const inviteLink = computed(() => {
   return u.href;
 });
 async function perform(key: string, task: () => Promise<unknown>, message: string) {
+  if (busy.value) return;
   busy.value = key;
   try {
     await task();

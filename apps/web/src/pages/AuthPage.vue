@@ -40,20 +40,28 @@ const rules = {
   startDate: [{ required: true, message: '请选择在一起的日子', trigger: 'change' }],
   code: [{ required: true, message: '请输入另一半分享的邀请码', trigger: 'blur' }],
 };
+let checkSequence = 0;
+function applyStatus(status: { initialized: boolean }) {
+  initialized.value = status.initialized;
+  mode.value = form.code ? 'join' : initialized.value ? 'login' : 'setup';
+}
 async function check() {
+  const sequence = ++checkSequence;
   checking.value = true;
   error.value = '';
   try {
-    initialized.value = (await api.get('/auth/status')).initialized;
-    mode.value = form.code ? 'join' : initialized.value ? 'login' : 'setup';
+    const status = await api.get('/auth/status');
+    if (sequence === checkSequence) applyStatus(status);
   } catch (e) {
-    error.value = e.message;
+    if (sequence === checkSequence) error.value = e.message;
   } finally {
-    checking.value = false;
+    if (sequence === checkSequence) checking.value = false;
   }
 }
 async function submit() {
+  if (connecting.value || loading.value || checking.value) return;
   if (!(await formRef.value.validate().catch(() => false))) return;
+  if (connecting.value || loading.value || checking.value) return;
   loading.value = true;
   error.value = '';
   try {
@@ -86,12 +94,15 @@ async function submit() {
   }
 }
 async function saveAddress() {
-  if (connecting.value) return;
+  if (connecting.value || loading.value) return;
   connecting.value = true;
   try {
-    await connectBase(address.value);
+    const status = await connectBase(address.value);
+    ++checkSequence;
+    applyStatus(status);
+    checking.value = false;
+    error.value = '';
     addressOpen.value = false;
-    await check();
   } catch (e) {
     error.value = e.message;
     ElMessage.error(e.message);
