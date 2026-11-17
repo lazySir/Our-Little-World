@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { webTestEndpoint } from './web-endpoint.mts';
 
 const root = path.resolve(import.meta.dirname, '..');
 const require = createRequire(import.meta.url);
@@ -52,7 +53,7 @@ async function stopChild(child: ChildProcess) {
 /** Playwright owns this returned teardown, so Windows cannot skip it by killing webServer. */
 export async function startTestServer(kind: 'web' | 'uni') {
   const apiPort = kind === 'web' ? 3001 : 3002;
-  const pagePort = kind === 'web' ? 5174 : 5175;
+  const pagePort = kind === 'web' ? webTestEndpoint().port : 5175;
   await assertPortFree(apiPort);
   await assertPortFree(pagePort);
   const directory = await mkdtemp(path.join(tmpdir(), `little-world-${kind}-`));

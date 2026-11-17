@@ -6,6 +6,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { webTestEndpoint } from '../web-endpoint.mts';
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(import.meta.dirname, '../..');
@@ -68,6 +69,6 @@ test('isolated test service is ready', async () => {
     const leftovers = (await readdir(temporary)).filter((name) => name.startsWith(`little-world-${kind}-`));
     assert.deepEqual(leftovers, [], 'test database/upload directory remained after Playwright exited');
     await assertPortReleased(port);
-    await assertPortReleased(kind === 'web' ? 5174 : 5175);
+    await assertPortReleased(kind === 'web' ? webTestEndpoint().port : 5175);
   });
 }
