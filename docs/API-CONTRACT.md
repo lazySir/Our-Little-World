@@ -17,7 +17,7 @@ Prefix `/api`. JSON responses are direct objects/arrays, no wrapper. Failures: `
 
 ## Resources
 
-Every resource below supports `GET /<path>` array, `POST /<path>` object, `PATCH /<path>/:id` object, `DELETE /<path>/:id` `{ok:true}`. IDs/spaceId/authorId/createdAt/updatedAt assigned server-side. GET list may return up to 1000 records; frontend filters/searches locally. Resource objects contain the fields listed below plus id/createdAt/updatedAt and authorId if relevant. PATCH validates merged data; clients may send full writable object.
+Every resource below supports `GET /<path>` array, `POST /<path>` object, `PATCH /<path>/:id` object, `DELETE /<path>/:id` `{ok:true}`. IDs/spaceId/authorId/createdAt/updatedAt assigned server-side. GET returns the complete history for the authenticated space in descending creation order; frontend filters/searches locally. Resource objects contain the fields listed below plus id/createdAt/updatedAt and authorId if relevant. PATCH validates merged data and preserves omitted fields; clients may send full writable objects. For WeChat, the same PATCH routes accept POST with the exact `X-HTTP-Method-Override: PATCH` header and identical authentication.
 
 - `wishes`: `{title,description:'',category:'travel|food|life|other',status:'todo|done',targetDate:null|string,completedAt:null|string}`.
 - `menu`: `{name,category:'dish|drink|restaurant',description:'',priceCents:0,assetId:null|string,favorite:false}`.
@@ -46,7 +46,9 @@ Every resource below supports `GET /<path>` array, `POST /<path>` object, `PATCH
 
 - `GET /backup/export` authenticated → JSON full data export; exclude passwords/sessions/invite tokens; include record metadata/assets metadata. UI downloads JSON.
 - `GET /backup/download` authenticated owner → zip with consistent database and files.
-- `POST /backup/restore` owner multipart field `file` zip → `{ok:true,restartRequired:false}`; validate manifest/version/path containment, save pre-restore backup, restore records atomically or stop API for swap; explicitly document actual semantics. A restore must not remove the only owner's ability to log in.
+- `POST /backup/restore` owner multipart field `file` zip → `{ok:true,restartRequired:false,safetyBackup,safetyMissingAssets,safetyDamagedAssets}`; validate manifest/version/path containment, save pre-restore backup, then restore records transactionally with file rollback on failure. Current accounts, passwords and sessions remain; invites are removed. A restore must not remove the owner's ability to log in.
+
+Complete ZIP download, automatic ZIP, safety archives and incoming restore use the same budgets: at most 10000 records, 10000 ZIP members (including 3 fixed files), 2 users, 10MiB per image, 250MiB expanded total and 100MiB ZIP. Over-limit current data returns 413 with offline copy guidance, before mutation or replacing existing automatic archives. Use a stopped-service copy of data/storage/.env for larger archives. A safety archive may retain missing or damaged current-image metadata in `manifest.json` (`complete:false`, `missingAssets`, `damagedAssets`) so a previous complete archive can repair current files; an incomplete safety archive is rejected as a complete restore source. Ordinary downloads refuse missing or size-inconsistent files.
 
 All client requests use environment configurable API base. Web default `/api`, Vite proxies to 3000. Uni initial default `http://127.0.0.1:3000/api` for development; settings allows LAN/HTTPS address persisted locally. Never pretend a developer AppID is a production AppID.
 

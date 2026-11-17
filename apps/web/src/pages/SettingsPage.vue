@@ -144,14 +144,18 @@ async function restore(event: Event) {
     async () => {
       const form = new FormData();
       form.append('file', file);
-      const result = await request<{ safetyMissingAssets?: number }>('/backup/restore', {
-        method: 'POST',
-        body: form,
-      });
+      const result = await request<{ safetyMissingAssets?: number; safetyDamagedAssets?: number }>(
+        '/backup/restore',
+        {
+          method: 'POST',
+          body: form,
+        },
+      );
       await session.refresh();
-      if (result.safetyMissingAssets) {
+      const affectedPhotos = (result.safetyMissingAssets || 0) + (result.safetyDamagedAssets || 0);
+      if (affectedPhotos) {
         ElMessage.warning({
-          message: `恢复前已有 ${result.safetyMissingAssets} 张照片文件缺失，保护副本已标记这些缺失；本次已按所选备份恢复。`,
+          message: `恢复前已有 ${affectedPhotos} 张照片文件缺失或大小异常，保护副本已标记这些问题；本次已按所选备份恢复。`,
           duration: 0,
           showClose: true,
         });

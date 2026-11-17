@@ -144,7 +144,7 @@ test('valid backup repairs a missing photo while the safety copy records the gap
     .set(auth())
     .attach('file', safety.toBuffer(), { filename: 'incomplete-safety.zip' });
   assert.equal(incompleteRestore.status, 400);
-  assert.match(incompleteRestore.body.message, /保护副本缺少附件/);
+  assert.match(incompleteRestore.body.message, /保护副本的附件不完整/);
   assert.equal((await api.get(lostPhoto.url)).status, 200);
   assert.ok(
     !(await api.get('/api/work').set(auth())).body.some((row: any) => row.id === newer.body.id),

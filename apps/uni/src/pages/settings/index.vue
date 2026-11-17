@@ -254,13 +254,17 @@ async function restore() {
       ))
     )
       return;
-    const result = await uploadFile<{ safetyMissingAssets?: number }>(path, '/backup/restore');
+    const result = await uploadFile<{ safetyMissingAssets?: number; safetyDamagedAssets?: number }>(
+      path,
+      '/backup/restore',
+    );
     await session.load();
-    if (result.safetyMissingAssets) {
+    const affectedPhotos = (result.safetyMissingAssets || 0) + (result.safetyDamagedAssets || 0);
+    if (affectedPhotos) {
       await new Promise<void>((resolve) =>
         uni.showModal({
           title: '记录已经恢复',
-          content: `恢复前已有 ${result.safetyMissingAssets} 张照片文件缺失，保护副本已标记这些缺失；本次已按所选备份恢复。`,
+          content: `恢复前已有 ${affectedPhotos} 张照片文件缺失或大小异常，保护副本已标记这些问题；本次已按所选备份恢复。`,
           showCancel: false,
           confirmText: '知道了',
           confirmColor: '#b8776e',

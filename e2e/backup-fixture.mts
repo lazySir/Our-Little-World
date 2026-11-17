@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
-import { readFile, unlink } from 'node:fs/promises';
+import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
 
 /** Damage only the isolated service started by this Playwright run. */
-export async function removeTestPhoto(archivePath: string, kind: 'web' | 'uni') {
+export async function removeTestPhoto(
+  archivePath: string,
+  kind: 'web' | 'uni',
+  mode: 'missing' | 'damaged' = 'missing',
+) {
   const storage = process.env.E2E_STORAGE_DIR;
   assert.ok(storage, 'An isolated Playwright storage directory is required');
   const temporary = path.dirname(path.resolve(storage));
@@ -18,6 +22,7 @@ export async function removeTestPhoto(archivePath: string, kind: 'web' | 'uni') 
   const filename = assets[0].filename as string;
   assert.match(filename, /^[a-zA-Z0-9-]+\.webp$/);
   const target = path.join(storage, 'uploads', filename);
-  await unlink(target);
+  if (mode === 'missing') await unlink(target);
+  else await writeFile(target, Buffer.from('damaged test image'));
   return { target, bytes: zip.readFile(`uploads/${filename}`)! };
 }

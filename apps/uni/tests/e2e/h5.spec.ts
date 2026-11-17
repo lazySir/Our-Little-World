@@ -249,7 +249,7 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await expect(page.locator('.card-title').filter({ hasText: afterBackupWish })).toHaveCount(0);
   await expect(page.locator('.card-title').filter({ hasText: names.wish })).toBeVisible();
   await visit(page, 'settings', '我们的设置');
-  const missingPhoto = await removeTestPhoto(backupPath!, 'uni');
+  const missingPhoto = await removeTestPhoto(backupPath!, 'uni', 'damaged');
   const warningChooser = page.waitForEvent('filechooser');
   await click(page, '选择 ZIP 并恢复');
   await (await warningChooser).setFiles(backupPath!);

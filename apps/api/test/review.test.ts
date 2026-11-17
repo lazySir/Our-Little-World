@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -25,26 +25,22 @@ before(async () => {
   app = await createApp({ logger: false });
   await app.init();
   api = request(app.getHttpServer());
-  const setup = await api
-    .post('/api/auth/setup')
-    .send({
-      username: 'review_owner',
-      password: 'review-password-123',
-      nickname: '小林',
-      spaceName: '审查空间',
-      startDate: '2024-02-29',
-    });
+  const setup = await api.post('/api/auth/setup').send({
+    username: 'review_owner',
+    password: 'review-password-123',
+    nickname: '小林',
+    spaceName: '审查空间',
+    startDate: '2024-02-29',
+  });
   assert.equal(setup.status, 201, JSON.stringify(setup.body));
   ownerToken = setup.body.token;
   const invite = await api.post('/api/auth/invite').set(owner());
-  const partner = await api
-    .post('/api/auth/join')
-    .send({
-      code: invite.body.code,
-      username: 'review_partner',
-      password: 'review-partner-123',
-      nickname: '小禾',
-    });
+  const partner = await api.post('/api/auth/join').send({
+    code: invite.body.code,
+    username: 'review_partner',
+    password: 'review-partner-123',
+    nickname: '小禾',
+  });
   assert.equal(partner.status, 201);
   partnerToken = partner.body.token;
 });
@@ -55,14 +51,11 @@ after(async () => {
 
 test('ordinary exports keep letters sealed across configured time zones', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 10, 16, 20, 0, 0) });
-  const letter = await api
-    .post('/api/letters')
-    .set(owner())
-    .send({
-      title: '明天再打开',
-      content: '时区不同也不能提前打开的秘密',
-      unlockDate: '2026-11-17',
-    });
+  const letter = await api.post('/api/letters').set(owner()).send({
+    title: '明天再打开',
+    content: '时区不同也不能提前打开的秘密',
+    unlockDate: '2026-11-17',
+  });
   assert.equal(letter.status, 201, JSON.stringify(letter.body));
   assert.equal(letter.body.isLocked, true);
   const listed = await api.get('/api/letters').set({ Authorization: `Bearer ${partnerToken}` });
@@ -107,11 +100,31 @@ test('restore repairs a damaged image even when its filename already exists', as
     path.join(directory, 'storage', 'uploads', stored.filename),
     Buffer.from('damaged existing file'),
   );
+  const ordinary = await api.get('/api/backup/download').set(owner());
+  assert.equal(ordinary.status, 409, 'A complete download must refuse inconsistent photo bytes');
   const restore = await api
     .post('/api/backup/restore')
     .set(owner())
     .attach('file', backup.body, { filename: 'review-backup.zip' });
   assert.equal(restore.status, 201, JSON.stringify(restore.body));
+  assert.equal(restore.body.safetyDamagedAssets, 1);
+  const safety = new AdmZip(
+    await readFile(path.join(directory, 'storage', 'backups', restore.body.safetyBackup)),
+  );
+  const manifest = JSON.parse(safety.readAsText('manifest.json'));
+  assert.equal(manifest.complete, false);
+  assert.deepEqual(manifest.damagedAssets, [
+    {
+      id: stored.id,
+      filename: stored.filename,
+      expectedSize: stored.size,
+      actualSize: Buffer.byteLength('damaged existing file'),
+    },
+  ]);
+  assert.deepEqual(
+    safety.readFile(`uploads/${stored.filename}`),
+    Buffer.from('damaged existing file'),
+  );
   const served = await api
     .get(asset.body.url)
     .buffer(true)

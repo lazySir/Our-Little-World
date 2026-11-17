@@ -8,6 +8,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Mutex } from 'async-mutex';
 import { z, date, schemas, text } from './validation';
 import { today } from './resources';
+import { assertBackupBudget, BACKUP_LIMITS, BackupLimitError } from './backup-limits';
 const { fail } = require('./auth');
 const config = require('./config');
 
@@ -35,45 +36,102 @@ async function dataset(db: PrismaClient, user: any, includeCredentials = false) 
 }
 export function makeBackupController({ db, assets, route, mutex }: BackupContext) {
   async function archive(user: any, { allowMissingAssets = false } = {}) {
-    const data = await dataset(db, user, true);
-    const zip = new AdmZip();
-    const missingAssets: { id: string; filename: string }[] = [];
-    zip.addFile('data.json', Buffer.from(JSON.stringify(data)));
-    for (const asset of data.assets) {
-      if (!safeFilename.test(asset.filename)) fail(500, '附件文件名无效');
-      try {
-        const bytes = await fs.readFile(path.join(assets.directory, asset.filename));
-        zip.addFile(`uploads/${asset.filename}`, bytes);
-      } catch (error: any) {
-        if (!allowMissingAssets && error.code === 'ENOENT')
-          fail(409, '有照片文件缺失，请先使用以前保存的完整备份恢复，再重新备份');
-        if (!allowMissingAssets || error.code !== 'ENOENT') throw error;
-        missingAssets.push({ id: asset.id, filename: asset.filename });
+    try {
+      // Reject counts and a lower byte estimate before materializing all payloads.
+      const [entryStats, assetStats, users] = await db.$transaction([
+        db.$queryRaw<{ records: bigint | number; bytes: bigint | number }[]>`
+          SELECT COUNT(*) AS records, COALESCE(SUM(LENGTH(CAST("data" AS BLOB))), 0) AS bytes
+          FROM "Entry" WHERE "spaceId" = ${user.spaceId}`,
+        db.asset.aggregate({
+          where: { spaceId: user.spaceId },
+          _count: { _all: true },
+          _sum: { size: true },
+        }),
+        db.user.count({ where: { spaceId: user.spaceId } }),
+      ]);
+      assertBackupBudget({
+        records: Number(entryStats[0].records),
+        assets: assetStats._count._all,
+        users,
+        zipEntries: assetStats._count._all + 3,
+        expandedBytes: Number(entryStats[0].bytes) + (assetStats._sum.size || 0),
+      });
+      const data = await dataset(db, user, true);
+      const dataBytes = Buffer.from(JSON.stringify(data));
+      const missingAssets: { id: string; filename: string }[] = [];
+      const damagedAssets: {
+        id: string;
+        filename: string;
+        expectedSize: number;
+        actualSize: number;
+      }[] = [];
+      const files: { filename: string; source: string; size: number }[] = [];
+      let expandedBytes = dataBytes.length;
+      assertBackupBudget({ expandedBytes });
+      // Inspect every attachment before reading any attachment into memory.
+      for (const asset of data.assets) {
+        if (!safeFilename.test(asset.filename)) fail(500, '附件文件名无效');
+        const source = path.join(assets.directory, asset.filename);
+        try {
+          const stat = await fs.stat(source);
+          assertBackupBudget({ assetBytes: stat.size });
+          if (stat.size !== asset.size) {
+            if (!allowMissingAssets) fail(409, '照片文件大小与记录不一致，请先恢复完整备份');
+            damagedAssets.push({
+              id: asset.id,
+              filename: asset.filename,
+              expectedSize: asset.size,
+              actualSize: stat.size,
+            });
+          }
+          expandedBytes += stat.size;
+          assertBackupBudget({ expandedBytes });
+          files.push({ filename: asset.filename, source, size: stat.size });
+        } catch (error: any) {
+          if (!allowMissingAssets && error.code === 'ENOENT')
+            fail(409, '有照片文件缺失，请先使用以前保存的完整备份恢复，再重新备份');
+          if (!allowMissingAssets || error.code !== 'ENOENT') throw error;
+          missingAssets.push({ id: asset.id, filename: asset.filename });
+        }
       }
-    }
-    zip.addFile(
-      'manifest.json',
-      Buffer.from(
+      const manifestBytes = Buffer.from(
         JSON.stringify({
           product: 'our-little-world',
           version: VERSION,
           createdAt: data.exportedAt,
           format: 'logical-sqlite',
-          complete: missingAssets.length === 0,
+          complete: missingAssets.length === 0 && damagedAssets.length === 0,
           missingAssets,
+          damagedAssets,
         }),
-      ),
-    );
-    // SQLite snapshot plus logical data makes the archive useful for both
-    // direct offline recovery and safe in-process restore without replacing handles.
-    const snapshot = path.join(config.storage, `snapshot-${crypto.randomUUID()}.db`);
-    try {
-      await db.$executeRawUnsafe(`VACUUM INTO '${snapshot.replace(/'/g, "''")}'`);
-      zip.addFile('database.sqlite', await fs.readFile(snapshot));
-    } finally {
-      await fs.unlink(snapshot).catch(() => {});
+      );
+      expandedBytes += manifestBytes.length;
+      assertBackupBudget({ expandedBytes });
+      // SQLite snapshot plus logical data supports direct offline recovery.
+      const snapshot = path.join(config.storage, `snapshot-${crypto.randomUUID()}.db`);
+      try {
+        await db.$executeRawUnsafe(`VACUUM INTO '${snapshot.replace(/'/g, "''")}'`);
+        expandedBytes += (await fs.stat(snapshot)).size;
+        assertBackupBudget({ expandedBytes });
+        const zip = new AdmZip();
+        zip.addFile('data.json', dataBytes);
+        zip.addFile('manifest.json', manifestBytes);
+        zip.addFile('database.sqlite', await fs.readFile(snapshot));
+        for (const file of files) {
+          const bytes = await fs.readFile(file.source);
+          if (bytes.length !== file.size) fail(409, '照片文件在备份期间发生变化，请重新备份');
+          zip.addFile(`uploads/${file.filename}`, bytes);
+        }
+        const buffer = zip.toBuffer();
+        assertBackupBudget({ zipBytes: buffer.length });
+        return { buffer, missingAssets, damagedAssets };
+      } finally {
+        await fs.unlink(snapshot).catch(() => {});
+      }
+    } catch (error) {
+      if (error instanceof BackupLimitError) fail(413, error.message);
+      throw error;
     }
-    return { buffer: zip.toBuffer(), missingAssets };
   }
   class BackupController {
     async export(req: any, res: any) {
@@ -111,7 +169,7 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
       try {
         zip = new AdmZip(file.buffer);
         const rows = zip.getEntries();
-        if (rows.length > 10000) throw new Error();
+        assertBackupBudget({ zipEntries: rows.length, zipBytes: file.buffer.length });
         let total = 0;
         for (const entry of rows) {
           const name = entry.entryName;
@@ -123,7 +181,7 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
           )
             throw new Error();
           total += entry.header.size;
-          if (total > 250 * 1024 * 1024) throw new Error();
+          assertBackupBudget({ expandedBytes: total });
           if (
             !['manifest.json', 'data.json', 'database.sqlite'].includes(name) &&
             !/^uploads\/[a-zA-Z0-9-]+\.webp$/.test(name)
@@ -133,7 +191,7 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
         const manifest = JSON.parse(zip.readAsText('manifest.json'));
         data = JSON.parse(zip.readAsText('data.json'));
         if (manifest.complete === false)
-          fail(400, '此恢复前保护副本缺少附件，不能作为完整备份恢复');
+          fail(400, '此恢复前保护副本的附件不完整，不能作为完整备份恢复');
         if (
           manifest.product !== 'our-little-world' ||
           manifest.version !== VERSION ||
@@ -144,8 +202,11 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
         )
           throw new Error();
         if (data.space?.id !== req.user.spaceId) fail(400, '只能恢复当前空间的备份');
-        if (data.entries.length > 10000 || data.assets.length > 10000 || data.users.length > 2)
-          throw new Error();
+        assertBackupBudget({
+          records: data.entries.length,
+          assets: data.assets.length,
+          users: data.users.length,
+        });
         const users = await db.user.findMany({ where: { spaceId: req.user.spaceId } });
         // Preserve current accounts and passwords. Restore never imports credentials.
         z.object({
@@ -164,11 +225,7 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
             filename: z.string().regex(safeFilename),
             originalName: z.string().max(200),
             mime: z.literal('image/webp'),
-            size: z
-              .number()
-              .int()
-              .positive()
-              .max(10 * 1024 * 1024),
+            size: z.number().int().positive().max(BACKUP_LIMITS.assetBytes),
             createdAt: timestamp,
           }).parse(asset);
           if (
@@ -301,6 +358,7 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
         restartRequired: false,
         safetyBackup: safetyName,
         safetyMissingAssets: safety.missingAssets.length,
+        safetyDamagedAssets: safety.damagedAssets.length,
       };
     }
   }
@@ -308,7 +366,10 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
   route(BackupController, Get, 'export', 'export', [Req(), Res()]);
   route(BackupController, Get, 'download', 'download', [Req(), Res()]);
   route(BackupController, Post, 'restore', 'restore', [Req(), UploadedFile()]);
-  UseInterceptors(FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024, files: 1 } }))(
+  UseInterceptors(
+    // Busboy emits its limit at equality; the shared budget accepts the exact boundary.
+    FileInterceptor('file', { limits: { fileSize: BACKUP_LIMITS.zipBytes + 1, files: 1 } }),
+  )(
     BackupController.prototype,
     'restore',
     Object.getOwnPropertyDescriptor(BackupController.prototype, 'restore')!,
