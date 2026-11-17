@@ -99,6 +99,7 @@ const session = useSession(),
   error = ref(''),
   showServer = ref(false),
   apiBase = ref(getBase());
+let connectionVersion = 0;
 const form = reactive({
   username: '',
   password: '',
@@ -123,36 +124,43 @@ function applyStatus(result: { initialized: boolean }) {
   error.value = '';
 }
 async function check() {
+  const version = ++connectionVersion;
   const base = getBase();
   try {
     const result = validateStatus(await request('/auth/status', 'GET', undefined, true, base));
-    if (base !== getBase() || connecting.value || saving.value) return false;
+    if (version !== connectionVersion || base !== getBase() || connecting.value || saving.value)
+      return false;
     applyStatus(result);
     return true;
   } catch (e) {
-    if (base !== getBase() || connecting.value || saving.value) return false;
+    if (version !== connectionVersion || base !== getBase() || connecting.value || saving.value)
+      return false;
     error.value = e.message;
     showServer.value = true;
     return false;
   }
 }
 onLoad(async () => {
+  const version = ++connectionVersion;
   const base = getBase();
   if (getToken()) {
     try {
       if (await session.load()) {
-        if (connecting.value || saving.value || base !== getBase()) return;
+        if (version !== connectionVersion || connecting.value || saving.value || base !== getBase())
+          return;
         uni.switchTab({ url: '/pages/home/index' });
         return;
       }
     } catch {}
   }
-  if (connecting.value || saving.value || base !== getBase()) return;
+  if (version !== connectionVersion || connecting.value || saving.value || base !== getBase())
+    return;
   await check();
 });
 async function saveBase() {
   if (connecting.value || saving.value) return;
   connecting.value = true;
+  connectionVersion++;
   const previous = getBase();
   try {
     const status = await connectBase(apiBase.value);

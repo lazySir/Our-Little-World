@@ -184,6 +184,46 @@ test('auth does not leave a pending connection check when an earlier session loa
   assert.equal(s.view.mode.value, 'setup');
 });
 
+test('an old status result cannot replace a newer check of the same address', async () => {
+  const s = setup('auth');
+  const oldCheck = s.view.check();
+  const connecting = s.view.saveBase();
+  s.requests[1].success({ statusCode: 200, data: { initialized: true } });
+  await connecting;
+  s.requests[0].success({ statusCode: 200, data: { initialized: false } });
+  await oldCheck;
+  assert.equal(s.view.mode.value, 'login');
+  assert.equal(s.view.initialized.value, true);
+  assert.equal(s.view.error.value, '');
+});
+
+test('an old status error cannot replace a successful recheck of the same address', async () => {
+  const s = setup('auth');
+  const oldCheck = s.view.check();
+  const connecting = s.view.saveBase();
+  s.requests[1].success({ statusCode: 200, data: { initialized: true } });
+  await connecting;
+  s.requests[0].fail();
+  await oldCheck;
+  assert.equal(s.view.error.value, '');
+  assert.equal(s.view.showServer.value, false);
+});
+
+test('an old login-page session load cannot navigate after a newer check of the same address', async () => {
+  const s = setup('auth');
+  const loading = s.hooks.load();
+  const connecting = s.view.saveBase();
+  s.requests[1].success({ statusCode: 200, data: { initialized: true } });
+  await connecting;
+  s.requests[0].success({
+    statusCode: 200,
+    data: { user: { id: 'old-user' }, space: { id: 'old-space' } },
+  });
+  await loading;
+  assert.deepEqual(s.navigation, []);
+  assert.equal(s.view.mode.value, 'login');
+});
+
 test('settings cannot save a profile while a connection is being checked', async () => {
   const s = setup('settings');
   s.view.apiBase.value = candidate;
