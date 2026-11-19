@@ -4,10 +4,10 @@
 
 ## 最新结果
 
-- `npm test`：234/234 通过（shared 12、API 43、Web 63、uni 94、部署与验收脚本 22）；根 `npm run typecheck` 通过。
+- `npm test`：234/234 通过（shared 12、API 43、Web 63、uni 94、部署与验收脚本 22）；根 `npm run typecheck` 通过。独立的 `npm run test:e2e:unit`：12/12 通过，覆盖测试进程清理的失败和重试。
 - 11 月 19 日的账本缩放与日期弹层修复后，shared、API、Web、微信小程序和 H5 生产构建全部通过；最终 H5 样式包含高优先级日期层规则，微信产物不含该 H5 专用规则。
 - `npm run test:e2e`：17/17 通过，覆盖双人完整流程、手机宽度、旧点单操作、切换服务后的过期响应、账本和点单在慢网络下的保存/失败/重试，以及五种照片编辑器的真实上传网络交互；包含认证资料请求断网、两个入口的离线退出、心情输入锁和失败后真实重试，以及宝宝档案读取失败保护和保留字段的真实保存。新增愿望转回忆的重复点击、失败解锁与真实重试，以及旧订单快照晚于真实下单返回的回归。
-- `npm run test:e2e:uni`：7/7 通过，覆盖连接失败/无关 JSON 服务、真实日常流程、保存期间的账本与点单输入保护、双图上传、损坏照片后的 ZIP 恢复、心情慢网保存与失败草稿重试，以及宝宝档案读取失败后的真实重试和持久化。新增愿望分类/日期取消与确认/搜索/编辑/完成重开，以及回忆标签编辑后新旧标签搜索与刷新持久化；新增用例可在全新隔离数据库中单独初始化登录。`npm run test:e2e:cleanup`：2/2 通过；清理检查与浏览器流程顺序执行，避免共用测试端口。
+- `npm run test:e2e:uni`：12/12 通过，完整命令退出 0 且该次临时目录和 3002/5175 均已释放。保留原有连接、日常记录、双图上传/ZIP 恢复、保存锁、心情/宝宝保护和愿望/回忆编辑流程；新增愿望转回忆失败重试、菜单删除后的购物篮及真实下单/完成/删除的旧快照保护。`npm run test:e2e:cleanup`：2/2 通过；清理检查与浏览器流程顺序执行，避免共用测试端口。之前 12 项业务通过但收尾失败的记录仍保留，详见下文。
 - 11 月 19 日前轮微信开发者工具游客模拟器（1.06.2310080、基础库 3.2.3、320px）实际通过首次建号、心情保存、愿望新增/编辑、金额转分，以及全部 12 个页面渲染。实际 `wx.uploadFile`、`wx.downloadFile` 完成照片上传、签名图片下载、ZIP 下载和恢复，恢复后原记录、照片字节和当前会话保持一致。文件选择、分享和恢复确认使用受控替身，未向他人发送文件。首页愿望预览补齐后的本轮模拟器复验未通过，不能沿用前轮结果证明新增流程，详见下方。
 - Wot 图标字体使用锁定依赖内的 TTF 内嵌到样式；微信与 H5 产物不再请求字体 CDN。新增回归校验字体字节和样式，模拟器密码栏的眼睛图标已实际查看。
 - Web 认证接口成功后，补充资料连接失败不再把用户困在创建或登录页；真实 `/auth/me` 的 401 则走页面过期监听清除会话，不误报登录成功。两个退出入口在远端撤销请求失败时仍会完成本地退出并返回登录页。
@@ -111,6 +111,16 @@
 证据位于忽略目录 `test-results/`：愿望红/绿 `wish-memory-{web,uni}-{red,green}.log`、真实浏览器 `wish-memory-web-e2e-focused.log` / `wish-memory-h5-focused.log`；点单红/绿 `order-history-{web,uni}-{red,green}.log`、Web 全套 `current-web-e2e-full.log`。H5 预期失败为 `write-races-h5-modal-red.log`，首次实际层级为 `h5-menu-delete-layers-red.json`，定向通过为 `write-races-h5-focused-green.log`，完整业务通过但收尾失败为 `write-races-h5-final-full.log`。稳定截图和层级为 `h5-menu-delete-confirmation-final.png` / `h5-menu-delete-layers-final.json`，完整轨迹为 `h5-write-races-final/`。构建与编译分支验证见 `write-races-mp-final-build.log`、`write-races-h5-final-build.log`、`write-races-overlay-build-check.log`。
 
 本机 3003 的健康、已有空间状态及入口 HTML/四个入口资源匹配通过只读检查，见 `write-races-production-readonly.log`。本轮未重置或写入正式日常数据，未使用其他项目的 5174。最新微信运行和真机验收仍未通过，不沿用首页补齐前的成功记录。
+
+## 浏览器测试收尾复验 — 2026-11-20
+
+前述完整 H5 失败只证明 10 秒内没有观察到目标 close，不能确定当时进程仍活或具体迟缓原因。静态审查确认两项独立缺陷：Windows 终止工具若一直不退出，就不会触发原有错误/非零退出的后备处理；清理 Promise 的拒绝会被永久缓存，目标稍后退出后也不能重新核对并清理。未通过增加等待时间掩盖失败。
+
+提取可注入的测试清理逻辑，启动时登记 exit、close 和错误；5 秒触发一次后备处理，保留 10 秒总期限。成功必须观察到目标及本次/历史自建终止工具的 close，exit 单独用于诊断，已退出 PID 不再发送终止信号。任何已登记进程尚未确认关闭时不删除目录；失败后释放拒绝缓存，允许重新核对。直接后备终止只确认这些已登记进程，不能据此宣称未知孙进程树全停。
+
+首批十项内存测试在原语义下八项预期失败、两项控制通过；最终十二项覆盖卡住/失败/异步启动错误、无 PID、成功返回但目标仍活、exit 与 close 延迟、旧终止工具、并发清理、失败后重试及目录繁忙重试，均通过。独立严格 TypeScript、格式检查通过；真实 Web 与 uni 清理流程 2/2、命令退出 0。随后顺序重跑完整 H5 12/12 和完整 Web 17/17，两条命令均退出 0；两次新增临时目录和各自测试端口均无残留。
+
+日志为 `e2e-process-cleanup-red.log`、`order-cleanup-unit-final.log`、`order-cleanup-types-final.log`、`order-cleanup-format-final.log`、`order-cleanup-lifecycle-final.log`、`order-cleanup-h5-full.log` 和 `order-cleanup-web-full.log`。`order-cleanup-h5-final-state.json` 与 `order-cleanup-web-final-state.json` 均记录命令退出 0、`newDirectories: []`、`testListeners: []`；完整 H5 轨迹/截图保存在 `order-cleanup-h5-evidence/`。本轮完整业务单测与类型复验为 `order-module-unit-final.log` / `order-module-typecheck-final.log`，生产只读身份核对为 `order-module-production-readonly-verified.log`。上次被自动审批拒绝手动删除的 `little-world-uni-Q4F3zw` 仍保留，未借本次测试重试删除，也未改动正式数据或其他项目的 5174。
 
 ## 本轮已修复的问题
 

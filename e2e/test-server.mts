@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { webTestEndpoint } from './web-endpoint.mts';
+import { createTestCleanup, trackChild } from './process-cleanup.mts';
 
 const root = path.resolve(import.meta.dirname, '..');
 const require = createRequire(import.meta.url);
@@ -15,38 +16,6 @@ async function assertPortFree(port: number) {
     const probe = createServer();
     probe.once('error', reject);
     probe.listen(port, '127.0.0.1', () => probe.close(() => resolve()));
-  });
-}
-
-async function stopChild(child: ChildProcess) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`Test process ${child.pid} did not stop`)),
-      10000,
-    );
-    child.once('close', () => {
-      clearTimeout(timer);
-      resolve();
-    });
-    // Only processes spawned by this setup are targeted. Windows has no SIGTERM
-    // handlers, and the compiler can own an esbuild child that must stop too.
-    if (process.platform === 'win32' && child.pid) {
-      const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
-        stdio: 'ignore',
-        windowsHide: true,
-      });
-      killer.once('error', () => child.kill('SIGKILL'));
-      killer.once('exit', (code) => {
-        if (code !== 0) child.kill('SIGKILL');
-      });
-    } else {
-      try {
-        process.kill(-child.pid!, 'SIGKILL');
-      } catch {
-        child.kill('SIGKILL');
-      }
-    }
   });
 }
 
@@ -73,32 +42,30 @@ export async function startTestServer(kind: 'web' | 'uni') {
   };
   process.env.E2E_STORAGE_DIR = environment.STORAGE_DIR;
   let stopping = false;
-  let stopPromise: Promise<void> | undefined;
   let failure: Error | undefined;
+  const cleanup = createTestCleanup(children, async () => {
+    const target = path.resolve(directory);
+    if (
+      path.dirname(target) !== path.resolve(tmpdir()) ||
+      !path.basename(target).startsWith(`little-world-${kind}-`)
+    )
+      throw new Error('Unexpected test storage location');
+    await rm(target, { recursive: true, force: true, maxRetries: 20, retryDelay: 150 });
+  });
   const stop = () => {
-    if (stopPromise) return stopPromise;
     stopping = true;
-    stopPromise = (async () => {
-      const stopped = await Promise.allSettled(children.map(stopChild));
-      for (const result of stopped) if (result.status === 'rejected') throw result.reason;
-      const target = path.resolve(directory);
-      if (
-        path.dirname(target) !== path.resolve(tmpdir()) ||
-        !path.basename(target).startsWith(`little-world-${kind}-`)
-      )
-        throw new Error('Unexpected test storage location');
-      await rm(target, { recursive: true, force: true, maxRetries: 20, retryDelay: 150 });
-    })();
-    return stopPromise;
+    return cleanup();
   };
   function launch(args: string[], cwd = root) {
-    const child = spawn(process.execPath, args, {
-      cwd,
-      env: environment,
-      stdio: 'inherit',
-      windowsHide: true,
-      detached: process.platform !== 'win32',
-    });
+    const child = trackChild(
+      spawn(process.execPath, args, {
+        cwd,
+        env: environment,
+        stdio: 'inherit',
+        windowsHide: true,
+        detached: process.platform !== 'win32',
+      }),
+    );
     children.push(child);
     child.once('error', (error) => {
       failure = error;
