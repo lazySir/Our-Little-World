@@ -167,7 +167,11 @@ function go(url) {
   navigate(url);
 }
 let loadVersion = 0;
-async function load() {
+async function load(force = false) {
+  if (moodSaving.value && !force) {
+    uni.stopPullDownRefresh();
+    return;
+  }
   const version = ++loadVersion;
   loading.value = true;
   error.value = '';
@@ -205,19 +209,24 @@ async function saveMood() {
     return;
   }
   moodSaving.value = true;
+  loadVersion++;
+  if (loading.value) {
+    loading.value = false;
+    uni.stopPullDownRefresh();
+  }
   try {
     await request('/moods', 'POST', {
       mood: myMood.value,
       note: moodNote.value,
     });
     notify('今天的心情收好啦');
-    await load();
+    await load(true);
   } catch (e) {
     notify(e.message);
   } finally {
     moodSaving.value = false;
   }
 }
-onShow(load);
-onPullDownRefresh(load);
+onShow(() => load());
+onPullDownRefresh(() => load());
 </script>

@@ -46,9 +46,10 @@ function setup(t: any, withDate = true, pendingWrite?: Promise<void>) {
     ],
   };
   const writes: any[] = [];
+  const notices: string[] = [];
   const session = { user: { id: 'owner' }, load: async () => true };
-  let show!: () => Promise<void>;
-  let refresh!: () => Promise<void>;
+  let show!: (event?: unknown) => Promise<void>;
+  let refresh!: (event?: unknown) => Promise<void>;
   let stopped = 0;
   const filename = fileURLToPath(new URL('../src/pages/home/index.vue', import.meta.url));
   const descriptor = parse(readFileSync(filename, 'utf8'), { filename }).descriptor;
@@ -84,7 +85,9 @@ function setup(t: any, withDate = true, pendingWrite?: Promise<void>) {
         }
         return structuredClone(dashboard);
       },
-      notify() {},
+      notify(message: string) {
+        notices.push(message);
+      },
       navigate() {},
     },
   };
@@ -120,10 +123,11 @@ function setup(t: any, withDate = true, pendingWrite?: Promise<void>) {
   return {
     view,
     writes,
+    notices,
     api: dependencies['../../lib/api'],
     session,
-    show: () => show(),
-    refresh: () => refresh(),
+    show: (event?: unknown) => show(event),
+    refresh: (event?: unknown) => refresh(event),
     stopped: () => stopped,
     render: () => templateModule.exports.render(context, [], {}, context),
     nextServiceDay(date: string) {
@@ -217,7 +221,7 @@ test('home clears yesterday mood when the next service day has no mood record', 
   assert.equal(s.view.moodNote.value, '');
 });
 
-test('a pull-down response started during a mood save cannot undo its post-save refresh', async (t) => {
+test('a pull-down response started before a mood save cannot undo its post-save refresh', async (t) => {
   const write = deferred<void>();
   const s = setup(t, true, write.promise);
   await s.view.load();
@@ -231,21 +235,22 @@ test('a pull-down response started during a mood save cannot undo its post-save 
     return read.promise;
   };
   s.view.moodNote.value = '刚刚保存的新心情';
-  const saving = s.view.saveMood();
   const refreshing = s.refresh();
   await drain();
   assert.equal(reads.length, 1);
+  const saving = s.view.saveMood();
   write.resolve();
   await drain();
   assert.equal(reads.length, 2);
   reads[1].resolve(await request('/dashboard'));
   await saving;
   assert.equal(s.view.moodNote.value, '刚刚保存的新心情');
+  const stopsAfterLatest = s.stopped();
   reads[0].resolve(oldDashboard);
   await refreshing;
   assert.equal(s.view.moodNote.value, '刚刚保存的新心情');
   assert.equal(s.view.dashboard.value.moods[0].note, '刚刚保存的新心情');
-  assert.equal(s.stopped(), 2, 'Only the initial load and latest refresh may stop the spinner');
+  assert.equal(s.stopped(), stopsAfterLatest, 'The stale response cannot finish another refresh');
 });
 
 test('an older home load failure cannot publish errors or stop a newer refresh', async (t) => {
@@ -300,5 +305,93 @@ test('an old session check cannot start another dashboard request after a newer 
   await older;
   assert.equal(reads, 1, 'A superseded session check must not issue a stale dashboard load');
   assert.equal(s.stopped(), 1);
+  assert.equal(s.view.loading.value, false);
+});
+
+for (const hook of ['show', 'refresh'] as const) {
+  test(`a ${hook} event during a failed mood save cannot replace its draft`, async (t) => {
+    const write = deferred<void>();
+    const s = setup(t, true, write.promise);
+    await s.view.load();
+    s.view.myMood.value = 'low';
+    s.view.moodNote.value = '发送失败也请保留这句';
+    const saving = s.view.saveMood();
+    const stopsBeforeHook = s.stopped();
+    await s[hook]({ source: hook });
+    assert.equal(s.stopped(), stopsBeforeHook + 1, 'The skipped refresh must stop its spinner');
+    write.reject(new Error('心情没有送达'));
+    await saving;
+    assert.equal(s.view.myMood.value, 'low');
+    assert.equal(s.view.moodNote.value, '发送失败也请保留这句');
+    assert.equal(s.view.moodSaving.value, false);
+    assert.equal(s.view.loading.value, false);
+    assert.deepEqual(s.notices, ['心情没有送达']);
+    const note = nodes(s.render()).find((node) => node.type === 'wd-textarea');
+    assert.ok(note, 'The retained draft must remain visible after failure');
+    assert.equal(note.props.disabled, false);
+    note.props['onUpdate:modelValue']('可以继续补写');
+    assert.equal(s.view.moodNote.value, '可以继续补写');
+  });
+}
+
+test('a load already in flight cannot overwrite the draft after a mood save fails', async (t) => {
+  const write = deferred<void>();
+  const s = setup(t, true, write.promise);
+  await s.view.load();
+  const request = s.api.request;
+  const previousDashboard = await request('/dashboard');
+  const read = deferred<any>();
+  let reads = 0;
+  s.api.request = async (path, method, body) => {
+    if (method) return request(path, method, body);
+    reads++;
+    return read.promise;
+  };
+  s.view.myMood.value = 'great';
+  s.view.moodNote.value = '先前刷新也不能抹掉的草稿';
+  const refreshing = s.refresh();
+  await drain();
+  assert.equal(reads, 1);
+  const saving = s.view.saveMood();
+  write.reject(new Error('心情没有送达'));
+  await saving;
+  const loadingAfterFailure = s.view.loading.value;
+  const stopsAfterFailure = s.stopped();
+  read.resolve(previousDashboard);
+  await refreshing;
+  assert.equal(s.view.myMood.value, 'great');
+  assert.equal(s.view.moodNote.value, '先前刷新也不能抹掉的草稿');
+  assert.equal(s.view.moodSaving.value, false);
+  assert.equal(loadingAfterFailure, false, 'The invalidated refresh cannot hide the failed draft');
+  assert.equal(stopsAfterFailure, 2, 'Saving must end the superseded pull-down spinner');
+  assert.equal(s.stopped(), stopsAfterFailure, 'A cancelled load cannot stop a later refresh');
+  assert.equal(s.view.loading.value, false);
+  assert.deepEqual(s.notices, ['心情没有送达']);
+});
+
+test('a session check started before a failed mood save cannot reload over its draft', async (t) => {
+  const write = deferred<void>();
+  const s = setup(t, true, write.promise);
+  await s.view.load();
+  const check = deferred<boolean>();
+  s.session.load = () => check.promise;
+  const request = s.api.request;
+  let reads = 0;
+  s.api.request = async (path, method, body) => {
+    if (!method) reads++;
+    return request(path, method, body);
+  };
+  s.view.myMood.value = 'tired';
+  s.view.moodNote.value = '等待账号资料时也要保留';
+  const refreshing = s.refresh();
+  await drain();
+  const saving = s.view.saveMood();
+  write.reject(new Error('心情没有送达'));
+  await saving;
+  check.resolve(true);
+  await refreshing;
+  assert.equal(reads, 0, 'The superseded session check must not start a dashboard request');
+  assert.equal(s.view.myMood.value, 'tired');
+  assert.equal(s.view.moodNote.value, '等待账号资料时也要保留');
   assert.equal(s.view.loading.value, false);
 });
