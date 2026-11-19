@@ -277,20 +277,23 @@ async function logout() {
             v-model="password.currentPassword"
             type="password"
             show-password
-            autocomplete="current-password" /></el-form-item
+            autocomplete="current-password"
+            :disabled="busy === 'password'" /></el-form-item
         ><el-form-item label="新密码"
           ><el-input
             v-model="password.newPassword"
             type="password"
             show-password
             autocomplete="new-password"
+            :disabled="busy === 'password'"
             placeholder="至少 8 位" /></el-form-item
         ><el-form-item label="再输入一次新密码"
           ><el-input
             v-model="password.confirm"
             type="password"
             show-password
-            autocomplete="new-password" /></el-form-item
+            autocomplete="new-password"
+            :disabled="busy === 'password'" /></el-form-item
         ><el-button :loading="busy === 'password'" @click="savePassword"
           >修改密码</el-button
         ></el-form

@@ -111,12 +111,14 @@
         v-model="password.currentPassword"
         label="当前密码"
         kind="password"
+        :disabled="busy === 'password'"
         required
         :maxlength="128"
       /><FormField
         v-model="password.newPassword"
         label="新密码"
         kind="password"
+        :disabled="busy === 'password'"
         required
         placeholder="至少 8 位"
         :maxlength="128"
@@ -124,6 +126,7 @@
         v-model="password.confirmPassword"
         label="再输入一次新密码"
         kind="password"
+        :disabled="busy === 'password'"
         required
         :maxlength="128"
       /><wd-button block plain :loading="busy === 'password'" @click="changePassword"

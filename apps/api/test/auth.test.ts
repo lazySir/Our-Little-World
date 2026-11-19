@@ -93,3 +93,29 @@ test('password checks, login and logout revoke sessions', async () => {
     401,
   );
 });
+test('changing a password keeps its current session and revokes other sessions', async () => {
+  const secondSession = await api
+    .post('/api/auth/login')
+    .send({ username: 'owner', password: 'correct-horse-123' });
+  assert.equal(secondSession.status, 201, JSON.stringify(secondSession.body));
+  const changed = await api
+    .patch('/api/auth/password')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ currentPassword: 'correct-horse-123', newPassword: 'new-correct-horse-456' });
+  assert.equal(changed.status, 200, JSON.stringify(changed.body));
+  assert.equal((await api.get('/api/auth/me').set('Authorization', `Bearer ${token}`)).status, 200);
+  assert.equal(
+    (await api.get('/api/auth/me').set('Authorization', `Bearer ${secondSession.body.token}`))
+      .status,
+    401,
+  );
+  assert.equal(
+    (await api.post('/api/auth/login').send({ username: 'owner', password: 'correct-horse-123' }))
+      .status,
+    401,
+  );
+  const newLogin = await api
+    .post('/api/auth/login')
+    .send({ username: 'owner', password: 'new-correct-horse-456' });
+  assert.equal(newLogin.status, 201, JSON.stringify(newLogin.body));
+});

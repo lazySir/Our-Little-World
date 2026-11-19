@@ -267,3 +267,88 @@ for (const resource of ['auth/profile', 'space'] as const) {
     }
   });
 }
+
+test('uni H5 locks password fields while saving, keeps a failed draft, and clears it after retry', async ({
+  page,
+  world,
+}) => {
+  const gate = deferred();
+  const captured = deferred();
+  let attempts = 0;
+  const savePassword = async (route: Route) => {
+    if (!isPatch(route)) return route.continue();
+    attempts += 1;
+    if (attempts === 1) {
+      captured.resolve();
+      await gate.promise;
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: '密码暂时无法更新，请重试' }),
+      });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+  };
+  await page.route(`${api}/auth/password`, savePassword);
+  try {
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve, reject) =>
+          (window as any).uni.navigateTo({
+            url: '/pages/settings/index',
+            success: () => resolve(),
+            fail: reject,
+          }),
+        ),
+    );
+    const box = currentPage(page);
+    await expect(box.locator('.title')).toHaveText('我们的设置');
+    const values = {
+      current: 'uni-private-test-123',
+      next: 'uni-password-test-next',
+    };
+    await fill(box, '当前密码', values.current);
+    await fill(box, '新密码', values.next);
+    await fill(box, '再输入一次新密码', values.next);
+
+    const request = page.waitForRequest(
+      (entry) =>
+        entry.url() === `${api}/auth/password` &&
+        entry.method() === 'POST' &&
+        entry.headers()['x-http-method-override'] === 'PATCH',
+    );
+    await press(box, '更新密码');
+    await request;
+    await captured.promise;
+    const inputs = [
+      field(box, '当前密码').locator('input').first(),
+      field(box, '新密码').locator('input').first(),
+      field(box, '再输入一次新密码').locator('input').first(),
+    ];
+    for (const input of inputs) await expect(input).toBeDisabled();
+
+    const failure = page.waitForResponse(
+      (response) => response.url() === `${api}/auth/password` && response.status() === 503,
+    );
+    gate.resolve();
+    await failure;
+    await expect(box.locator('.error-box')).toContainText('密码暂时无法更新');
+    await expect(inputs[0]).toHaveValue(values.current);
+    await expect(inputs[1]).toHaveValue(values.next);
+    await expect(inputs[2]).toHaveValue(values.next);
+    for (const input of inputs) await expect(input).toBeEnabled();
+
+    const success = page.waitForResponse(
+      (response) => response.url() === `${api}/auth/password` && response.status() === 200,
+    );
+    await press(box, '更新密码');
+    await success;
+    for (const input of inputs) await expect(input).toHaveValue('');
+    expect(attempts).toBe(2);
+    expect(world.errors).toEqual([]);
+  } finally {
+    gate.resolve();
+    await page.unroute(`${api}/auth/password`, savePassword);
+  }
+});
