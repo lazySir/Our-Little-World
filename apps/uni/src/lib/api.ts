@@ -79,17 +79,24 @@ export async function connectBase(value: string) {
   return status;
 }
 export async function uploadFile<T = Asset>(filePath: string, path = '/assets'): Promise<T> {
+  const base = getBase();
+  const token = getToken();
   return new Promise((resolve, reject) =>
     uni.uploadFile({
-      url: `${getBase()}${path}`,
+      url: `${base}${path}`,
       filePath,
       name: 'file',
       timeout: 120000,
-      header: { Authorization: `Bearer ${getToken()}` },
+      header: { Authorization: `Bearer ${token}` },
       success(response) {
         try {
           resolve(decodeResponse(response.statusCode, response.data));
         } catch (error) {
+          if (error.status === 401 && base === getBase() && token === getToken()) {
+            setToken('');
+            uni.$emit('session-expired');
+            uni.reLaunch({ url: '/pages/auth/index' });
+          }
           reject(error);
         }
       },

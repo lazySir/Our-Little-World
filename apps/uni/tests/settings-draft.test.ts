@@ -62,6 +62,7 @@ function setup(knownSession = true) {
     ['little-world-token', 'owner-token'],
   ]);
   const requests: any[] = [],
+    uploads: any[] = [],
     notices: string[] = [],
     navigation: string[] = [],
     events: string[] = [];
@@ -75,6 +76,9 @@ function setup(knownSession = true) {
         ...options,
         data: options.data === undefined ? undefined : JSON.parse(JSON.stringify(options.data)),
       });
+    },
+    uploadFile(options: any) {
+      uploads.push(options);
     },
     showToast: (options: any) => notices.push(options.title),
     reLaunch: (options: any) => navigation.push(options.url),
@@ -139,6 +143,7 @@ function setup(knownSession = true) {
     store,
     api,
     requests,
+    uploads,
     notices,
     navigation,
     events,
@@ -474,6 +479,35 @@ test('ordinary authenticated requests keep their existing 401 expiry behavior', 
   assert.equal(s.api.getToken(), '');
   assert.deepEqual(s.navigation, ['/pages/auth/index']);
   assert.deepEqual(s.events, ['session-expired']);
+});
+
+test('an authenticated photo upload 401 expires the current session and returns to login', async () => {
+  const s = setup();
+  const uploading = s.api.uploadFile('/tmp/photo.png');
+  assert.equal(s.uploads[0].url, 'https://world.example/api/assets');
+  assert.equal(s.uploads[0].header.Authorization, 'Bearer owner-token');
+  s.uploads[0].success({ statusCode: 401, data: { message: '上传时登录已过期' } });
+  await assert.rejects(uploading, /上传时登录已过期/);
+  assert.equal(s.api.getToken(), '');
+  assert.deepEqual(s.navigation, ['/pages/auth/index']);
+  assert.deepEqual(s.events, ['session-expired']);
+});
+
+test('a late upload 401 from an old base or token cannot expire the current identity', async (t) => {
+  for (const changed of ['base', 'token'] as const) {
+    await t.test(changed, async () => {
+      const s = setup();
+      const uploading = s.api.uploadFile('/tmp/photo.png');
+      if (changed === 'base') s.api.setBase('https://another-world.example/api');
+      else s.api.setToken('new-owner-token');
+      const currentToken = s.api.getToken();
+      s.uploads[0].success({ statusCode: 401, data: { message: '旧上传身份认证失败' } });
+      await assert.rejects(uploading, /旧上传身份认证失败/);
+      assert.equal(s.api.getToken(), currentToken);
+      assert.deepEqual(s.navigation, []);
+      assert.deepEqual(s.events, []);
+    });
+  }
 });
 
 test('a session-read guard cannot suppress expiry for another resource', async () => {
