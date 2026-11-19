@@ -575,3 +575,121 @@ test('uni H5 locks a pending mood, keeps its failed draft and persists a real re
   expect(mine).toMatchObject({ mood: 'good', note: savedNote });
   expect(errors).toEqual([]);
 });
+
+test('uni H5 protects an existing baby profile after a delayed failed read and retry', async ({
+  page,
+  request,
+}) => {
+  const status = await (await request.get(`${api}/auth/status`)).json();
+  const signedIn = await request.post(`${api}/auth/${status.initialized ? 'login' : 'setup'}`, {
+    data: {
+      username: 'uni_h5_owner',
+      password: 'uni-private-test-123',
+      nickname: '小熊',
+      spaceName: '宝宝档案读取保护',
+      startDate: '2026-01-01',
+    },
+  });
+  expect(signedIn.ok(), await signedIn.text()).toBeTruthy();
+  const { token } = await signedIn.json();
+  const headers = { Authorization: `Bearer ${token}` };
+  const photo = await request.post(`${api}/assets`, {
+    headers,
+    multipart: { file: { name: 'baby-profile.png', mimeType: 'image/png', buffer: pixel } },
+  });
+  expect(photo.ok(), await photo.text()).toBeTruthy();
+  const avatar = await photo.json();
+  const original = {
+    name: `一直保留的小档案 ${stamp}`,
+    birthday: '2025-03-08',
+    gender: 'girl',
+    notes: '断网后仍然保留生日、备注和头像',
+    avatarId: avatar.id,
+  };
+  const seeded = await request.put(`${api}/baby`, { headers, data: original });
+  expect(seeded.ok(), await seeded.text()).toBeTruthy();
+  const previous = await seeded.json();
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/#/pages/auth/index');
+  await expect(page.locator('.title')).toContainText('欢迎来到我们的小世界');
+  if (!(await field(page.locator('.auth-page'), '小世界服务地址').isVisible()))
+    await page.locator('.auth-bottom').filter({ hasText: '连接设置' }).click();
+  await fill(page.locator('.auth-page'), '小世界服务地址', api);
+  const connected = page.waitForResponse(`${api}/auth/status`);
+  await click(page, '保存地址并检查连接');
+  expect((await connected).ok()).toBeTruthy();
+  await fill(page.locator('.auth-form'), '登录账号', 'uni_h5_owner');
+  await fill(page.locator('.auth-form'), '密码', 'uni-private-test-123');
+  await click(page, '回家啦');
+  await expect(page.locator('.title')).toHaveText('今天，也在好好生活');
+  await expect(page.locator('.loading')).toHaveCount(0);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const tasks: Promise<void>[] = [];
+  let writes = 0;
+  page.on('request', (req) => {
+    if (req.url().endsWith('/api/baby') && req.method() === 'PUT') writes++;
+  });
+  const failure = '宝宝档案暂时无法读取，请重试';
+  const failRead = (route: import('@playwright/test').Route) => {
+    const task = (async () => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await gate;
+      await route.fulfill({
+        status: 503,
+        headers: { 'access-control-allow-origin': '*' },
+        json: { message: failure },
+      });
+    })();
+    tasks.push(task);
+    return task;
+  };
+  await page.route('**/api/baby', failRead);
+  try {
+    const reading = page.waitForRequest(
+      (req) => req.url().endsWith('/api/baby') && req.method() === 'GET',
+    );
+    await page.goto('/#/pages/baby/index');
+    await reading;
+    await expect(page.getByText('宝宝档案打开中…', { exact: true })).toBeVisible();
+    await expect(page.getByText('建立宝宝档案', { exact: true })).toHaveCount(0);
+    await expect(page.locator('.hero .text-action')).toHaveCount(0);
+    await expect(sheet(page)).toHaveCount(0);
+    release();
+    await expect(page.locator('.error-box').filter({ hasText: failure })).toBeVisible();
+    await expect(page.getByText('建立宝宝档案', { exact: true })).toHaveCount(0);
+    await expect(page.locator('.hero .text-action')).toHaveCount(0);
+    expect(writes).toBe(0);
+    await page.screenshot({ path: 'test-results/baby-h5-read-error.png', fullPage: true });
+  } finally {
+    release();
+    await Promise.allSettled(tasks);
+    await page.unroute('**/api/baby', failRead);
+  }
+  await click(page, '重试宝宝档案');
+  await expect(page.locator('.hero')).toContainText(original.name);
+  await expect(page.locator('.hero')).toContainText(original.birthday);
+  await page.locator('.hero .text-action').filter({ hasText: '编辑' }).click();
+  await expect(field(sheet(page), '生日').locator('.date-input')).toContainText(original.birthday);
+  await expect(field(sheet(page), '性别').locator('.chip.active')).toHaveText('女孩');
+  await expect(field(sheet(page), '关于宝宝').locator('textarea')).toHaveValue(original.notes);
+  await expect(sheet(page).locator('.photo-grid .photo')).toBeVisible();
+  const updatedName = `${original.name}，继续成长`;
+  await fill(sheet(page), '宝宝的名字', updatedName);
+  const saved = page.waitForResponse(
+    (res) => res.url().endsWith('/api/baby') && res.request().method() === 'PUT',
+  );
+  await click(sheet(page), '保存这一刻');
+  expect((await saved).ok()).toBeTruthy();
+  await expect(sheet(page)).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('.hero')).toContainText(updatedName);
+  const persisted = await request.get(`${api}/baby`, { headers });
+  expect(persisted.ok()).toBeTruthy();
+  expect(await persisted.json()).toMatchObject({ ...original, id: previous.id, name: updatedName });
+  expect(writes).toBe(1);
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/baby-h5-profile.png', fullPage: true });
+});

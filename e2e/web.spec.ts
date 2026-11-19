@@ -1030,3 +1030,106 @@ test('photo editors keep pending uploads attached and release controls after fai
   await dialog(page).getByRole('button', { name: '取消', exact: true }).click();
   await expect(dialog(page)).toHaveCount(0);
 });
+
+test('baby profile read failure cannot turn an existing profile into a blank replacement', async ({
+  page,
+  request,
+}) => {
+  const apiBase = 'http://127.0.0.1:3001/api';
+  const status = await (await request.get(`${apiBase}/auth/status`)).json();
+  const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
+    data: {
+      username: 'web_owner',
+      password: 'little-world-e2e-123',
+      nickname: '小林',
+      spaceName: '宝宝档案读取保护',
+      startDate: '2024-02-29',
+    },
+  });
+  expect(signedIn.ok(), await signedIn.text()).toBeTruthy();
+  const { token } = await signedIn.json();
+  const headers = { Authorization: `Bearer ${token}` };
+  const photo = await request.post(`${apiBase}/assets`, {
+    headers,
+    multipart: { file: { name: 'baby-profile.png', mimeType: 'image/png', buffer: pixel } },
+  });
+  expect(photo.ok(), await photo.text()).toBeTruthy();
+  const avatar = await photo.json();
+  const original = {
+    name: `需要保留的小档案 ${stamp}`,
+    birthday: '2025-03-08',
+    gender: 'girl',
+    notes: '读取失败后仍要保留的生日、备注和照片',
+    avatarId: avatar.id,
+  };
+  const seeded = await request.put(`${apiBase}/baby`, { headers, data: original });
+  expect(seeded.ok(), await seeded.text()).toBeTruthy();
+  const previous = await seeded.json();
+  await page.addInitScript((value) => localStorage.setItem('little-world-token', value), token);
+  await page.setViewportSize({ width: 375, height: 812 });
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const tasks: Promise<void>[] = [];
+  let writes = 0;
+  page.on('request', (req) => {
+    if (req.url().endsWith('/api/baby') && req.method() === 'PUT') writes++;
+  });
+  const failure = '宝宝档案暂时无法读取，请重试';
+  const failRead = (route: import('@playwright/test').Route) => {
+    const task = (async () => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await gate;
+      await route.fulfill({ status: 503, json: { message: failure } });
+    })();
+    tasks.push(task);
+    return task;
+  };
+  await page.route('**/api/baby', failRead);
+  try {
+    const reading = page.waitForRequest(
+      (req) => req.url().endsWith('/api/baby') && req.method() === 'GET',
+    );
+    await page.goto('/baby');
+    await reading;
+    await expect(page.getByRole('button', { name: '创建宝宝档案', exact: true })).toBeDisabled();
+    await expect(page.locator('.baby-onboarding')).toHaveCount(0);
+    await expect(dialog(page)).toHaveCount(0);
+    release();
+    await expect(page.getByRole('alert').filter({ hasText: failure })).toBeVisible();
+    await expect(page.getByRole('button', { name: '创建宝宝档案', exact: true })).toBeDisabled();
+    await expect(page.locator('.baby-onboarding')).toHaveCount(0);
+    await page.screenshot({ path: 'test-results/baby-web-read-error.png', fullPage: true });
+    expect(writes).toBe(0);
+  } finally {
+    release();
+    await Promise.allSettled(tasks);
+    await page.unroute('**/api/baby', failRead);
+  }
+  await page.getByRole('button', { name: '重新连接', exact: true }).click();
+  await expect(page.locator('.baby-profile')).toContainText(original.name);
+  await expect(page.locator('.baby-profile')).toContainText(original.birthday);
+  await page.getByRole('button', { name: '编辑宝宝档案', exact: true }).click();
+  await expect(field(dialog(page), '生日').locator('input')).toHaveValue(original.birthday);
+  await expect(field(dialog(page), '性别')).toContainText('女孩');
+  await expect(field(dialog(page), '想说的话').locator('textarea')).toHaveValue(original.notes);
+  await expect(field(dialog(page), '头像').locator('.el-image img').first()).toBeVisible();
+  const updatedName = `${original.name}，继续成长`;
+  await fill(dialog(page), '宝宝的名字', updatedName);
+  const saved = page.waitForResponse(
+    (res) => res.url().endsWith('/api/baby') && res.request().method() === 'PUT',
+  );
+  await dialog(page).getByRole('button', { name: '保存小档案', exact: true }).click();
+  expect((await saved).ok()).toBeTruthy();
+  await expect(dialog(page)).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('.baby-profile')).toContainText(updatedName);
+  const persisted = await request.get(`${apiBase}/baby`, { headers });
+  expect(persisted.ok()).toBeTruthy();
+  expect(await persisted.json()).toMatchObject({ ...original, id: previous.id, name: updatedName });
+  expect(writes).toBe(1);
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/baby-web-profile.png', fullPage: true });
+});

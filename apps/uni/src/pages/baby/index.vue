@@ -5,7 +5,12 @@
       title="宝宝成长"
       description="可选的小家庭档案，收藏每一个慢慢长大的瞬间。"
       symbol="⌂" />
-    <view v-if="baby" class="hero" style="min-height: 220rpx">
+    <view v-if="babyLoading" class="loading">宝宝档案打开中…</view>
+    <view v-else-if="babyError" class="error-box">
+      <view>{{ babyError }}</view>
+      <wd-button size="small" plain @click="loadBaby">重试宝宝档案</wd-button>
+    </view>
+    <view v-else-if="babyReady && baby" class="hero" style="min-height: 220rpx">
       <view class="row">
         <image
           v-if="baby.asset || baby.avatar"
@@ -33,7 +38,7 @@
       <view v-if="baby.notes" class="card-text">{{ baby.notes }}</view>
     </view>
     <EmptyState
-      v-else
+      v-else-if="babyReady"
       symbol="☻"
       title="还没有宝宝档案"
       description="现在或未来有需要时，再为宝宝建一个温柔的小档案。"
@@ -169,9 +174,13 @@ import PhotoPicker from '../../components/PhotoPicker.vue';
 import { useResource } from '../../lib/useResource';
 import { request, notify, assetUrl, previewPhotos } from '../../lib/api';
 import { today, daysBetween } from '../../lib/domain';
+import type { Baby } from '../../types';
 const { session, items, loading, error, saving, editor, formError, save, remove } =
     useResource('growth'),
-  baby = ref(null),
+  baby = ref<Baby | null>(null),
+  babyLoading = ref(true),
+  babyReady = ref(false),
+  babyError = ref(''),
   profileEditor = ref(false),
   profileSaving = ref(false),
   profileUploading = ref(false),
@@ -215,14 +224,28 @@ const filtered = computed(() =>
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
 const typeLabel = (value) => types.find((x) => x.value === value)?.label || value;
+let babyLoadVersion = 0;
 async function loadBaby() {
+  if (profileEditor.value || profileSaving.value) return;
+  const version = ++babyLoadVersion;
+  babyLoading.value = true;
+  babyReady.value = false;
+  babyError.value = '';
   try {
-    baby.value = await request('/baby');
+    const result = await request<Baby | null>('/baby');
+    if (version !== babyLoadVersion) return;
+    baby.value = result;
+    babyReady.value = true;
   } catch (e) {
-    notify(e.message);
+    if (version === babyLoadVersion)
+      babyError.value =
+        e instanceof Error && e.message.trim() ? e.message : '宝宝档案读取失败，请重试';
+  } finally {
+    if (version === babyLoadVersion) babyLoading.value = false;
   }
 }
 function editBaby() {
+  if (!babyReady.value || babyLoading.value || profileEditor.value || profileSaving.value) return;
   Object.assign(
     profile,
     baby.value
@@ -240,17 +263,19 @@ function editBaby() {
   profileEditor.value = true;
 }
 async function saveBaby() {
+  if (!babyReady.value || babyLoading.value || profileSaving.value || profileUploading.value)
+    return;
   profileSaving.value = true;
   profileError.value = '';
+  babyLoadVersion++;
   try {
     if (!profile.name.trim()) throw Error('给宝宝填一个名字吧');
-    await request('/baby', 'PUT', {
+    baby.value = await request<Baby>('/baby', 'PUT', {
       ...profile,
       birthday: profile.birthday || null,
       avatarId: profilePhotos.value[0]?.id || null,
     });
     profileEditor.value = false;
-    await loadBaby();
     notify('宝宝档案已保存');
   } catch (e) {
     profileError.value = e.message;

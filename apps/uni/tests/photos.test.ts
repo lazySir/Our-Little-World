@@ -67,6 +67,7 @@ const tick = async () => {
 // Run the actual page SFCs in Vue. Only platform UI, navigation and the network are replaced.
 function mountPage(page: string) {
   const requests: { url: string; method: string; data?: any }[] = [];
+  const shows: (() => Promise<void>)[] = [];
   let finishUpload: (value: any) => void = () => {};
   let failUpload: (error: Error) => void = () => {};
   const pendingUpload = new Promise((resolve, reject) => {
@@ -76,7 +77,7 @@ function mountPage(page: string) {
   const api = {
     async request(url: string, method = 'GET', data?: any) {
       requests.push({ url, method, data });
-      return method === 'GET' ? [] : { id: 'saved', ...data };
+      return method === 'GET' ? (url === '/baby' ? null : []) : { id: 'saved', ...data };
     },
     choosePhotos: async () => ['/camera/photo.png'],
     uploadFile: async () => pendingUpload,
@@ -119,7 +120,13 @@ function mountPage(page: string) {
     }).outputText;
     const module = { exports: {} as any };
     const localRequire = (specifier: string) => {
-      if (specifier === '@dcloudio/uni-app') return { onShow() {}, onPullDownRefresh() {} };
+      if (specifier === '@dcloudio/uni-app')
+        return {
+          onShow(callback: () => Promise<void>) {
+            shows.push(callback);
+          },
+          onPullDownRefresh() {},
+        };
       if (/lib\/api$/.test(specifier) || specifier === './api') return api;
       if (/stores\/session$/.test(specifier)) return { useSession: () => session };
       if (/lib\/domain$/.test(specifier)) return domain;
@@ -208,7 +215,18 @@ function mountPage(page: string) {
     assert.ok(found, `Missing button: ${label}`);
     return found;
   };
-  return { root, requests, button, finishUpload, failUpload, unmount: () => app.unmount() };
+  return {
+    root,
+    requests,
+    button,
+    finishUpload,
+    failUpload,
+    show: async () => {
+      await Promise.all(shows.map((show) => show()));
+      await tick();
+    },
+    unmount: () => app.unmount(),
+  };
 }
 
 for (const scenario of [
@@ -221,6 +239,7 @@ for (const scenario of [
   test(`${scenario.endpoint} keeps its editor open and waits for pending photos before saving`, async () => {
     const view = mountPage(scenario.page);
     try {
+      await view.show();
       view.button(scenario.open).props.onClick();
       await tick();
       const title = all(view.root)
@@ -274,6 +293,7 @@ for (const scenario of [
 test('a failed photo upload releases the editor controls and shows the upload error', async () => {
   const view = mountPage('memories');
   try {
+    await view.show();
     view.button('＋ 写一篇').props.onClick();
     await tick();
     all(view.root)

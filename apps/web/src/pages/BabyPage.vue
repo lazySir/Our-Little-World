@@ -8,6 +8,8 @@ import type { Baby, Growth, Asset } from '../types';
 import PhotoUpload from '../components/PhotoUpload.vue';
 const baby = ref<Baby | null>(null),
   babyLoading = ref(true),
+  babyLoaded = ref(false),
+  babyError = ref(''),
   profileOpen = ref(false),
   profileSaving = ref(false),
   profileUploading = ref(false);
@@ -42,6 +44,8 @@ const filtered = computed(() =>
 );
 const editorBusy = computed(() => uploading.value || saving.value);
 const profileBusy = computed(() => profileUploading.value || profileSaving.value);
+const profileReady = computed(() => babyLoaded.value && !babyLoading.value);
+let babyLoadVersion = 0;
 const latestGrowth = computed(
   () =>
     [...items.value]
@@ -57,13 +61,21 @@ const avatarIds = computed({
   set: (v) => (profile.avatarId = v[0] || null),
 });
 async function loadBaby() {
+  if (profileBusy.value) return;
+  const version = ++babyLoadVersion;
   babyLoading.value = true;
+  babyLoaded.value = false;
+  babyError.value = '';
   try {
-    baby.value = await api.get('/baby');
+    const result = await api.get('/baby');
+    if (version !== babyLoadVersion) return;
+    baby.value = result;
+    babyLoaded.value = true;
   } catch (e) {
-    ElMessage.error(e.message);
+    if (version !== babyLoadVersion) return;
+    babyError.value = e instanceof Error && e.message ? e.message : '宝宝档案暂时无法读取，请重试';
   } finally {
-    babyLoading.value = false;
+    if (version === babyLoadVersion) babyLoading.value = false;
   }
 }
 async function getAssets() {
@@ -72,7 +84,7 @@ async function getAssets() {
   } catch {}
 }
 function editProfile() {
-  if (profileBusy.value) return;
+  if (profileBusy.value || !profileReady.value) return;
   Object.assign(
     profile,
     baby.value
@@ -89,7 +101,7 @@ function editProfile() {
   getAssets();
 }
 async function saveProfile() {
-  if (profileBusy.value) return;
+  if (profileBusy.value || !profileReady.value) return;
   if (!profile.name.trim()) {
     ElMessage.warning('给宝宝填写一个名字吧');
     return;
@@ -153,11 +165,12 @@ onMounted(loadBaby);
 </script>
 <template>
   <PageHeader title="宝宝成长" description="小小的你，每一天都在长大；小小的事，我们都想记住。"
-    ><el-button type="primary" @click="baby ? edit() : editProfile()"
+    ><el-button type="primary" :disabled="!profileReady" @click="baby ? edit() : editProfile()"
       ><AppIcon name="plus" :size="16" />{{ baby ? '记下成长' : '创建宝宝档案' }}</el-button
     ></PageHeader
   >
-  <section v-if="baby && !babyLoading" class="baby-profile panel">
+  <LoadState :loading="babyLoading" :error="babyError" @retry="loadBaby" />
+  <section v-if="baby && profileReady" class="baby-profile panel">
     <div class="baby-avatar">
       <el-image v-if="baby.asset" :src="assetUrl(baby.asset)" fit="cover" /><AppIcon
         v-else
@@ -185,7 +198,7 @@ onMounted(loadBaby);
       <AppIcon name="edit" :size="18" />
     </button>
   </section>
-  <div v-else-if="!babyLoading" class="panel baby-onboarding">
+  <div v-else-if="profileReady" class="panel baby-onboarding">
     <EmptyState
       title="给小小的家人，留一片温柔的地方"
       description="创建宝宝档案后，就可以记录身高体重、喂养睡眠与每一个第一次。"
@@ -274,7 +287,7 @@ onMounted(loadBaby);
     ><el-form
       label-position="top"
       :model="profile"
-      :disabled="profileSaving"
+      :disabled="profileSaving || !profileReady"
       @submit.prevent="saveProfile"
       ><el-form-item label="宝宝的名字" required
         ><el-input v-model="profile.name" maxlength="40" placeholder="小名、大名，都很好听"
@@ -297,7 +310,7 @@ onMounted(loadBaby);
           v-model="avatarIds"
           :assets="assets"
           :limit="1"
-          :disabled="profileSaving"
+          :disabled="profileSaving || !profileReady"
           @busy="profileUploading = $event" /></el-form-item
       ><el-form-item label="想说的话"
         ><el-input v-model="profile.notes" type="textarea" :rows="3" maxlength="500"
@@ -307,7 +320,7 @@ onMounted(loadBaby);
         ><el-button
           type="primary"
           :loading="profileSaving"
-          :disabled="profileUploading"
+          :disabled="profileUploading || !profileReady"
           @click="saveProfile"
           >保存小档案</el-button
         >

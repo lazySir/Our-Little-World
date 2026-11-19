@@ -77,7 +77,17 @@ The requirement-by-requirement audit found that the mini program home did not re
 - [x] Add the section to `apps/uni/src/pages/home/index.vue` without changing mood-save or refresh behavior. Run `npm run test:uni` and `npm run typecheck`.
 - [x] Extend `apps/uni/tests/e2e/h5.spec.ts` and `scripts/verify-wechat.mts` to check a real saved wish on the home page and its navigation; verify that completing a wish removes it from the H5 preview.
 - [x] Run H5 browser acceptance and H5/mp-weixin builds; inspect the H5 preview. Reproduce and fix Wot's title-width restriction before the final four-test browser run. Update verification records with the actual simulator failure and the old-home comparison. Keep explicit staging and immediate push discipline below.
-- [ ] Re-run the 7 core / 9 complete WeChat checks and inspect the actual `home-wishes.png`. Five candidate attempts and a separately built `efe03ea` home baseline all timed out before App readiness; no new business flow was validated. Full unit suite remains 196 (shared 12, API 43, Web 47, uni 72, scripts 22). Real AppID/domain/device acceptance above is also still outstanding.
+- [ ] Re-run the 7 core / 9 complete WeChat checks and inspect the actual `home-wishes.png`. Five candidate attempts and a separately built `efe03ea` home baseline all timed out before App readiness; no new business flow was validated. At that home-wishes iteration, the full unit suite was 196 (shared 12, API 43, Web 47, uni 72, scripts 22). Real AppID/domain/device acceptance above is also still outstanding.
+
+## Data-protection correction — baby profile loading
+
+The daily-use audit found a confirmed data-loss path in both clients: an unknown or failed baby-profile GET was treated as a successful empty profile, allowing a PUT with default values to overwrite an existing birthday, gender, notes and avatar. Keep the existing optional profile and growth-record structure. Distinguish unknown/loading/failure from a successful null, offer retry, and allow profile writes only after a successful read.
+
+- [x] Add real SFC regression tests in both clients and observe the missing protection fail before implementation. Cover pending/failed reads, retrying existing/null, field/avatar retention, latest-read-wins, unknown errors and existing upload/save locks.
+- [x] Apply the localized loading/success/error guards in the two baby pages. Preserve the growth resource flow; skip uni profile reloads during its editor/save, and use the successful PUT response.
+- [x] Add real API-backed browser regressions for both clients, delay/fail the initial GET, retry and edit only the name, then reload and verify the original record ID, birthday, gender, notes and uploaded avatar. Verify each test independently in a fresh isolated database, then the complete suites.
+- [x] Verify 215 unit tests, root TypeScript, Web 13/13, H5 5/5, cleanup 2/2, shared/API/Web/mp-weixin/H5 production builds, and inspect 375px/390px error and recovered screenshots. Independent review found no blocking issue. Production 3003 health/status and its served build match without changing daily data.
+- [x] Record the separate native-minimal WeChat comparison: the same App-readiness timeout with no business code; no business checks executed, no cleanup errors, and no definitive internal root cause. The unchecked latest-simulator and real-device requirements above remain unchecked.
 
 ## Commit discipline
 
