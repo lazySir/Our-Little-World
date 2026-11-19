@@ -38,6 +38,7 @@
 - [x] Implement matching API pages, chooseImage/uploadFile/previewImage, forms and confirmation via Wot; verify TypeScript and client regression tests.
 - [x] Compile H5 and mp-weixin separately to `apps/uni/dist/build/{h5,mp-weixin}`.
 - [x] Complete uni H5 browser integration: real records, two-photo upload, pending-upload lock, anniversary/baby flows, themes, export and ZIP restore with session continuity and missing-photo recovery.
+- [x] Complete repeatable guest-simulator acceptance with actual WeChat requests, native upload/download, all 12 routes and ZIP restore against isolated storage; keep real-device acceptance separate.
 - [ ] WeChat image-picker/permission/file-sharing acceptance on a real device; requires the actual AppID, allowed HTTPS domains and WeChat environment.
 
 ## Workstream 5 — delivery and independent review
@@ -46,7 +47,7 @@
 - [x] Chinese README with quick start, local/LAN/HTTPS, ports, credentials created by user, responsive mobile Web, WeChat AppID/domain requirements, and backup restore.
 - [x] Independent spec review then quality/security review; fix confirmed findings with regression tests and commits. Subsequent findings are tracked in docs/VERIFICATION.md.
 - [x] Run all API/shared tests and Web/uni H5/mp-weixin builds. Browser E2E creates owner, joins partner, creates and reloads records, uploads image, checks mobile width and main flows.
-- [x] Inspect git log/status and push each completed module to supplied remote; latest business changes on local and remote develop matched at 71d7704 before the current verification-document update. Platform limitations are explicitly recorded in docs/VERIFICATION.md.
+- [x] Inspect git log/status and push each completed module to the supplied remote. Keep final verification results and platform limitations in docs/VERIFICATION.md.
 
 ## Recorded verification — 2026-11-17
 
@@ -59,6 +60,14 @@
 - Local production was updated on port 3003 while retaining its existing space (`initialized: true`). Health, desktop/mobile login rendering, no horizontal overflow and no page errors passed; the host can also reach the LAN address 192.168.1.3:3003. No daily records were created by the validation.
 - uni archive branches verify temporary-path sharing, neutral cancellation and readable unsupported-version/transfer errors; real WeChat AppID, allowed HTTPS domains and device acceptance remain outstanding.
 - Docker Desktop 29.8.1 real image build and isolated runtime passed: migration, UID 1000, production desktop/mobile Web, real account/record/photo writes, restart persistence, existing session/login, ZIP restore. Actual Compose named volumes and container health also passed. Disposable validation resources were removed; normal Node service/data and other containers were preserved.
+
+## Recorded verification — 2026-11-19
+
+- Full unit suite: 191 passed (shared 12, API 43, Web 47, uni 67, deployment and acceptance scripts 22); root TypeScript passed. Shared/API/Web/mp-weixin/H5 production builds passed.
+- Web browser acceptance passed 12/12, uni H5 passed 4/4, and isolated lifecycle cleanup passed 2/2. New browser flows cover failed profile refresh, offline exit through both Web entry points, pending mood controls, retained failed drafts and real retry persistence.
+- Confirmed defects were reproduced before repair: Web authentication recovery and real 401 expiry, stale list results/errors/loading in both clients, mood controls changing during a pending write, uni page/refresh loads overwriting a failed mood draft, and cached future-letter dates after midnight. Real SFC/composable tests cover delayed requests, session checks, native lifecycle event arguments and controlled dates.
+- Repeatable WeChat guest-simulator acceptance passed 8 core/media checks, including actual native photo upload/download and ZIP restore, with no runtime or cleanup errors. Actual AppID, allowed HTTPS domains, device permissions, preview and file-sharing acceptance remain unchecked above.
+- Local production retained its existing space on port 3003. Read-only health/status and production login rendering at 1440px/375px passed, without horizontal overflow or page script errors. Docker runtime evidence remains the dated November 17 baseline; the engine was not running for this later iteration.
 
 ## Commit discipline
 
