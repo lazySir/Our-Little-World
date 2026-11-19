@@ -67,7 +67,7 @@
         label="哪一天开启"
         required
         kind="date"
-        :min="tomorrow"
+        :min="tomorrow()"
       />
       <FormField v-model="form.recipient" label="写给谁" kind="select" :options="recipients" />
       <FormField
@@ -82,7 +82,7 @@
   </view>
 </template>
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive } from 'vue';
 import PageHeading from '../../components/PageHeading.vue';
 import EmptyState from '../../components/EmptyState.vue';
 import EditorSheet from '../../components/EditorSheet.vue';
@@ -97,14 +97,14 @@ const recipients = [
   { value: 'both', label: '未来的我们' },
   { value: 'partner', label: '另一半' },
 ];
-const tomorrow = computed(() => {
+function tomorrow() {
   const d = new Date(`${today()}T12:00:00`);
   d.setDate(d.getDate() + 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-});
+}
 function openNew() {
   editing.value = null;
-  Object.assign(form, { title: '', content: '', unlockDate: tomorrow.value, recipient: 'both' });
+  Object.assign(form, { title: '', content: '', unlockDate: tomorrow(), recipient: 'both' });
   editor.value = true;
 }
 function edit(item) {
