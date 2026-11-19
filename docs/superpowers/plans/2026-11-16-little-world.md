@@ -95,6 +95,13 @@ The daily-use audit found a confirmed data-loss path in both clients: an unknown
 - [x] Extend the existing browser suite with cross-year/month filtering, exact monetary aggregates, live ECharts category/day values, edit/reload/API persistence and wish category/search/completion/reopening checks. Preserve the original 13 cases; full Web suite passes 15/15.
 - [x] Inspect 1440px/375px chart screenshots after real animation completion. Confirm 215 unit tests, root TypeScript, production Web build and read-only existing production health/build identity. Independent review finds no blocking issue; commit and immediately push this module separately.
 
+## Daily-detail acceptance — H5 picker and memory tags
+
+- [x] Reproduce native date cancel/confirm being intercepted by the editor. Read actual computed layers (999 picker versus 1200 editor); identify the lazy-loaded default overriding the first class-only rule.
+- [x] Apply only an H5-conditional higher-specificity `uni-app .uni-picker-container` at 1300. Verify real cancel/reopen/confirm/save, category/title edits, wish completion/reopening and refresh/API persistence; independently check edited/removed memory-tag search.
+- [x] Pass all 7 H5 cases, retain final traces/layer evidence and inspect the 390px picker screenshot. Verify final mp-weixin/H5 builds, compiled H5 inclusion and WeChat exclusion, test TypeScript/format checks and 2/2 cleanup. Independent review finds no blocking issue; commit and immediately push separately.
+- [x] Record the further native-minimal 9446 App-readiness timeout and successful isolated cleanup without claiming internal root cause or latest WeChat runtime acceptance. Preserve the unchecked simulator and real-device requirements above.
+
 ## Commit discipline
 
 Each worker stages only their owned files, never `git add .` in shared repo. Root serializes commits on request to avoid index locks. No video, database, uploads, tokens, node_modules or build output committed. Destructive filesystem operations limited to verified workspace temporary/generated paths.
