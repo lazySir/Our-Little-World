@@ -90,6 +90,8 @@ node --experimental-strip-types scripts/verify-demo.mts
 
 两套浏览器验证都会自动启动服务并使用临时数据库与附件目录，结束后停止本次服务并删除临时数据。主 Web 使用端口 `3001`、`5174`；小程序 H5 联调使用 `3002`、`5175`，端口已占用时拒绝启动，不复用已运行的服务。`test:e2e:cleanup` 单独验证两套环境的进程停止和临时目录清理。
 
+微信官方模拟器的可选验收命令为 `npm run test:wechat`，加 `-- --media` 验证图片上传/下载和 ZIP 恢复。它使用独立项目副本、临时数据库与随机 API 端口，SDK 另行安装；安装、端口配置、受控选择器边界及清理说明见 [微信模拟器验收](docs/WECHAT-VERIFICATION.md)。
+
 如果 Web 测试的 `5174` 已被其他程序使用，可在 PowerShell 先设 `$env:WEB_E2E_BASE='http://127.0.0.1:5184'`，再运行 Web 或清理测试。页面、隔离服务和清理检查会统一使用该端口；只接受本机 HTTP 地址，API 仍使用 `3001`。
 
 Web 产物在 `apps/web/dist`；微信小程序产物在 `apps/uni/dist/build/mp-weixin`。`apps/uni/dist/build/h5` 保留用于小程序页面的浏览器联调。Web 构建由 Nest 服务提供，生产访问只需要一个 `3000` 端口。

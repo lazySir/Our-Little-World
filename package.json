@@ -30,7 +30,8 @@
     "format": "prettier --write apps/**/src packages/shared/src scripts docs *.json *.md",
     "test:e2e": "playwright test --config=e2e/web.config.ts",
     "test:e2e:uni": "npm run build:shared && playwright test --config=apps/uni/playwright.config.ts",
-    "test:e2e:cleanup": "node --experimental-strip-types --test e2e/test/cleanup.test.mts"
+    "test:e2e:cleanup": "node --experimental-strip-types --test e2e/test/cleanup.test.mts",
+    "test:wechat": "node --experimental-strip-types scripts/verify-wechat.mts"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
