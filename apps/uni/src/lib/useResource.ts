@@ -11,16 +11,22 @@ export function useResource(path) {
     saving = ref(false),
     editor = ref(false),
     formError = ref('');
+  let loadVersion = 0;
   async function load() {
+    const version = ++loadVersion;
     loading.value = true;
     error.value = '';
     try {
-      if (await session.load()) items.value = await request(`/${path}`);
+      if (!(await session.load()) || version !== loadVersion) return;
+      const result = await request(`/${path}`);
+      if (version === loadVersion) items.value = result;
     } catch (e) {
-      error.value = e.message;
+      if (version === loadVersion) error.value = e.message;
     } finally {
-      loading.value = false;
-      uni.stopPullDownRefresh();
+      if (version === loadVersion) {
+        loading.value = false;
+        uni.stopPullDownRefresh();
+      }
     }
   }
   async function save(data: Record<string, unknown>, id?: string) {

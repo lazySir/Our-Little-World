@@ -8,15 +8,18 @@ export function useResource<T extends { id: string; title?: string; name?: strin
     loading = ref(true),
     error = ref(''),
     saving = ref(false);
+  let loadSequence = 0;
   async function load() {
+    const sequence = ++loadSequence;
     loading.value = true;
     error.value = '';
     try {
-      items.value = await api.get(path);
+      const result = await api.get(path);
+      if (sequence === loadSequence) items.value = result;
     } catch (e) {
-      error.value = e.message;
+      if (sequence === loadSequence) error.value = e.message;
     } finally {
-      loading.value = false;
+      if (sequence === loadSequence) loading.value = false;
     }
   }
   async function save(payload: object, id?: string) {
