@@ -246,6 +246,9 @@ test('two people can create, share and persist their complete little world', asy
   await fill(dialog(page), '标题', names.memory);
   await fill(dialog(page), '内容', '阳光落在窗台，我们一起慢慢吃早餐。');
   await fill(dialog(page), '标签', '周末，阳光');
+  await expect(
+    dialog(page).getByText('服务端仅保存优化后的照片，重要原片请另行保存。'),
+  ).toBeVisible();
   await dialog(page)
     .locator('input[type=file]')
     .setInputFiles([

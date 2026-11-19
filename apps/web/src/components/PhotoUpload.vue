@@ -84,5 +84,6 @@ async function choose(event: Event) {
       /></label>
     </div>
     <small>每张不超过 10 MB，最多 {{ limit }} 张。上传后保存记录即可归档。</small>
+    <small class="photo-original-note">服务端仅保存优化后的照片，重要原片请另行保存。</small>
   </div>
 </template>

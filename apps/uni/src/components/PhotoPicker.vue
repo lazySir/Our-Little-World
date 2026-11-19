@@ -15,6 +15,7 @@
       </view>
     </view>
     <view class="form-note">{{ modelValue.length }} / {{ max }} 张 · 每张不超过 10 MB</view>
+    <view class="form-note">服务端仅保存优化后的照片，重要原片请另行保存。</view>
     <view v-if="error" class="error-box">{{ error }}</view>
   </view>
 </template>

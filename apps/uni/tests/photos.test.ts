@@ -254,6 +254,7 @@ for (const scenario of [
       title.props.onInput('有照片的记录');
       const picker = all(view.root).find((node) => node.props.class === 'upload-tile');
       assert.ok(picker);
+      assert.ok(textOf(view.root).includes('重要原片请另行保存'));
       picker.props.onClick();
       await tick();
       view.button('保存这一刻').props.onClick();
