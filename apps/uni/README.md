@@ -14,11 +14,13 @@ npm run build:mp-weixin --workspace=@our-little-world/uni
 npm run typecheck --workspace=@our-little-world/uni
 npm run test --workspace=@our-little-world/uni
 npm run test:e2e:uni
+# 可选：配置官方开发者工具和验收 SDK 后运行
+npm run test:wechat -- --media
 ```
 
 `test:e2e:uni` 自动准备组件、建立临时 SQLite 并启动隔离 API 与 H5 页面，验证真实记录、双图上传、主题和数据导出。运行前确保 `3002`、`5175` 未被占用；测试不使用本机日常空间。
 
-微信小程序产物位于 `dist/build/mp-weixin`；`dist/build/h5` 用于浏览器联调。面向日常电脑和手机浏览器使用的 Web 位于 `apps/web`。构建前会从 npm 锁定的 Wot 依赖同步组件源码到被忽略的 `src/uni_modules`，避免 monorepo 中提升依赖导致小程序组件文件生成到应用目录之外；无需手动复制或修改第三方代码。
+微信小程序产物位于 `dist/build/mp-weixin`；`dist/build/h5` 用于浏览器联调。面向日常电脑和手机浏览器使用的 Web 位于 `apps/web`。构建前会从 npm 锁定的 Wot 依赖同步组件源码到被忽略的 `src/uni_modules`，并内嵌组件库随附的图标字体，支持没有字体 CDN 的本地环境；无需手动复制或修改第三方代码。
 
 ## 第一次连接
 
@@ -32,7 +34,9 @@ npm run test:e2e:uni
 
 ## 图片与备份
 
-照片使用 `uni.chooseImage`、`uni.uploadFile` 和 `uni.previewImage`。完整备份在 H5 使用浏览器下载，微信保存后可分享文件。恢复在微信选择聊天文件，在 H5 选择本机文件。微信中的图片选择、权限和文件操作需要通过开发者工具和手机微信验证；命令行编译与 H5 联调不能代替微信环境验收。
+照片使用 `uni.chooseImage`、`uni.uploadFile` 和 `uni.previewImage`。完整备份在 H5 使用浏览器下载，微信下载后可分享临时文件。恢复在微信选择聊天文件，在 H5 选择本机文件。
+
+2026-11-19 已在微信游客模拟器（开发者工具 1.06.2310080、基础库 3.2.3、320px）验证全部 12 个页面、建号、心情、愿望新增/编辑、账本，以及真实原生照片上传/下载、ZIP 下载/恢复和恢复后的会话。验收使用独立数据库与存储，文件选择、分享及恢复确认使用受控替身。真实 AppID、合法域名、相机相册权限、真机预览与文件选择/分享仍需真机验收；模拟器结果不能替代这些检查。详见根目录 [验收记录](../../docs/VERIFICATION.md) 与 [可重复微信验收命令](../../docs/WECHAT-VERIFICATION.md)。
 
 ## 页面
 
