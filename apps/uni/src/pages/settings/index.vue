@@ -10,9 +10,20 @@
       <view class="section-title">我的小名片</view>
     </view>
     <view class="card">
-      <FormField v-model="nickname" label="怎么称呼我" required :maxlength="40" />
+      <FormField
+        v-model="nickname"
+        label="怎么称呼我"
+        required
+        :maxlength="40"
+        :disabled="settingsLocked"
+      />
       <view class="meta">登录账号 · {{ session.user?.username }}</view>
-      <wd-button block :loading="busy === 'profile'" style="margin-top: 24rpx" @click="saveProfile"
+      <wd-button
+        block
+        :loading="busy === 'profile'"
+        :disabled="settingsLocked"
+        style="margin-top: 24rpx"
+        @click="saveProfile"
         >保存昵称</wd-button
       >
     </view>
@@ -20,17 +31,24 @@
       <view class="section-title">小世界档案</view>
     </view>
     <view class="card">
-      <FormField v-model="space.name" label="小世界的名字" required :maxlength="60" />
+      <FormField
+        v-model="space.name"
+        label="小世界的名字"
+        required
+        :maxlength="60"
+        :disabled="settingsLocked"
+      />
       <FormField
         v-model="space.startDate"
         label="故事开始的那一天"
         required
         kind="date"
         :max="today()"
+        :disabled="settingsLocked"
       />
       <view class="form-label">喜欢哪种颜色</view>
       <view class="feature-grid" style="grid-template-columns: repeat(3, 1fr)">
-        <view v-for="theme in themes" :key="theme.value" @click="space.theme = theme.value">
+        <view v-for="theme in themes" :key="theme.value" @click="selectTheme(theme.value)">
           <view
             class="theme-swatch"
             :style="{
@@ -46,7 +64,12 @@
           }}</view>
         </view>
       </view>
-      <wd-button block :loading="busy === 'space'" style="margin-top: 26rpx" @click="saveSpace"
+      <wd-button
+        block
+        :loading="busy === 'space'"
+        :disabled="settingsLocked"
+        style="margin-top: 26rpx"
+        @click="saveSpace"
         >保存小世界</wd-button
       >
     </view>
@@ -137,12 +160,14 @@
         ></template
       ></view
     ><view v-if="error" class="error-box">{{ error }}</view
+    ><wd-button v-if="!ready" block plain :loading="settingsLoading" @click="loadSettings"
+      >重新读取设置</wd-button
     ><wd-button block plain type="error" @click="logout">退出当前设备</wd-button
     ><view class="auth-bottom">我们的小世界 · 1.0.0<br />只属于你们的生活手账 ♡</view></view
   >
 </template>
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import PageHeading from '../../components/PageHeading.vue';
 import FormField from '../../components/FormField.vue';
@@ -161,8 +186,14 @@ import {
 import { today } from '../../lib/domain';
 import type { Space } from '../../types';
 const session = useSession(),
-  nickname = ref(''),
-  space = reactive({ name: '', startDate: '', theme: 'cream' }),
+  nickname = ref(session.user?.nickname || ''),
+  space = reactive({
+    name: session.space?.name || '',
+    startDate: session.space?.startDate || '',
+    theme: session.space?.theme || 'cream',
+  }),
+  ready = ref(session.loaded && !!session.user && !!session.space),
+  settingsLoading = ref(false),
   apiBase = ref(getBase()),
   busy = ref(''),
   error = ref(''),
@@ -171,13 +202,40 @@ const session = useSession(),
     expiresAt: string;
   } | null>(null),
   password = reactive({ currentPassword: '', newPassword: '', confirmPassword: '' });
+let savedNickname = nickname.value,
+  savedSpace = { ...space },
+  loadVersion = 0,
+  readError: string | null = null;
+const settingsLocked = computed(() => !ready.value || !!busy.value);
+function syncDrafts() {
+  if (!session.user || !session.space) return;
+  if (nickname.value === savedNickname) {
+    nickname.value = session.user.nickname;
+    savedNickname = nickname.value;
+  }
+  if (Object.keys(savedSpace).every((key) => space[key] === savedSpace[key])) {
+    savedSpace = {
+      name: session.space.name,
+      startDate: session.space.startDate,
+      theme: session.space.theme,
+    };
+    Object.assign(space, savedSpace);
+  }
+  ready.value = true;
+}
+function selectTheme(theme: Space['theme']) {
+  if (!settingsLocked.value) space.theme = theme;
+}
 const themes = [
   { value: 'cream', label: '奶油手账', background: '#efe4ce', color: '#b99866' },
   { value: 'rose', label: '玫瑰日记', background: '#f3dfe5', color: '#b66e86' },
   { value: 'sage', label: '鼠尾草绿', background: '#e2ead9', color: '#6f8974' },
-];
+] as const;
 async function action(key: string, work: () => Promise<void>) {
   if (busy.value) return;
+  loadVersion++;
+  settingsLoading.value = false;
+  readError = null;
   busy.value = key;
   error.value = '';
   try {
@@ -190,18 +248,25 @@ async function action(key: string, work: () => Promise<void>) {
   }
 }
 async function saveProfile() {
+  if (!ready.value) return;
   await action('profile', async () => {
     if (!nickname.value.trim()) throw Error('昵称不能为空');
-    await request('/auth/profile', 'PATCH', { nickname: nickname.value.trim() });
-    await session.load();
+    const submitted = nickname.value.trim();
+    await request('/auth/profile', 'PATCH', { nickname: submitted });
+    nickname.value = submitted;
+    savedNickname = submitted;
+    if (await session.load()) syncDrafts();
     notify('昵称保存好啦');
   });
 }
 async function saveSpace() {
+  if (!ready.value) return;
   await action('space', async () => {
     if (!space.name.trim() || !space.startDate) throw Error('请写下小世界名字和开始日期');
-    await request('/space', 'PATCH', space);
-    await session.load();
+    const submitted = { ...space };
+    await request('/space', 'PATCH', submitted);
+    savedSpace = submitted;
+    if (await session.load()) syncDrafts();
     notify('小世界更新好啦');
   });
 }
@@ -280,17 +345,20 @@ async function logout() {
   if (busy.value) return;
   if (await confirm('退出这个设备？你们的记录仍保存在服务中。')) await session.logout();
 }
-onShow(async () => {
+async function loadSettings() {
+  if (busy.value) return;
+  const version = ++loadVersion;
+  settingsLoading.value = true;
   try {
-    await session.load();
-    nickname.value = session.user?.nickname || '';
-    Object.assign(space, {
-      name: session.space?.name || '',
-      startDate: session.space?.startDate || today(),
-      theme: session.space?.theme || 'cream',
-    });
+    if (!(await session.load()) || version !== loadVersion) return;
+    syncDrafts();
+    if (error.value === readError) error.value = '';
+    readError = null;
   } catch (e) {
-    error.value = e.message;
+    if (version === loadVersion) error.value = readError = e.message;
+  } finally {
+    if (version === loadVersion) settingsLoading.value = false;
   }
-});
+}
+onShow(loadSettings);
 </script>

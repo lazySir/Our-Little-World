@@ -111,6 +111,13 @@ The daily-use audit found a confirmed data-loss path in both clients: an unknown
 - [x] Pass 234 unit tests, root TypeScript, all production builds and the complete 17-case Web browser suite. Preserve the 12-case H5 run that passed business checks but exited 1 during teardown; keep latest WeChat runtime/device requirements above unchecked.
 - [x] Repair the independently confirmed teardown deadline/retry gaps: twelve in-memory failure/control regressions, strict TypeScript and actual cleanup 2/2 pass. Complete H5 12/12 and Web 17/17 both exit 0 with no new temporary directories or test listeners. Keep the 10-second total deadline, wait for owned targets and termination tools to close, and permit safe retry after failure. Retain the older temporary directory whose manual deletion was rejected by automatic approval review; the original delay's internal cause and unknown descendant-tree guarantees remain unproven.
 
+## Daily-use correctness — settings drafts and session reads
+
+- [x] Reproduce uni settings losing unsaved or failed drafts to an old onShow response; retain dirty profile/space groups, guard unknown data and lock relevant fields during writes.
+- [x] Reproduce same-session read reordering in both stores and real transport expiry effects before store guards. Sequence reads and limit expiry guards to `/auth/me`, preserving current/other-resource 401 handling. Respect a false uni post-login load before home navigation.
+- [x] Pass 270 unit tests, root TypeScript and shared/API/Web/mp-weixin/H5 builds. New real H5 settings failures/retries persist all four edited fields; complete H5 14/14, Web 17/17, cleanup 2/2 and cleanup-unit 12/12 all exit 0.
+- [x] Inspect final settings screenshots and read-only production health/assets, preserve formal data and other project listeners, and record the unresolved WeChat runtime/device boundary. Detailed plan: `2026-11-20-settings-drafts.md`.
+
 ## Commit discipline
 
 Each worker stages only their owned files, never `git add .` in shared repo. Root serializes commits on request to avoid index locks. No video, database, uploads, tokens, node_modules or build output committed. Destructive filesystem operations limited to verified workspace temporary/generated paths.

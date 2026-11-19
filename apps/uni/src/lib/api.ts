@@ -28,6 +28,7 @@ export async function request<T = any>(
   data?: unknown,
   anonymous = false,
   base = getBase(),
+  canExpireSession: () => boolean = () => true,
 ): Promise<T> {
   const token = getToken();
   return new Promise((resolve, reject) =>
@@ -45,7 +46,13 @@ export async function request<T = any>(
           try {
             resolve(decodeResponse(response.statusCode, response.data));
           } catch (error) {
-            if (error.status === 401 && !anonymous && base === getBase() && token === getToken()) {
+            if (
+              error.status === 401 &&
+              !anonymous &&
+              base === getBase() &&
+              token === getToken() &&
+              (path !== '/auth/me' || canExpireSession())
+            ) {
               setToken('');
               uni.$emit('session-expired');
               uni.reLaunch({ url: '/pages/auth/index' });

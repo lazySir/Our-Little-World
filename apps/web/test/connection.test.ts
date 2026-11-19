@@ -146,6 +146,100 @@ test('a failed hydration completes after clearing its own expired token', async 
   assert.equal(s.store.ready, true);
 });
 
+const sessionDetails = (nickname: string, theme: string) => ({
+  user: { id: 'owner', nickname },
+  space: { id: 'home', name: `${nickname}的小世界`, theme },
+  partner: { id: 'partner', nickname: `${nickname}的对象` },
+});
+
+test('the latest refresh owns profile, partner and theme when older success arrives last', async () => {
+  const s = setup();
+  const older = s.store.refresh();
+  const latest = s.store.refresh();
+  const saved = sessionDetails('保存后的昵称', 'rose');
+  s.requests[1].resolve(saved);
+  assert.equal(await latest, true);
+  s.requests[0].resolve(sessionDetails('旧昵称', 'cream'));
+  assert.equal(await older, false);
+  assert.deepEqual(s.store.user, saved.user);
+  assert.deepEqual(s.store.space, saved.space);
+  assert.deepEqual(s.store.partner, saved.partner);
+});
+
+test('an older refresh error is ignored after the latest refresh succeeds', async () => {
+  const s = setup();
+  const older = s.store.refresh();
+  const settled = older.then(
+    (value: boolean) => ({ value }),
+    (error: Error) => ({ error }),
+  );
+  const latest = s.store.refresh();
+  s.requests[1].resolve(sessionDetails('最新昵称', 'rose'));
+  await latest;
+  s.requests[0].reject(new Error('earlier request failed'));
+  assert.deepEqual(await settled, { value: false });
+  assert.equal(s.store.user.nickname, '最新昵称');
+});
+
+test('a latest refresh failure cannot let an older success roll back saved details', async () => {
+  const s = setup();
+  const saved = sessionDetails('已保存', 'rose');
+  s.store.accept({ ...saved, token: 'old-token' });
+  const older = s.store.refresh();
+  const latest = s.store.refresh();
+  const rejected = assert.rejects(latest, /latest request failed/);
+  s.requests[1].reject(new Error('latest request failed'));
+  await rejected;
+  s.requests[0].resolve(sessionDetails('旧昵称', 'cream'));
+  assert.equal(await older, false);
+  assert.deepEqual(s.store.space, saved.space);
+  const retry = s.store.refresh();
+  s.requests[2].resolve(sessionDetails('重试成功', 'mint'));
+  assert.equal(await retry, true);
+  assert.equal(s.store.user.nickname, '重试成功');
+});
+
+test('an old hydration success cannot replace a newer refresh but still completes readiness', async () => {
+  const s = setup();
+  const hydration = s.store.hydrate();
+  const latest = s.store.refresh();
+  s.requests[1].resolve(sessionDetails('新昵称', 'rose'));
+  await latest;
+  s.requests[0].resolve(sessionDetails('旧昵称', 'cream'));
+  await hydration;
+  assert.equal(s.store.user.nickname, '新昵称');
+  assert.equal(s.store.space.theme, 'rose');
+  assert.equal(s.store.ready, true);
+  assert.equal(s.storage.get('little-world-token'), 'old-token');
+});
+
+test('an old hydration error cannot remove the token after a newer refresh succeeds', async () => {
+  const s = setup();
+  const hydration = s.store.hydrate();
+  const latest = s.store.refresh();
+  s.requests[1].resolve(sessionDetails('新昵称', 'rose'));
+  await latest;
+  s.requests[0].reject(new Error('earlier hydration failed'));
+  await hydration;
+  assert.equal(s.store.user.nickname, '新昵称');
+  assert.equal(s.store.ready, true);
+  assert.equal(s.storage.get('little-world-token'), 'old-token');
+});
+
+test('hydration is shared and can supersede an earlier refresh', async () => {
+  const s = setup();
+  const older = s.store.refresh();
+  const first = s.store.hydrate();
+  const second = s.store.hydrate();
+  assert.equal(s.requests.length, 2);
+  s.requests[1].resolve(sessionDetails('初始化的新昵称', 'rose'));
+  await Promise.all([first, second]);
+  s.requests[0].resolve(sessionDetails('旧昵称', 'cream'));
+  assert.equal(await older, false);
+  assert.equal(s.store.user.nickname, '初始化的新昵称');
+  assert.equal(s.store.ready, true);
+});
+
 test('settings cannot save a profile while a connection is being checked', async () => {
   const s = setup();
   const view = s.settings();

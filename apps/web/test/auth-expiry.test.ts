@@ -177,10 +177,67 @@ for (const changed of ['base', 'token']) {
   });
 }
 
+for (const earlier of ['refresh', 'hydrate'] as const) {
+  test(`an older ${earlier} 401 cannot expire the same session after its newer read succeeds`, async (t) => {
+    const responses: ((response: Response) => void)[] = [];
+    const s = setup(t, () => new Promise<Response>((resolve) => responses.push(resolve)));
+    if (earlier === 'refresh') s.store.accept(account);
+    else s.storage.set('little-world-token', account.token);
+    const older = s.store[earlier]();
+    const settled = older.then(
+      (value: unknown) => ({ value }),
+      (error: Error) => ({ error }),
+    );
+    const latest = s.store.refresh();
+    responses[1](
+      Response.json({
+        user: { ...account.user, nickname: '新昵称' },
+        space: { ...account.space, theme: 'rose' },
+      }),
+    );
+    assert.equal(await latest, true);
+    responses[0](Response.json({ message: '旧读取过期' }, { status: 401 }));
+    assert.deepEqual(await settled, { value: earlier === 'refresh' ? false : undefined });
+    assert.equal(s.store.user.nickname, '新昵称');
+    assert.equal(s.store.space.theme, 'rose');
+    assert.equal(s.store.ready, true);
+    assert.equal(s.storage.get('little-world-token'), account.token);
+    assert.deepEqual(s.navigations, []);
+    assert.deepEqual(s.warnings, []);
+  });
+}
+
+test('the newest profile 401 still expires the session and an older success cannot restore it', async (t) => {
+  const responses: ((response: Response) => void)[] = [];
+  const s = setup(t, () => new Promise<Response>((resolve) => responses.push(resolve)));
+  s.store.accept(account);
+  const older = s.store.refresh();
+  const latest = s.store.refresh();
+  const rejected = assert.rejects(latest, /当前登录过期/);
+  responses[1](Response.json({ message: '当前登录过期' }, { status: 401 }));
+  await rejected;
+  responses[0](Response.json(account));
+  assert.equal(await older, false);
+  assert.equal(s.store.authenticated, false);
+  assert.equal(s.storage.has('little-world-token'), false);
+  assert.deepEqual(s.navigations, ['/auth']);
+  assert.equal(s.warnings.length, 1);
+});
+
 test('a current protected-resource 401 still clears the session through App', async (t) => {
   const s = setup(t, async () => Response.json({ message: '登录过期' }, { status: 401 }));
   s.store.accept(account);
   await assert.rejects(s.api.api.get('/dashboard'), /登录过期/);
+  assert.equal(s.store.authenticated, false);
+  assert.equal(s.storage.has('little-world-token'), false);
+  assert.deepEqual(s.navigations, ['/auth']);
+  assert.equal(s.warnings.length, 1);
+});
+
+test('a profile read guard cannot silence a protected-resource 401', async (t) => {
+  const s = setup(t, async () => Response.json({ message: '登录过期' }, { status: 401 }));
+  s.store.accept(account);
+  await assert.rejects(s.api.api.get('/dashboard', { canExpireSession: () => false }), /登录过期/);
   assert.equal(s.store.authenticated, false);
   assert.equal(s.storage.has('little-world-token'), false);
   assert.deepEqual(s.navigations, ['/auth']);

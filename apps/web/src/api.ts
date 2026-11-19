@@ -15,7 +15,13 @@ export function setBase(value: string) {
   else localStorage.removeItem(BASE_KEY);
 }
 export async function request<T = any>(path: string, options: ApiOptions = {}): Promise<T> {
-  const { base = getBase(), anonymous = false, binary = false, ...fetchOptions } = options;
+  const {
+    base = getBase(),
+    anonymous = false,
+    binary = false,
+    canExpireSession,
+    ...fetchOptions
+  } = options;
   const headers = new Headers(options.headers);
   const token = localStorage.getItem(TOKEN_KEY);
   if (token && !anonymous) headers.set('Authorization', `Bearer ${token}`);
@@ -44,6 +50,7 @@ export async function request<T = any>(path: string, options: ApiOptions = {}): 
         token &&
         base === getBase() &&
         token === localStorage.getItem(TOKEN_KEY) &&
+        (path !== '/auth/me' || !canExpireSession || canExpireSession()) &&
         (path === '/auth/me' || !path.startsWith('/auth/'))
       )
         window.dispatchEvent(new Event('session-expired'));
@@ -71,7 +78,8 @@ export async function connectBase(value: string) {
   return status;
 }
 export const api = {
-  get: <T = any>(path: string) => request<T>(path),
+  get: <T = any>(path: string, options: Pick<ApiOptions, 'canExpireSession'> = {}) =>
+    request<T>(path, options),
   post: <T = any>(path: string, body?: object) => request<T>(path, { method: 'POST', body }),
   patch: <T = any>(path: string, body: object) => request<T>(path, { method: 'PATCH', body }),
   put: <T = any>(path: string, body: object) => request<T>(path, { method: 'PUT', body }),

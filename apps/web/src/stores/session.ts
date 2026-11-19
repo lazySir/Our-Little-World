@@ -3,6 +3,8 @@ import { defineStore } from 'pinia';
 import { api, getBase, TOKEN_KEY } from '../api';
 let hydration: Promise<void> | undefined;
 let generation = 0;
+// Reads can supersede each other without changing login identity or hydration readiness.
+let latestRead = 0;
 function currentSession() {
   const base = getBase(),
     token = localStorage.getItem(TOKEN_KEY),
@@ -23,14 +25,16 @@ export const useSession = defineStore('session', {
       if (this.ready) return;
       if (!hydration) {
         const current = currentSession();
+        const read = ++latestRead;
+        const currentRead = () => current() && read === latestRead;
         hydration = (async () => {
           try {
             if (localStorage.getItem(TOKEN_KEY)) {
-              const data = await api.get('/auth/me');
-              if (current()) Object.assign(this, data);
+              const data = await api.get('/auth/me', { canExpireSession: currentRead });
+              if (currentRead()) Object.assign(this, data);
             }
           } catch {
-            if (current()) {
+            if (currentRead()) {
               localStorage.removeItem(TOKEN_KEY);
               this.ready = true;
             }
@@ -56,10 +60,17 @@ export const useSession = defineStore('session', {
     },
     async refresh() {
       const current = currentSession();
-      const data = await api.get('/auth/me');
-      if (!current()) return false;
-      Object.assign(this, data);
-      return true;
+      const read = ++latestRead;
+      const currentRead = () => current() && read === latestRead;
+      try {
+        const data = await api.get('/auth/me', { canExpireSession: currentRead });
+        if (!currentRead()) return false;
+        Object.assign(this, data);
+        return true;
+      } catch (error) {
+        if (current() && read !== latestRead) return false;
+        throw error;
+      }
     },
     clear() {
       generation++;

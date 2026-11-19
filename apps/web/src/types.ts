@@ -135,4 +135,6 @@ export interface ApiOptions extends Omit<RequestInit, 'body'> {
   binary?: boolean;
   base?: string;
   anonymous?: boolean;
+  /** Only a current /auth/me read may expire the shared session. */
+  canExpireSession?: () => boolean;
 }
