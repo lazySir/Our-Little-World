@@ -716,6 +716,113 @@ test('ordering locks the submitted basket and preserves it after a failed reques
   ).toBeDisabled();
 });
 
+test('authentication survives a failed profile refresh and both exits work offline', async ({
+  page,
+  request,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const apiBase = 'http://127.0.0.1:3001/api';
+  const status = await (await request.get(`${apiBase}/auth/status`)).json();
+  if (!status.initialized) {
+    const setup = await request.post(`${apiBase}/auth/setup`, {
+      data: {
+        username: 'web_owner',
+        password: 'little-world-e2e-123',
+        nickname: '小林',
+        spaceName: '小林与小禾的小世界',
+        startDate: '2024-02-29',
+      },
+    });
+    expect(setup.ok(), await setup.text()).toBeTruthy();
+  }
+  const failProfile = (route: import('@playwright/test').Route) => route.abort('failed');
+  await page.route('**/api/auth/me', failProfile);
+  await page.route('**/api/auth/logout', (route) => route.abort('failed'));
+  await page.goto('/auth');
+  await expect(page.locator('.auth-card .el-skeleton')).toHaveCount(0);
+  await fill(page.locator('.auth-card'), '账号', 'web_owner');
+  await fill(page.locator('.auth-card'), '密码', 'little-world-e2e-123');
+  await page.getByRole('button', { name: '回到小世界', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '平凡日子，也闪闪发光' })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('little-world-token'))).toBeTruthy();
+  await page.getByTitle('退出登录', { exact: true }).click();
+  await expect(page).toHaveURL(/\/auth$/);
+  expect(await page.evaluate(() => localStorage.getItem('little-world-token'))).toBeNull();
+  await page.unroute('**/api/auth/me', failProfile);
+  await fill(page.locator('.auth-card'), '账号', 'web_owner');
+  await fill(page.locator('.auth-card'), '密码', 'little-world-e2e-123');
+  await page.getByRole('button', { name: '回到小世界', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '平凡日子，也闪闪发光' })).toBeVisible();
+  await visit(page, '/settings', '我们的小设置');
+  await page.getByRole('button', { name: '暂时离开小世界', exact: true }).click();
+  await expect(page).toHaveURL(/\/auth$/);
+  expect(await page.evaluate(() => localStorage.getItem('little-world-token'))).toBeNull();
+  expect(errors).toEqual([]);
+});
+
+test('mood saves protect pending inputs and preserve a failed draft for retry', async ({
+  page,
+  request,
+}) => {
+  const apiBase = 'http://127.0.0.1:3001/api';
+  const status = await (await request.get(`${apiBase}/auth/status`)).json();
+  const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
+    data: {
+      username: 'web_owner',
+      password: 'little-world-e2e-123',
+      nickname: '小林',
+      spaceName: '小林与小禾的小世界',
+      startDate: '2024-02-29',
+    },
+  });
+  expect(signedIn.ok(), await signedIn.text()).toBeTruthy();
+  const { token } = await signedIn.json();
+  await page.addInitScript((value) => localStorage.setItem('little-world-token', value), token);
+  await visit(page, '/', '平凡日子，也闪闪发光');
+  const note = `慢网心情 ${stamp}`;
+  await page.getByRole('button', { name: '超开心', exact: true }).click();
+  await page.getByPlaceholder('留一句今天的小心情…').fill(note);
+  let release!: () => void;
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const pending = new Promise<void>((resolve) => (started = resolve));
+  const tasks: Promise<void>[] = [];
+  const handler = (route: import('@playwright/test').Route) => {
+    const task = (async () => {
+      started();
+      await gate;
+      await route.fulfill({ status: 503, json: { message: '心情暂时没有送达，请重试' } });
+    })();
+    tasks.push(task);
+    return task;
+  };
+  await page.route('**/api/moods', handler);
+  try {
+    await page.getByRole('button', { name: /记下心情|更新心情/ }).click();
+    await pending;
+    await expect(page.getByPlaceholder('留一句今天的小心情…')).toBeDisabled();
+    for (const option of await page.locator('.mood-options button').all())
+      await expect(option).toBeDisabled();
+    release();
+    await expect(page.locator('.el-message')).toContainText('心情暂时没有送达，请重试');
+    await expect(page.getByPlaceholder('留一句今天的小心情…')).toBeEnabled();
+    await expect(page.getByPlaceholder('留一句今天的小心情…')).toHaveValue(note);
+    await expect(page.getByRole('button', { name: '超开心', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  } finally {
+    release();
+    await Promise.allSettled(tasks);
+    await page.unroute('**/api/moods', handler);
+  }
+  await page.getByRole('button', { name: /记下心情|更新心情/ }).click();
+  await expect(page.locator('.partner-moods')).toContainText(note);
+  await page.reload();
+  await expect(page.locator('.partner-moods')).toContainText(note);
+});
+
 test('photo editors keep pending uploads attached and release controls after failures', async ({
   page,
   request,

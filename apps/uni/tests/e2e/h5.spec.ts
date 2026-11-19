@@ -429,3 +429,126 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   expect(await page.evaluate(() => localStorage.getItem('little-world-token'))).toBeNull();
   expect(errors).toEqual([]);
 });
+
+test('uni H5 locks a pending mood, keeps its failed draft and persists a real retry', async ({
+  page,
+  request,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const status = await request.get(`${api}/auth/status`);
+  expect(status.ok()).toBeTruthy();
+  if (!(await status.json()).initialized) {
+    const setup = await request.post(`${api}/auth/setup`, {
+      data: {
+        username: 'uni_h5_owner',
+        password: 'uni-private-test-123',
+        nickname: '小熊',
+        spaceName: '小熊与兔子的小屋',
+        startDate: '2026-01-01',
+      },
+    });
+    expect(setup.ok(), await setup.text()).toBeTruthy();
+  }
+  await page.goto('/#/pages/auth/index');
+  await expect(page.locator('.title')).toContainText('欢迎来到我们的小世界');
+  const serverField = field(page.locator('.auth-page'), '小世界服务地址');
+  if (!(await serverField.isVisible()))
+    await page.locator('.auth-bottom').filter({ hasText: '连接设置' }).click();
+  await fill(page.locator('.auth-page'), '小世界服务地址', api);
+  const connected = page.waitForResponse(`${api}/auth/status`);
+  await click(page, '保存地址并检查连接');
+  expect((await connected).ok()).toBeTruthy();
+  await fill(page.locator('.auth-form'), '登录账号', 'uni_h5_owner');
+  await fill(page.locator('.auth-form'), '密码', 'uni-private-test-123');
+  const loggedIn = page.waitForResponse(`${api}/auth/login`);
+  await click(page, '回家啦');
+  const login = await loggedIn;
+  expect(login.ok(), await login.text()).toBeTruthy();
+  const account = await login.json();
+  await expect(page.locator('.title')).toHaveText('今天，也在好好生活');
+  await expect(page.locator('.loading')).toHaveCount(0);
+
+  const selected = page.locator('.chips .chip').filter({ hasText: '还不错' });
+  const other = page.locator('.chips .chip').filter({ hasText: '有点低落' });
+  const note = page.locator('.page textarea').first();
+  const draft = `保存失败也不丢失的心情 ${stamp}`;
+  await selected.click();
+  await note.fill(draft);
+  await expect(selected).toHaveClass(/active/);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const intercepted: unknown[] = [];
+  const tasks: Promise<void>[] = [];
+  const failure = '保存暂时失败，请再试一次';
+  const holdMood = (route: import('@playwright/test').Route) => {
+    const task = (async () => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+      intercepted.push(route.request().postDataJSON());
+      await gate;
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: JSON.stringify({ message: failure }),
+      });
+    })();
+    tasks.push(task);
+    return task;
+  };
+  await page.route('**/api/moods', holdMood);
+  try {
+    const started = page.waitForRequest(
+      (req) => req.url().endsWith('/api/moods') && req.method() === 'POST',
+    );
+    await click(page, '保存今天的心情');
+    await started;
+    await expect(note).toBeDisabled();
+    await other.click();
+    await expect(selected).toHaveClass(/active/);
+    await expect(other).not.toHaveClass(/active/);
+    await expect(note).toHaveValue(draft);
+    expect(intercepted).toEqual([{ mood: 'good', note: draft }]);
+    const failed = page.waitForResponse(
+      (response) => response.url().endsWith('/api/moods') && response.request().method() === 'POST',
+    );
+    release();
+    expect((await failed).status()).toBe(503);
+    await expect(page.getByText(failure, { exact: true })).toBeVisible();
+    await expect(note).toBeEnabled();
+    await expect(note).toHaveValue(draft);
+    await expect(selected).toHaveClass(/active/);
+  } finally {
+    release();
+    await Promise.allSettled(tasks);
+    await page.unroute('**/api/moods', holdMood);
+  }
+
+  const savedNote = `${draft}，现在继续记录`;
+  await note.fill(savedNote);
+  const saved = page.waitForResponse(
+    (response) => response.url().endsWith('/api/moods') && response.request().method() === 'POST',
+  );
+  await click(page, '保存今天的心情');
+  const response = await saved;
+  expect(response.ok(), await response.text()).toBeTruthy();
+  await expect(page.locator('.loading')).toHaveCount(0);
+  await expect(note).toBeEnabled();
+  await page.reload();
+  await expect(page.locator('.title')).toHaveText('今天，也在好好生活');
+  await expect(page.locator('.loading')).toHaveCount(0);
+  await expect(note).toHaveValue(savedNote);
+  await expect(selected).toHaveClass(/active/);
+  const dashboard = await request.get(`${api}/dashboard`, {
+    headers: { Authorization: `Bearer ${account.token}` },
+  });
+  expect(dashboard.ok(), await dashboard.text()).toBeTruthy();
+  const mine = (await dashboard.json()).moods.find(
+    (entry: { authorId: string }) => entry.authorId === account.user.id,
+  );
+  expect(mine).toMatchObject({ mood: 'good', note: savedNote });
+  expect(errors).toEqual([]);
+});
