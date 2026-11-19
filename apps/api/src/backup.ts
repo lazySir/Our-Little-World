@@ -217,8 +217,11 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
         const rows = zip.getEntries();
         assertBackupBudget({ zipEntries: rows.length, zipBytes: file.buffer.length });
         let total = 0;
+        const entryNames = new Set<string>();
         for (const entry of rows) {
           const name = entry.entryName;
+          if (entryNames.has(name)) throw new Error();
+          entryNames.add(name);
           if (
             name.includes('..') ||
             name.includes('\\') ||

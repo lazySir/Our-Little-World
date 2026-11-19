@@ -17,6 +17,43 @@ const binary = (res: any, cb: any) => {
   res.on('end', () => cb(null, Buffer.concat(chunks)));
 };
 
+function duplicateZipEntry(buffer: Buffer, entryName: string): Buffer {
+  const endOffset = buffer.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  assert.notEqual(endOffset, -1, 'ZIP end record must exist');
+  const centralOffset = buffer.readUInt32LE(endOffset + 16);
+  const centralSize = buffer.readUInt32LE(endOffset + 12);
+  const centralEnd = centralOffset + centralSize;
+  let duplicate: Buffer | undefined;
+
+  for (let offset = centralOffset; offset < centralEnd;) {
+    assert.equal(buffer.readUInt32LE(offset), 0x02014b50, 'central directory entry must exist');
+    const nameLength = buffer.readUInt16LE(offset + 28);
+    const extraLength = buffer.readUInt16LE(offset + 30);
+    const commentLength = buffer.readUInt16LE(offset + 32);
+    const entryLength = 46 + nameLength + extraLength + commentLength;
+    if (buffer.subarray(offset + 46, offset + 46 + nameLength).toString('utf8') === entryName) {
+      duplicate = Buffer.from(buffer.subarray(offset, offset + entryLength));
+      break;
+    }
+    offset += entryLength;
+  }
+
+  assert.ok(duplicate, `ZIP entry ${entryName} must exist`);
+  const result = Buffer.concat([
+    buffer.subarray(0, endOffset),
+    duplicate,
+    buffer.subarray(endOffset),
+  ]);
+  const updatedEndOffset = endOffset + duplicate.length;
+  result.writeUInt16LE(result.readUInt16LE(updatedEndOffset + 8) + 1, updatedEndOffset + 8);
+  result.writeUInt16LE(result.readUInt16LE(updatedEndOffset + 10) + 1, updatedEndOffset + 10);
+  result.writeUInt32LE(
+    result.readUInt32LE(updatedEndOffset + 12) + duplicate.length,
+    updatedEndOffset + 12,
+  );
+  return result;
+}
+
 before(async () => {
   directory = await mkdtemp(path.join(os.tmpdir(), 'world-backup-recovery-'));
   process.env.DATABASE_URL = `file:${path.join(directory, 'test.db').replace(/\\/g, '/')}`;
@@ -378,4 +415,32 @@ test('an invalid zip changes neither the current records nor the available files
     ),
     filesBefore,
   );
+});
+
+test('restore rejects duplicate archive entry names before changing data or files', async () => {
+  const backup = await api.get('/api/backup/download').set(auth()).buffer(true).parse(binary);
+  assert.equal(backup.status, 200);
+  const duplicate = duplicateZipEntry(backup.body, 'data.json');
+  const exportBefore = await api.get('/api/backup/export').set(auth());
+  const uploadDirectory = path.join(directory, 'storage', 'uploads');
+  const backupDirectory = path.join(directory, 'storage', 'backups');
+  await Promise.all([
+    mkdir(uploadDirectory, { recursive: true }),
+    mkdir(backupDirectory, { recursive: true }),
+  ]);
+  const uploadFilesBefore = await readdir(uploadDirectory);
+  const backupFilesBefore = await readdir(backupDirectory);
+
+  const restore = await api
+    .post('/api/backup/restore')
+    .set(auth())
+    .attach('file', duplicate, { filename: 'duplicate-entry.zip' });
+
+  assert.equal(restore.status, 400);
+  const exportAfter = await api.get('/api/backup/export').set(auth());
+  const { exportedAt: _beforeTime, ...before } = exportBefore.body;
+  const { exportedAt: _afterTime, ...after } = exportAfter.body;
+  assert.deepEqual(after, before);
+  assert.deepEqual(await readdir(uploadDirectory), uploadFilesBefore);
+  assert.deepEqual(await readdir(backupDirectory), backupFilesBefore);
 });
