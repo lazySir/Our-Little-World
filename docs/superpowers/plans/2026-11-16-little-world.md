@@ -89,6 +89,12 @@ The daily-use audit found a confirmed data-loss path in both clients: an unknown
 - [x] Verify 215 unit tests, root TypeScript, Web 13/13, H5 5/5, cleanup 2/2, shared/API/Web/mp-weixin/H5 production builds, and inspect 375px/390px error and recovered screenshots. Independent review found no blocking issue. Production 3003 health/status and its served build match without changing daily data.
 - [x] Record the separate native-minimal WeChat comparison: the same App-readiness timeout with no business code; no business checks executed, no cleanup errors, and no definitive internal root cause. The unchecked latest-simulator and real-device requirements above remain unchecked.
 
+## Daily-detail acceptance — Web ledger and wishes
+
+- [x] Reproduce desktop-to-phone ledger overflow in a real browser (268px after a 12-second poll); add `min-w-0` only to the two chart grid items, and pass the same regression.
+- [x] Extend the existing browser suite with cross-year/month filtering, exact monetary aggregates, live ECharts category/day values, edit/reload/API persistence and wish category/search/completion/reopening checks. Preserve the original 13 cases; full Web suite passes 15/15.
+- [x] Inspect 1440px/375px chart screenshots after real animation completion. Confirm 215 unit tests, root TypeScript, production Web build and read-only existing production health/build identity. Independent review finds no blocking issue; commit and immediately push this module separately.
+
 ## Commit discipline
 
 Each worker stages only their owned files, never `git add .` in shared repo. Root serializes commits on request to avoid index locks. No video, database, uploads, tokens, node_modules or build output committed. Destructive filesystem operations limited to verified workspace temporary/generated paths.

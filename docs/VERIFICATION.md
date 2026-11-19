@@ -78,9 +78,18 @@
 
 日志为 `baby-unit-final.log`、`baby-typecheck-final.log`、`baby-web-e2e-focused.log`、`baby-h5-e2e-focused.log`、`baby-web-e2e-final.log`、`baby-h5-e2e-final.log`、`baby-build-final.log`、`baby-h5-build-final.log` 与 `baby-cleanup-final.log`，均在忽略目录 `test-results/`。隔离清理 2/2 通过；Web 测试显式使用 5184，不占用其他项目的 5174。独立代码审查未发现阻挡问题。本机 3003 的只读健康与已有空间状态通过，入口 HTML 与四个入口资源字节均匹配新构建，没有重置空间或写入测试资料。
 
+## Web 账本缩放与日常编辑复验 — 2026-11-19
+
+真实浏览器流程先在 1440px 渲染账本，再缩到 375px；等待 12 秒后图表仍使页面横向溢出 268px。根因是两个图表所在的 grid 子项保留默认最小内容宽度，已有 ResizeObserver 无法取得缩小后的容器。仅在这两个子项补充 Tailwind `min-w-0`，同一流程通过，未隐藏溢出或替换图表。
+
+新增验收使用真实 API 写入不同年份、月份与类别的账目，通过界面修改金额、类别、付款人和日期，逐项核对月份列表、精确分金额汇总、实际 ECharts 分类及每日序列，刷新后再核对 API。另一项补查愿望类别编辑、描述与大小写/空格搜索、状态筛选、完成和重开计数、目标日期与完成时间持久化。原有 13 项保留，完整 Web 浏览器流程 15/15 通过。1440px/375px 图表截图等待实际动画完成后生成，均已查看。
+
+持久日志位于忽略目录 `test-results/`：`web-ledger-resize-red.log` 保留原失败，`web-ledger-resize-green.log`、`web-ledger-wish-green.log` 和 `web-ledger-wish-full.log` 为修复后结果。完整单测 215/215、根类型检查与 shared/API/Web 生产构建通过，记录于 `daily-detail-unit-final.log`、`daily-detail-typecheck-final.log`、`daily-detail-build-final.log`。独立代码审查未发现阻挡问题。本机 3003 只读检查仍为已有空间，健康状态正常，入口 HTML 和四个入口资源字节匹配新构建，见 `daily-detail-production-readonly.log`。未写入日常数据，测试 3001/5184 已释放，其他项目的 5174 保留。
+
 ## 本轮已修复的问题
 
 - 两端宝宝档案加载中或读取失败不再允许误建档覆盖已有资料；重试保留字段，旧读取及编辑/保存中的页面返回不再覆盖当前档案。
+- Web 账本从桌面缩至手机宽度后，分类与趋势图表会随容器缩小，不再持续撑宽页面。
 - 小程序首页遗漏的待办愿望现已展示，并修正该区块单元格右侧空白挤占标题的问题。
 - Web 弱网下的成功认证、资料补全失败、真实会话过期和离线退出不再互相混淆。
 - 两端列表忽略过期请求；小程序首页不再让页面刷新或保存前的旧请求覆盖保存失败后的草稿。

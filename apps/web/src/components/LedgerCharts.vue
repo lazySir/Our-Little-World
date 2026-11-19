@@ -103,14 +103,14 @@ onUnmounted(() => {
 </script>
 <template>
   <div class="ledger-charts">
-    <section class="panel">
+    <section class="panel min-w-0">
       <div class="section-head">
         <h3>支出都花在哪里</h3>
         <span class="muted">分类统计</span>
       </div>
       <div ref="categoryEl" class="chart-canvas" role="img" aria-label="本月支出分类饼图" />
     </section>
-    <section class="panel">
+    <section class="panel min-w-0">
       <div class="section-head">
         <h3>这个月的生活曲线</h3>
         <span class="muted">每日收支 · 元</span>

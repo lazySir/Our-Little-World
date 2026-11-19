@@ -1133,3 +1133,410 @@ test('baby profile read failure cannot turn an existing profile into a blank rep
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/baby-web-profile.png', fullPage: true });
 });
+
+test('ledger month filters and charts stay consistent after editing a category, payer and month', async ({
+  page,
+  request,
+}) => {
+  page.setDefaultTimeout(15000);
+  const apiBase = 'http://127.0.0.1:3001/api';
+  const status = await (await request.get(`${apiBase}/auth/status`)).json();
+  const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
+    data: {
+      username: 'web_owner',
+      password: 'little-world-e2e-123',
+      nickname: '小林',
+      spaceName: '小林与小禾的小世界',
+      startDate: '2024-02-29',
+    },
+  });
+  expect(signedIn.ok(), await signedIn.text()).toBeTruthy();
+  const { token } = await signedIn.json();
+  const headers = { Authorization: `Bearer ${token}` };
+  const payer = `付款甲 ${stamp}`;
+  const notes = {
+    salary: `六月工资 ${stamp}`,
+    breakfast: `六月早餐 ${stamp}`,
+    bonus: `六月奖金 ${stamp}`,
+    dinner: `六月晚餐 ${stamp}`,
+    travel: `六月出行 ${stamp}`,
+    julySalary: `七月工资 ${stamp}`,
+    home: `七月居家 ${stamp}`,
+    old: `去年六月 ${stamp}`,
+    moved: `改到七月的购物 ${stamp}`,
+  };
+  const rows = [
+    {
+      type: 'income',
+      amountCents: 120034,
+      category: '工资',
+      date: '2026-06-01',
+      payer: '小林',
+      note: notes.salary,
+    },
+    {
+      type: 'expense',
+      amountCents: 1234,
+      category: '餐饮',
+      date: '2026-06-01',
+      payer,
+      note: notes.breakfast,
+    },
+    {
+      type: 'income',
+      amountCents: 9966,
+      category: '奖金',
+      date: '2026-06-02',
+      payer: '小林',
+      note: notes.bonus,
+    },
+    {
+      type: 'expense',
+      amountCents: 766,
+      category: '餐饮',
+      date: '2026-06-02',
+      payer: '付款乙',
+      note: notes.dinner,
+    },
+    {
+      type: 'expense',
+      amountCents: 2550,
+      category: '出行',
+      date: '2026-06-30',
+      payer,
+      note: notes.travel,
+    },
+    {
+      type: 'income',
+      amountCents: 50000,
+      category: '工资',
+      date: '2026-07-01',
+      payer: '小林',
+      note: notes.julySalary,
+    },
+    {
+      type: 'expense',
+      amountCents: 3500,
+      category: '居家',
+      date: '2026-07-05',
+      payer: '共同账户',
+      note: notes.home,
+    },
+    {
+      type: 'expense',
+      amountCents: 99999,
+      category: '其他',
+      date: '2025-06-01',
+      payer,
+      note: notes.old,
+    },
+  ];
+  const seeded: { id: string; note: string }[] = [];
+  for (const row of rows) {
+    const response = await request.post(`${apiBase}/ledger`, { headers, data: row });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    seeded.push(await response.json());
+  }
+  const movedId = seeded.find((row) => row.note === notes.travel)!.id;
+  await page.addInitScript((value) => localStorage.setItem('little-world-token', value), token);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await visit(page, '/ledger', '共同账本');
+  const list = page.locator('.ledger-list');
+  const search = page.getByPlaceholder('搜索分类、备注、付款人');
+  const month = async (value: string) => {
+    const input = page.locator('.ledger-month input');
+    await input.fill(`${value.slice(0, 4)} 年 ${value.slice(5)} 月`);
+    await input.press('Enter');
+    await input.press('Tab');
+  };
+  const summary = async (income: string, expense: string, balance: string) => {
+    for (const [label, value] of [
+      ['本月收入', income],
+      ['本月支出', expense],
+      ['本月结余', balance],
+    ]) {
+      await expect(
+        page
+          .locator('.ledger-stats article')
+          .filter({ has: page.getByText(label, { exact: true }) })
+          .locator('strong'),
+      ).toHaveText(`¥ ${value}`);
+    }
+  };
+  const charts = () =>
+    page.evaluate(async () => {
+      // Import the exact ECharts runtime already drawing these canvases, including Vite's version.
+      const runtime = performance
+        .getEntriesByType('resource')
+        .find((entry) => new URL(entry.name).pathname.endsWith('/echarts_core.js'));
+      if (!runtime) return null;
+      const modulePath = runtime.name;
+      const { getInstanceByDom } = await import(/* @vite-ignore */ modulePath);
+      const categoryChart = getInstanceByDom(
+        document.querySelector('[aria-label="本月支出分类饼图"]'),
+      );
+      const trendChart = getInstanceByDom(
+        document.querySelector('[aria-label="本月每日收支柱状图"]'),
+      );
+      if (
+        !categoryChart ||
+        !trendChart ||
+        !categoryChart.getZr().animation.isFinished() ||
+        !trendChart.getZr().animation.isFinished()
+      )
+        return null;
+      const category = categoryChart.getOption();
+      const trend = trendChart.getOption();
+      return {
+        categories: Object.fromEntries(category.series[0].data.map((row) => [row.name, row.value])),
+        dates: trend.xAxis[0].data,
+        series: Object.fromEntries(trend.series.map((row) => [row.name, row.data])),
+      };
+    });
+  const juneBefore = {
+    categories: { 餐饮: 2000, 出行: 2550 },
+    dates: ['06-01', '06-02', '06-30'],
+    series: { 收入: [120034, 9966, 0], 支出: [1234, 766, 2550] },
+  };
+  const juneAfter = {
+    categories: { 餐饮: 2000 },
+    dates: ['06-01', '06-02'],
+    series: { 收入: [120034, 9966], 支出: [1234, 766] },
+  };
+  const julyBefore = {
+    categories: { 居家: 3500 },
+    dates: ['07-01', '07-05'],
+    series: { 收入: [50000, 0], 支出: [0, 3500] },
+  };
+  const julyAfter = {
+    categories: { 居家: 3500, 购物: 2789 },
+    dates: ['07-01', '07-05'],
+    series: { 收入: [50000, 0], 支出: [2789, 3500] },
+  };
+  await month('2026-06');
+  await summary('1,300.00', '45.50', '1,254.50');
+  await expect(list.locator('.ledger-row')).toHaveCount(5);
+  await expect(list).not.toContainText(notes.home);
+  await expect(list).not.toContainText(notes.old);
+  await expect.poll(charts).toEqual(juneBefore);
+  await page.getByRole('button', { name: '支出', exact: true }).click();
+  await expect(list.locator('.ledger-row')).toHaveCount(3);
+  await search.fill(payer);
+  await expect(list.locator('.ledger-row')).toHaveCount(2);
+  await expect(list).toContainText(notes.breakfast);
+  await expect(list).toContainText(notes.travel);
+  await search.fill('餐饮');
+  await expect(list.locator('.ledger-row')).toHaveCount(2);
+  await search.fill(notes.dinner);
+  await expect(list.locator('.ledger-row')).toHaveCount(1);
+  await summary('1,300.00', '45.50', '1,254.50');
+  await expect.poll(charts).toEqual(juneBefore);
+  await search.clear();
+  await page.getByRole('button', { name: '收入', exact: true }).click();
+  await expect(list.locator('.ledger-row')).toHaveCount(2);
+  await page.getByRole('button', { name: '全部记录', exact: true }).click();
+  await month('2026-07');
+  await summary('500.00', '35.00', '465.00');
+  await expect(list.locator('.ledger-row')).toHaveCount(2);
+  await expect.poll(charts).toEqual(julyBefore);
+  await month('2026-06');
+  await list
+    .locator('.ledger-row')
+    .filter({ hasText: notes.travel })
+    .getByRole('button', { name: '编辑账目', exact: true })
+    .click();
+  await expect(field(dialog(page), '金额（元）').locator('input')).toHaveValue('25.50');
+  await expect(field(dialog(page), '付款人')).toContainText(payer);
+  await fill(dialog(page), '金额（元）', '27.89');
+  await field(dialog(page), '分类').getByRole('combobox').click();
+  await page.getByRole('option', { name: '购物', exact: true }).click();
+  await field(dialog(page), '付款人').getByRole('combobox').click();
+  await page.getByRole('option', { name: '共同账户', exact: true }).click();
+  await date(dialog(page), '日期', '2026-07-01');
+  await fill(dialog(page), '备注', notes.moved);
+  const updated = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/ledger/${movedId}`) && response.request().method() === 'PATCH',
+  );
+  await dialog(page).getByRole('button', { name: '记进账本', exact: true }).click();
+  const response = await updated;
+  expect(response.ok(), await response.text()).toBeTruthy();
+  await expect(dialog(page)).toHaveCount(0);
+  await summary('1,300.00', '20.00', '1,280.00');
+  await expect(list.locator('.ledger-row')).toHaveCount(4);
+  await expect(list).not.toContainText(notes.travel);
+  await expect(list).not.toContainText(notes.moved);
+  await expect.poll(charts).toEqual(juneAfter);
+  await month('2026-07');
+  await summary('500.00', '62.89', '437.11');
+  const moved = list.locator('.ledger-row').filter({ hasText: notes.moved });
+  await expect(moved).toContainText('购物');
+  await expect(moved).toContainText('共同账户');
+  await expect(moved).toContainText('2026-07-01');
+  await expect(moved.locator('.ledger-amount')).toHaveText('− 27.89');
+  await expect.poll(charts).toEqual(julyAfter);
+  await page.reload();
+  await expect(page.locator('.el-skeleton')).toHaveCount(0);
+  await month('2026-06');
+  await summary('1,300.00', '20.00', '1,280.00');
+  await expect.poll(charts).toEqual(juneAfter);
+  await month('2026-07');
+  await summary('500.00', '62.89', '437.11');
+  await expect(moved).toBeVisible();
+  await expect.poll(charts).toEqual(julyAfter);
+  const persisted = await request.get(`${apiBase}/ledger`, { headers });
+  expect(persisted.ok()).toBeTruthy();
+  const saved = (await persisted.json()).filter((row) => row.id === movedId);
+  expect(saved).toHaveLength(1);
+  expect(saved[0]).toMatchObject({
+    type: 'expense',
+    amountCents: 2789,
+    category: '购物',
+    date: '2026-07-01',
+    payer: '共同账户',
+    note: notes.moved,
+  });
+  await page.screenshot({
+    path: 'test-results/web-ledger-cross-month-desktop.png',
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect
+    .poll(() => page.evaluate(() => Math.max(0, document.documentElement.scrollWidth - innerWidth)))
+    .toBe(0);
+  await expect.poll(charts).toEqual(julyAfter);
+  expect(errors).toEqual([]);
+  await page.screenshot({ path: 'test-results/web-ledger-cross-month-mobile.png', fullPage: true });
+});
+
+test('wish category edits and search stay consistent through completion, reopening and reload', async ({
+  page,
+  request,
+}) => {
+  page.setDefaultTimeout(15000);
+  const apiBase = 'http://127.0.0.1:3001/api';
+  const status = await (await request.get(`${apiBase}/auth/status`)).json();
+  const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
+    data: {
+      username: 'web_owner',
+      password: 'little-world-e2e-123',
+      nickname: '小林',
+      spaceName: '小林与小禾的小世界',
+      startDate: '2024-02-29',
+    },
+  });
+  expect(signedIn.ok(), await signedIn.text()).toBeTruthy();
+  const { token } = await signedIn.json();
+  const headers = { Authorization: `Bearer ${token}` };
+  const prefix = `journey-${stamp}`;
+  const title = `${prefix} 一起出发`;
+  const description = `只在说明里的关键词 ${stamp}`;
+  let wishId = '';
+  for (const wish of [
+    { title, description, category: 'travel', status: 'todo', targetDate: '2027-01-20' },
+    { title: `${prefix} 周末烘焙`, description: '厨房里的香气', category: 'food', status: 'done' },
+    {
+      title: `${prefix} 阳台种花`,
+      description: '一起照顾小绿植',
+      category: 'life',
+      status: 'todo',
+    },
+  ]) {
+    const response = await request.post(`${apiBase}/wishes`, { headers, data: wish });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    const created = await response.json();
+    if (wish.title === title) wishId = created.id;
+  }
+  const all = await (await request.get(`${apiBase}/wishes`, { headers })).json();
+  const todo = all.filter((wish) => wish.status === 'todo').length;
+  const done = all.filter((wish) => wish.status === 'done').length;
+  await page.addInitScript((value) => localStorage.setItem('little-world-token', value), token);
+  await page.setViewportSize({ width: 375, height: 812 });
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await visit(page, '/wishes', '一起做');
+  const search = page.getByPlaceholder('搜索愿望');
+  const cards = page.locator('.card-grid article');
+  const main = cards.filter({ hasText: title });
+  const pendingTab = page.getByRole('button', { name: /^待完成/ });
+  const completedTab = page.getByRole('button', { name: /^已完成/ });
+  await expect(pendingTab.locator('.count')).toHaveText(String(todo));
+  await expect(completedTab.locator('.count')).toHaveText(String(done));
+  await search.fill(`  ${prefix.toUpperCase()}  `);
+  await expect(cards).toHaveCount(3);
+  await search.fill(description);
+  await expect(cards).toHaveCount(1);
+  await expect(main.locator('.tag')).toHaveText('旅行');
+  await completedTab.click();
+  await expect(
+    page.getByRole('heading', { name: '没有找到匹配的记录', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: '清除搜索', exact: true }).click();
+  await expect(search).toHaveValue('');
+  await expect(cards.filter({ hasText: `${prefix} 周末烘焙` })).toBeVisible();
+  await expect(main).toHaveCount(0);
+  await search.fill(prefix);
+  await expect(cards).toHaveCount(1);
+  await pendingTab.click();
+  await expect(cards).toHaveCount(2);
+  await main.getByRole('button', { name: '编辑', exact: true }).click();
+  await expect(field(dialog(page), '分类')).toContainText('想去的地方');
+  await expect(field(dialog(page), '目标日期').locator('input')).toHaveValue('2027-01-20');
+  await field(dialog(page), '分类').locator('.el-select').click();
+  await page.getByRole('option', { name: '想吃的美味', exact: true }).click();
+  const edited = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/wishes/${wishId}`) && response.request().method() === 'PATCH',
+  );
+  await dialog(page).getByRole('button', { name: '保存到小世界', exact: true }).click();
+  expect((await edited).ok()).toBeTruthy();
+  await expect(dialog(page)).toHaveCount(0);
+  await expect(main.locator('.tag')).toHaveText('美食');
+  await expect(main).toContainText('2027-01-20');
+  await expect(main).toContainText(description);
+  const completed = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/wishes/${wishId}`) && response.request().method() === 'PATCH',
+  );
+  await main.getByRole('button', { name: '标记完成', exact: true }).click();
+  expect((await completed).ok()).toBeTruthy();
+  await expect(main).toHaveCount(0);
+  await expect(cards).toHaveCount(1);
+  await expect(pendingTab.locator('.count')).toHaveText(String(todo - 1));
+  await expect(completedTab.locator('.count')).toHaveText(String(done + 1));
+  await completedTab.click();
+  await expect(cards).toHaveCount(2);
+  await expect(main.locator('.tag')).toHaveText('已完成');
+  const reopened = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/api/wishes/${wishId}`) && response.request().method() === 'PATCH',
+  );
+  await main.getByRole('button', { name: '重新打开', exact: true }).click();
+  expect((await reopened).ok()).toBeTruthy();
+  await expect(main).toHaveCount(0);
+  await expect(cards).toHaveCount(1);
+  await expect(pendingTab.locator('.count')).toHaveText(String(todo));
+  await expect(completedTab.locator('.count')).toHaveText(String(done));
+  await page.reload();
+  await expect(page.locator('.el-skeleton')).toHaveCount(0);
+  await search.fill(prefix);
+  await pendingTab.click();
+  await expect(cards).toHaveCount(2);
+  await expect(main.locator('.tag')).toHaveText('美食');
+  await expect(main).toContainText('目标：2027-01-20');
+  const persisted = await request.get(`${apiBase}/wishes`, { headers });
+  expect(persisted.ok()).toBeTruthy();
+  expect((await persisted.json()).find((wish) => wish.id === wishId)).toMatchObject({
+    title,
+    description,
+    category: 'food',
+    status: 'todo',
+    completedAt: null,
+    targetDate: '2027-01-20',
+  });
+  expect(errors).toEqual([]);
+  await expect(page.locator('.el-message--error')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/web-wish-reopen-mobile.png', fullPage: true });
+});
