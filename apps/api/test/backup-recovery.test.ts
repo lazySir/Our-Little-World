@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, unlink, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, unlink, readFile, readdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -58,6 +58,180 @@ async function upload(color: string) {
   assert.equal(response.status, 201, JSON.stringify(response.body));
   return response.body;
 }
+
+test('a successful restore removes unreferenced uploads without deleting another space assets', async (t) => {
+  const retained = await upload('#e5bbaa');
+  const backup = await api.get('/api/backup/download').set(auth()).buffer(true).parse(binary);
+  assert.equal(backup.status, 200);
+  const archived = new AdmZip(backup.body);
+  const archivedAssets = JSON.parse(archived.readAsText('data.json')).assets;
+  const retainedAsset = archivedAssets.find((asset: any) => asset.id === retained.id);
+  assert.ok(retainedAsset);
+  const uploadDirectory = path.join(directory, 'storage', 'uploads');
+  const removed = await upload('#aae5bb');
+  await writeFile(path.join(uploadDirectory, 'legacy-orphan.webp'), 'orphan');
+  const { PrismaClient } = await import('@prisma/client');
+  const db = new PrismaClient();
+  const otherSpace = await db.space.create({
+    data: { name: '另一个空间', startDate: '2024-01-01', theme: 'cream' },
+  });
+  const otherSpaceAsset = await db.asset.create({
+    data: {
+      spaceId: otherSpace.id,
+      filename: 'other-space-photo.webp',
+      originalName: 'other.webp',
+      mime: 'image/webp',
+      size: 6,
+    },
+  });
+  t.after(async () => {
+    await db.asset.deleteMany({ where: { id: otherSpaceAsset.id } });
+    await db.space.deleteMany({ where: { id: otherSpace.id } });
+    await db.$disconnect();
+  });
+  await writeFile(path.join(uploadDirectory, otherSpaceAsset.filename), 'shared');
+  const current = await api.get('/api/backup/export').set(auth());
+  const removedAsset = current.body.assets.find((asset: any) => asset.id === removed.id);
+  assert.ok(removedAsset);
+
+  const restore = await api
+    .post('/api/backup/restore')
+    .set(auth())
+    .attach('file', backup.body, { filename: 'asset-cleanup.zip' });
+
+  assert.equal(restore.status, 201, JSON.stringify(restore.body));
+  assert.deepEqual(
+    (await readdir(uploadDirectory)).sort(),
+    [retainedAsset.filename, otherSpaceAsset.filename].sort(),
+  );
+  await assert.rejects(readFile(path.join(uploadDirectory, removedAsset.filename)), {
+    code: 'ENOENT',
+  });
+  assert.equal(
+    (await api.get(removed.url)).status,
+    404,
+    'A removed attachment must no longer be served after restore',
+  );
+  assert.deepEqual(
+    await readFile(path.join(uploadDirectory, otherSpaceAsset.filename)),
+    Buffer.from('shared'),
+  );
+});
+
+test('a failed database restore keeps files from the pre-restore state', async () => {
+  const retained = await upload('#d9bbaa');
+  const record = await api.post('/api/wishes').set(auth()).send({ title: '触发数据库回滚' });
+  assert.equal(record.status, 201);
+  const backup = await api.get('/api/backup/download').set(auth()).buffer(true).parse(binary);
+  assert.equal(backup.status, 200);
+  const archive = new AdmZip(backup.body);
+  const backupData = JSON.parse(archive.readAsText('data.json'));
+  const restoredAsset = backupData.assets.find((asset: any) => asset.id === retained.id);
+  assert.ok(restoredAsset);
+  const uploadDirectory = path.join(directory, 'storage', 'uploads');
+  const originalBytes = Buffer.from(archive.readFile(`uploads/${restoredAsset.filename}`)!);
+  const beforeRestore = await api.get(retained.url).buffer(true).parse(binary);
+  assert.equal(beforeRestore.status, 200);
+  assert.deepEqual(beforeRestore.body, originalBytes);
+  const altered = Buffer.from(archive.readFile(`uploads/${restoredAsset.filename}`)!);
+  altered[0] ^= 0xff;
+  archive.updateFile(`uploads/${restoredAsset.filename}`, altered);
+  const failingBackup = archive.toBuffer();
+  const current = await upload('#aabbdd');
+  const { PrismaClient } = await import('@prisma/client');
+  const db = new PrismaClient();
+  const filesBefore = (await readdir(uploadDirectory)).sort();
+  const exportBefore = await api.get('/api/backup/export').set(auth());
+
+  try {
+    await db.$executeRawUnsafe(`
+      CREATE TRIGGER fail_restore_entry
+      BEFORE INSERT ON "Entry"
+      BEGIN SELECT RAISE(ABORT, 'forced restore failure'); END
+    `);
+    const originalConsoleError = console.error;
+    let restore: any;
+    try {
+      console.error = () => {};
+      restore = await api
+        .post('/api/backup/restore')
+        .set(auth())
+        .attach('file', failingBackup, { filename: 'rollback.zip' });
+    } finally {
+      console.error = originalConsoleError;
+    }
+
+    assert.equal(restore.status, 500);
+    assert.deepEqual((await readdir(uploadDirectory)).sort(), filesBefore);
+    assert.equal((await api.get(current.url)).status, 200);
+    const retainedAfter = await api.get(retained.url).buffer(true).parse(binary);
+    assert.equal(retainedAfter.status, 200);
+    assert.deepEqual(
+      retainedAfter.body,
+      originalBytes,
+      'Rollback must restore overwritten attachment bytes',
+    );
+    assert.equal((await api.get('/api/auth/me').set(auth())).status, 200);
+    const exportAfter = await api.get('/api/backup/export').set(auth());
+    const { exportedAt: _beforeTime, ...before } = exportBefore.body;
+    const { exportedAt: _afterTime, ...after } = exportAfter.body;
+    assert.deepEqual(after, before, 'The failed transaction must preserve all database records');
+  } finally {
+    await db.$executeRawUnsafe('DROP TRIGGER IF EXISTS fail_restore_entry');
+    await db.$disconnect();
+  }
+});
+
+test('restore safety archives use unique names and retain only the latest seven', async () => {
+  const backup = await api.get('/api/backup/download').set(auth()).buffer(true).parse(binary);
+  assert.equal(backup.status, 200);
+  const backupDirectory = path.join(directory, 'storage', 'backups');
+  await mkdir(backupDirectory, { recursive: true });
+  for (let index = 0; index < 8; index++) {
+    await writeFile(
+      path.join(backupDirectory, `before-restore-${1000000000000 + index}.zip`),
+      'old',
+    );
+  }
+  await writeFile(path.join(backupDirectory, 'auto-1000000000000.zip'), 'scheduled');
+
+  const now = Date.now;
+  const fixedNow = now();
+  let firstName: string;
+  let secondName: string;
+  Date.now = () => fixedNow;
+  try {
+    const restore = () =>
+      api
+        .post('/api/backup/restore')
+        .set(auth())
+        .attach('file', backup.body, { filename: 'safety-retention.zip' });
+    const first = await restore();
+    const second = await restore();
+    assert.equal(first.status, 201, JSON.stringify(first.body));
+    assert.equal(second.status, 201, JSON.stringify(second.body));
+    firstName = first.body.safetyBackup;
+    secondName = second.body.safetyBackup;
+  } finally {
+    Date.now = now;
+  }
+
+  const files = await readdir(backupDirectory);
+  const safetyFiles = files.filter((name) => name.startsWith('before-restore-'));
+  assert.notEqual(firstName!, secondName!);
+  assert.ok(
+    Number(secondName!.match(/^before-restore-(\d+)/)?.[1]) >
+      Number(firstName!.match(/^before-restore-(\d+)/)?.[1]),
+    'A later restore must sort newer even when Date.now has not advanced',
+  );
+  assert.equal(safetyFiles.length, 7);
+  assert.ok(safetyFiles.includes(firstName!));
+  assert.ok(safetyFiles.includes(secondName!));
+  assert.ok(
+    files.includes('auto-1000000000000.zip'),
+    'Restore retention must not remove auto backups',
+  );
+});
 
 test('valid backup repairs a missing photo while the safety copy records the gap and keeps current data', async (t) => {
   const lostPhoto = await upload('#e5bbaa'),

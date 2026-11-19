@@ -14,7 +14,53 @@ const config = require('./config');
 
 const VERSION = 1;
 const safeFilename = /^[a-zA-Z0-9-]+\.webp$/;
+const safetyBackupName = /^before-restore-(\d+)(?:-[a-f0-9-]{36})?\.zip$/;
 type BackupContext = { db: PrismaClient; assets: any; route: Function; auth: any; mutex: Mutex };
+async function pruneRestoreSafetyBackups(directory: string) {
+  const backups = (await fs.readdir(directory))
+    .flatMap((name) => {
+      const match = safetyBackupName.exec(name);
+      return match ? [{ name, timestamp: Number(match[1]) }] : [];
+    })
+    .sort((a, b) => b.timestamp - a.timestamp || b.name.localeCompare(a.name));
+  for (const backup of backups.slice(7)) {
+    await fs.unlink(path.join(directory, backup.name)).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error;
+    });
+  }
+}
+async function writeRestoreSafetyBackup(directory: string, buffer: Buffer) {
+  const names = await fs.readdir(directory);
+  const latestTimestamp = names.reduce((latest, name) => {
+    const match = safetyBackupName.exec(name);
+    return match ? Math.max(latest, Number(match[1])) : latest;
+  }, 0);
+  let timestamp = Math.max(Date.now(), latestTimestamp + 1);
+  while (true) {
+    const name = `before-restore-${timestamp}-${crypto.randomUUID()}.zip`;
+    try {
+      await fs.writeFile(path.join(directory, name), buffer, { flag: 'wx' });
+      return name;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      timestamp++;
+    }
+  }
+}
+async function removeUnreferencedAssets(directory: string, retainedFilenames: Set<string>) {
+  try {
+    const files = await fs.readdir(directory, { withFileTypes: true });
+    for (const file of files) {
+      if (!file.isFile() || !safeFilename.test(file.name) || retainedFilenames.has(file.name))
+        continue;
+      await fs.unlink(path.join(directory, file.name)).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+    }
+  } catch (error) {
+    console.error('恢复成功，但清理旧附件失败:', error);
+  }
+}
 async function dataset(db: PrismaClient, user: any, includeCredentials = false) {
   const [space, users, entries, assets] = await db.$transaction([
     db.space.findUnique({ where: { id: user.spaceId } }),
@@ -290,9 +336,13 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
       }
       const backups = path.join(config.storage, 'backups');
       await fs.mkdir(backups, { recursive: true });
-      const safetyName = `before-restore-${Date.now()}.zip`;
       const safety = await archive(req.user, { allowMissingAssets: true });
-      await fs.writeFile(path.join(backups, safetyName), safety.buffer);
+      const safetyName = await writeRestoreSafetyBackup(backups, safety.buffer);
+      try {
+        await pruneRestoreSafetyBackups(backups);
+      } catch (error) {
+        console.error('恢复前保护副本清理失败:', error);
+      }
       await fs.mkdir(assets.directory, { recursive: true });
       const added: string[] = [];
       const replaced = new Map<string, Buffer>();
@@ -348,6 +398,15 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
             });
           await tx.invite.deleteMany({ where: { spaceId: req.user.spaceId } });
         });
+        try {
+          const retainedAssets = await db.asset.findMany({ select: { filename: true } });
+          await removeUnreferencedAssets(
+            assets.directory,
+            new Set(retainedAssets.map((asset) => asset.filename)),
+          );
+        } catch (error) {
+          console.error('恢复成功，但清理旧附件失败:', error);
+        }
       } catch (error) {
         await Promise.all(added.map((p) => fs.unlink(p).catch(() => {})));
         await Promise.all([...replaced].map(([p, bytes]) => fs.writeFile(p, bytes)));
