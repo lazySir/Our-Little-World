@@ -444,3 +444,51 @@ test('restore rejects duplicate archive entry names before changing data or file
   assert.deepEqual(await readdir(uploadDirectory), uploadFilesBefore);
   assert.deepEqual(await readdir(backupDirectory), backupFilesBefore);
 });
+
+test('restore rejects case-insensitive upload filename collisions before changing data or files', async () => {
+  const photo = await upload('#8a6b4c');
+  const backup = await api.get('/api/backup/download').set(auth()).buffer(true).parse(binary);
+  assert.equal(backup.status, 200);
+  const archive = new AdmZip(backup.body);
+  const data = JSON.parse(archive.readAsText('data.json'));
+  const original = data.assets.find((asset: any) => asset.id === photo.id);
+  assert.ok(original);
+  const collidingFilename = `${original.filename.slice(0, -5).toUpperCase()}.webp`;
+  assert.notEqual(collidingFilename, original.filename);
+  const collidingBytes = await sharp({
+    create: { width: 12, height: 12, channels: 3, background: '#4c6b8a' },
+  })
+    .webp()
+    .toBuffer();
+  data.assets.push({
+    ...original,
+    id: 'case-collision-asset',
+    filename: collidingFilename,
+    size: collidingBytes.length,
+  });
+  archive.updateFile('data.json', Buffer.from(JSON.stringify(data)));
+  archive.addFile(`uploads/${collidingFilename}`, collidingBytes);
+  const collisionBackup = archive.toBuffer();
+  const exportBefore = await api.get('/api/backup/export').set(auth());
+  const uploadDirectory = path.join(directory, 'storage', 'uploads');
+  const backupDirectory = path.join(directory, 'storage', 'backups');
+  await Promise.all([
+    mkdir(uploadDirectory, { recursive: true }),
+    mkdir(backupDirectory, { recursive: true }),
+  ]);
+  const uploadFilesBefore = await readdir(uploadDirectory);
+  const backupFilesBefore = await readdir(backupDirectory);
+
+  const restore = await api
+    .post('/api/backup/restore')
+    .set(auth())
+    .attach('file', collisionBackup, { filename: 'case-collision.zip' });
+
+  assert.equal(restore.status, 400);
+  const exportAfter = await api.get('/api/backup/export').set(auth());
+  const { exportedAt: _beforeTime, ...before } = exportBefore.body;
+  const { exportedAt: _afterTime, ...after } = exportAfter.body;
+  assert.deepEqual(after, before);
+  assert.deepEqual(await readdir(uploadDirectory), uploadFilesBefore);
+  assert.deepEqual(await readdir(backupDirectory), backupFilesBefore);
+});

@@ -277,17 +277,18 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
             size: z.number().int().positive().max(BACKUP_LIMITS.assetBytes),
             createdAt: timestamp,
           }).parse(asset);
+          const portableFilename = asset.filename.toLowerCase();
           if (
             asset.spaceId !== req.user.spaceId ||
             !zip.getEntry(`uploads/${asset.filename}`) ||
             assetIds.has(asset.id) ||
-            filenames.has(asset.filename)
+            filenames.has(portableFilename)
           )
             throw new Error();
           const image = zip.readFile(`uploads/${asset.filename}`);
           if (!image || image.length !== asset.size) throw new Error();
           assetIds.add(asset.id);
-          filenames.add(asset.filename);
+          filenames.add(portableFilename);
         }
         let babyCount = 0;
         for (const row of data.entries) {
