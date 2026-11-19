@@ -12,6 +12,10 @@ data
 storage
 backups
 reference-review
+test-results
+playwright-report
+deliverables
+.worktrees
 **/*.mp4
 **/*.db
 **/*.db-*
