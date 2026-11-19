@@ -47,6 +47,7 @@ async function load() {
   }
 }
 async function saveMood() {
+  if (saving.value) return;
   saving.value = true;
   try {
     await api.post('/moods', { mood: mood.value, note: note.value });
@@ -98,12 +99,18 @@ onMounted(load);
             :class="{ selected: mood === key }"
             :aria-label="item.label"
             :aria-pressed="mood === key"
+            :disabled="saving"
             @click="mood = key"
           >
             <span class="mood-face">{{ item.symbol }}</span><small>{{ item.label }}</small>
           </button>
         </div>
-        <el-input v-model="note" maxlength="200" placeholder="留一句今天的小心情…" />
+        <el-input
+          v-model="note"
+          :disabled="saving"
+          maxlength="200"
+          placeholder="留一句今天的小心情…"
+        />
         <div class="mood-bottom">
           <span v-if="ownMood">今天也认真感受生活了</span><span v-else>让另一半知道你的小情绪</span
           ><el-button size="small" type="primary" :loading="saving" @click="saveMood">{{

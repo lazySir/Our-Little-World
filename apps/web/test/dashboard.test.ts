@@ -46,6 +46,7 @@ function setup(t: any, withDate = true) {
     upcomingAnniversaries: [{ id: 'today', title: '就在今天', date, recurring: false }],
   };
   const writes: any[] = [];
+  const errors: string[] = [];
   const api = {
     get: async () => structuredClone(dashboard),
     post: async (path: string, body: any) => {
@@ -83,7 +84,7 @@ function setup(t: any, withDate = true) {
       ElMessage: {
         success() {},
         error(message: string) {
-          throw new Error(message);
+          errors.push(message);
         },
       },
     },
@@ -105,6 +106,10 @@ function setup(t: any, withDate = true) {
     });
     app.config.warnHandler = () => {};
     app.component('LoadState', { template: '<div><slot /></div>' });
+    app.component('el-input', {
+      props: ['modelValue', 'disabled'],
+      template: '<input :value="modelValue" :disabled="disabled" />',
+    });
     return renderToString(app);
   }
   function advanceServiceDay(nextDate: string) {
@@ -112,7 +117,7 @@ function setup(t: any, withDate = true) {
     if (withDate) dashboard.date = date;
     dashboard.moods = [];
   }
-  return { view, writes, render, advanceServiceDay };
+  return { view, writes, render, advanceServiceDay, api, errors };
 }
 
 test('dashboard keeps the service day moods visible across a device date boundary', async (t) => {
@@ -180,4 +185,66 @@ test('dashboard remains compatible with an older response without a calendar dat
   await s.view.saveMood();
   assert.equal(Object.hasOwn(s.writes[0].body, 'date'), false);
   assert.equal(s.view.ownMood.value?.id, 'mine');
+});
+
+test('a pending mood save cannot submit twice', async (t) => {
+  const s = setup(t);
+  await s.view.load();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const post = s.api.post;
+  let attempts = 0;
+  s.api.post = async (...args: Parameters<typeof post>) => {
+    attempts++;
+    await gate;
+    return post(...args);
+  };
+  s.view.note.value = '这一刻的心情';
+  const first = s.view.saveMood();
+  const second = s.view.saveMood();
+  release();
+  await Promise.all([first, second]);
+  assert.equal(attempts, 1);
+  assert.equal(s.view.saving.value, false);
+  assert.equal(s.view.ownMood.value?.note, '这一刻的心情');
+});
+
+test('a pending mood save disables every mood option and the note input', async (t) => {
+  const s = setup(t);
+  await s.view.load();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const post = s.api.post;
+  s.api.post = async (...args: Parameters<typeof post>) => {
+    await gate;
+    return post(...args);
+  };
+  const pending = s.view.saveMood();
+  const html = await s.render();
+  release();
+  await pending;
+  const options = html.match(/<div class="mood-options">([\s\S]*?)<\/div>/)?.[1] || '';
+  assert.equal((options.match(/<button[^>]* disabled/g) || []).length, 5);
+  assert.match(html, /<input[^>]* disabled/);
+});
+
+test('a failed mood save unlocks the unchanged draft for retry', async (t) => {
+  const s = setup(t);
+  await s.view.load();
+  const post = s.api.post;
+  s.api.post = async () => {
+    throw new Error('心情暂时没有送达');
+  };
+  s.view.mood.value = 'low';
+  s.view.note.value = '仍然想让你知道';
+  await s.view.saveMood();
+  assert.equal(s.view.saving.value, false);
+  assert.equal(s.view.mood.value, 'low');
+  assert.equal(s.view.note.value, '仍然想让你知道');
+  assert.deepEqual(s.errors, ['心情暂时没有送达']);
+  const html = await s.render();
+  assert.doesNotMatch(html, /<(?:button|input)[^>]* disabled/);
+  s.api.post = post;
+  await s.view.saveMood();
+  assert.equal(s.view.ownMood.value?.note, '仍然想让你知道');
 });

@@ -41,10 +41,11 @@
         <view class="field-control">
           <wd-textarea
             :model-value="moodNote"
+            :disabled="moodSaving"
             placeholder="今天想让对方知道什么？"
             :maxlength="120"
             auto-height
-            @update:model-value="moodNote = $event"
+            @update:model-value="updateMoodNote"
           />
         </view>
         <wd-button block style="margin-top: 18rpx" :loading="moodSaving" @click="saveMood"
@@ -165,28 +166,40 @@ const initial = computed(() => session.user?.nickname?.slice(0, 1) || '我'),
 function go(url) {
   navigate(url);
 }
+let loadVersion = 0;
 async function load() {
+  const version = ++loadVersion;
   loading.value = true;
   error.value = '';
   try {
-    if (!(await session.load())) return;
-    dashboard.value = await request('/dashboard');
+    if (!(await session.load()) || version !== loadVersion) return;
+    const result = await request('/dashboard');
+    if (version !== loadVersion) return;
+    dashboard.value = result;
     const mine = (dashboard.value.moods || []).find(
       (item) => item.authorId === session.user?.id || item.author?.id === session.user?.id,
     );
     myMood.value = mine?.mood || '';
     moodNote.value = mine?.note || '';
   } catch (e) {
-    error.value = e.message;
+    if (version === loadVersion) error.value = e.message;
   } finally {
-    loading.value = false;
-    uni.stopPullDownRefresh();
+    if (version === loadVersion) {
+      loading.value = false;
+      uni.stopPullDownRefresh();
+    }
   }
 }
 async function chooseMood(value) {
+  if (moodSaving.value) return;
   myMood.value = value;
 }
+function updateMoodNote(value: string) {
+  if (moodSaving.value) return;
+  moodNote.value = value;
+}
 async function saveMood() {
+  if (moodSaving.value) return;
   if (!myMood.value) {
     notify('先选一个今天的心情');
     return;
