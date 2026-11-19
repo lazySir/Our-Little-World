@@ -166,6 +166,25 @@ test('home previews up to four pending wishes between its feature grid and recen
   );
 });
 
+test('home mood choices render as named buttons with an exposed pressed state', async (t) => {
+  const s = setup(t);
+  await s.view.load();
+  const choices = nodes(s.render()).filter((node) => node.type === 'button');
+
+  assert.equal(choices.length, 5);
+  assert.ok(choices.every((choice) => choice.type === 'button'));
+  assert.deepEqual(
+    choices.map((choice) => [choice.props['aria-label'], choice.props['aria-pressed']]),
+    [
+      ['闪闪发光，未选中', false],
+      ['还不错，已选中', true],
+      ['平平的，未选中', false],
+      ['有点低落，未选中', false],
+      ['需要休息，未选中', false],
+    ],
+  );
+});
+
 test('home wish preview includes a target date only when the wish has one', async (t) => {
   const s = setup(t);
   await s.view.load();

@@ -29,13 +29,15 @@
           <view class="pill">{{ moodLabel }}</view>
         </view>
         <view class="chips">
-          <view
+          <button
             v-for="item in moods"
             :key="item.value"
             class="chip"
             :class="{ active: myMood === item.value }"
+            :aria-label="`${item.label}，${myMood === item.value ? '已选中' : '未选中'}`"
+            :aria-pressed="myMood === item.value"
             @click="chooseMood(item.value)"
-            >{{ item.icon }} {{ item.label }}</view
+            >{{ item.icon }} {{ item.label }}</button
           >
         </view>
         <view class="field-control">
@@ -255,6 +257,14 @@ onShow(() => load());
 onPullDownRefresh(() => load());
 </script>
 <style scoped lang="scss">
+.chips .chip {
+  margin: 0;
+  font-family: inherit;
+  text-align: center;
+}
+.chips .chip::after {
+  border: 0;
+}
 .home-wishes {
   :deep(.wd-cell__left) {
     @apply min-w-0;
