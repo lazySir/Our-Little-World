@@ -8,6 +8,7 @@ import request from 'supertest';
 import sharp from 'sharp';
 import AdmZip from 'adm-zip';
 import { Mutex } from 'async-mutex';
+import { readSetupToken } from './setup-fixture';
 let app: any, api: any, directory: string, token: string, partnerToken: string;
 const auth = () => ({ Authorization: `Bearer ${token}` });
 before(async () => {
@@ -27,6 +28,7 @@ before(async () => {
   await app.init();
   api = request(app.getHttpServer());
   const setup = await api.post('/api/auth/setup').send({
+    setupToken: readSetupToken(path.join(directory, 'storage')),
     username: 'owner',
     password: 'resource-password-123',
     nickname: '小林',

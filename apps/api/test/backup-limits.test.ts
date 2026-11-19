@@ -6,6 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import request from 'supertest';
 import { Mutex } from 'async-mutex';
+import { readSetupToken } from './setup-fixture';
 
 let app: any, api: any, db: any, directory: string, token: string, smallBackup: Buffer;
 const auth = () => ({ Authorization: `Bearer ${token}` });
@@ -33,6 +34,7 @@ before(async () => {
   api = request(app.getHttpServer());
   db = app.get('PRISMA');
   const setup = await api.post('/api/auth/setup').send({
+    setupToken: readSetupToken(path.join(directory, 'storage')),
     username: 'limits_owner',
     password: 'limits-password-123',
     nickname: '小林',

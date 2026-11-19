@@ -6,6 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import request from 'supertest';
 import type { WorldApplication } from '../src/app';
+import { readSetupToken } from './setup-fixture';
 let app: WorldApplication, api: ReturnType<typeof request>, directory: string, token: string;
 before(async () => {
   directory = await mkdtemp(path.join(os.tmpdir(), 'world-auth-'));
@@ -30,15 +31,14 @@ after(async () => {
 test('fresh install creates one owner and protects space', async () => {
   assert.equal((await api.get('/api/auth/status')).body.initialized, false);
   assert.equal((await api.get('/api/auth/me')).status, 401);
-  const setup = await api
-    .post('/api/auth/setup')
-    .send({
-      username: 'owner',
-      password: 'correct-horse-123',
-      nickname: '小林',
-      spaceName: '我们',
-      startDate: '2024-02-29',
-    });
+  const setup = await api.post('/api/auth/setup').send({
+    setupToken: readSetupToken(path.join(directory, 'storage')),
+    username: 'owner',
+    password: 'correct-horse-123',
+    nickname: '小林',
+    spaceName: '我们',
+    startDate: '2024-02-29',
+  });
   assert.equal(setup.status, 201, JSON.stringify(setup.body));
   token = setup.body.token;
   assert.ok(token);
@@ -51,25 +51,21 @@ test('fresh install creates one owner and protects space', async () => {
 test('one-use invitation admits one partner and rejects a third', async () => {
   const invitation = await api.post('/api/auth/invite').set('Authorization', `Bearer ${token}`);
   assert.equal(invitation.status, 201);
-  const joined = await api
-    .post('/api/auth/join')
-    .send({
-      code: invitation.body.code,
-      username: 'partner',
-      password: 'partner-password-123',
-      nickname: '小禾',
-    });
+  const joined = await api.post('/api/auth/join').send({
+    code: invitation.body.code,
+    username: 'partner',
+    password: 'partner-password-123',
+    nickname: '小禾',
+  });
   assert.equal(joined.status, 201, JSON.stringify(joined.body));
   assert.equal(
     (
-      await api
-        .post('/api/auth/join')
-        .send({
-          code: invitation.body.code,
-          username: 'third',
-          password: 'third-password-123',
-          nickname: '第三人',
-        })
+      await api.post('/api/auth/join').send({
+        code: invitation.body.code,
+        username: 'third',
+        password: 'third-password-123',
+        nickname: '第三人',
+      })
     ).status,
     400,
   );

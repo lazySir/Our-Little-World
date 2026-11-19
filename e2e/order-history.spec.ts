@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test';
+import { readE2ESetupToken } from './setup-token.mts';
 
 test('an actual old order snapshot cannot replace the history refreshed after creating an order', async ({
   page,
@@ -11,6 +12,7 @@ test('an actual old order snapshot cannot replace the history refreshed after cr
   const status = await (await request.get(`${apiBase}/auth/status`)).json();
   const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
     data: {
+      setupToken: status.initialized ? undefined : await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',

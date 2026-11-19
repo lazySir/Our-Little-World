@@ -2,6 +2,7 @@ import { test, expect, type Page, type Locator } from '@playwright/test';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { removeTestPhoto } from '../../../../e2e/backup-fixture.mts';
+import { readE2ESetupToken } from '../../../../e2e/setup-token.mts';
 
 const api = 'http://127.0.0.1:3002/api';
 const stamp = Date.now();
@@ -123,6 +124,7 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await fill(page.locator('.auth-form'), '密码', 'uni-private-test-123');
   if (await page.getByText('创建我们的小世界', { exact: true }).isVisible()) {
     await fill(page.locator('.auth-form'), '怎么称呼你', '小熊');
+    await fill(page.locator('.auth-form'), '首次创建验证码', await readE2ESetupToken());
     await fill(page.locator('.auth-form'), '我们的小世界叫做', '小熊与兔子的小屋');
     await click(page, '创建我们的小世界');
   } else await click(page, '回家啦');
@@ -464,6 +466,7 @@ test('uni H5 locks a pending mood, keeps its failed draft and persists a real re
   if (!(await status.json()).initialized) {
     const setup = await request.post(`${api}/auth/setup`, {
       data: {
+        setupToken: await readE2ESetupToken(),
         username: 'uni_h5_owner',
         password: 'uni-private-test-123',
         nickname: '小熊',

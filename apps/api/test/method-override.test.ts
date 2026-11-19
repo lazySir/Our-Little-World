@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import request from 'supertest';
+import { readSetupToken } from './setup-fixture';
 
 let app: any, api: any, directory: string, token: string, wishId: string;
 const auth = () => ({ Authorization: `Bearer ${token}` });
@@ -27,6 +28,7 @@ before(async () => {
   await app.init();
   api = request(app.getHttpServer());
   const setup = await api.post('/api/auth/setup').send({
+    setupToken: readSetupToken(path.join(directory, 'storage')),
     username: 'transport_owner',
     password: 'transport-password-123',
     nickname: '原昵称',

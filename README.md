@@ -32,9 +32,9 @@ npm run build:web
 npm start
 ```
 
-浏览器打开 `http://localhost:3000`。第一次进入时，**自行填写用户名、密码、昵称、空间名与在一起日期**。项目没有预设账号或通用密码。创建后，在设置中生成邀请码给另一半；第二个人通过加入入口注册自己的账号。邀请码有时效且只能使用一次。
+浏览器打开 `http://localhost:3000`。第一次创建空间前，在服务端运行目录读取 `storage/.setup-token`（PowerShell：`Get-Content .\storage\.setup-token`；Docker：`docker compose exec world cat /app/storage/.setup-token`），并填写页面要求的一次性验证码及自己的用户名、密码、昵称、空间名与在一起日期。验证码只保存在服务端；空间创建成功后自动删除。项目没有预设账号或通用密码。创建后，在设置中生成邀请码给另一半；第二个人通过加入入口注册自己的账号。邀请码有时效且只能使用一次。
 
-`npm run init` 创建根 `.env`、生成私密附件签名密钥、创建数据目录、生成 Prisma Client，并应用仓库内的数据库迁移。重复运行不会清空数据或覆盖已设置的密钥。
+`npm run init` 创建根 `.env`、生成私密附件签名密钥、创建数据目录、生成 Prisma Client，并应用仓库内的数据库迁移。API 首次启动时会在 `storage/.setup-token` 创建权限受限的一次性验证码；重复运行不会清空数据或覆盖已设置的密钥。可用环境变量 `SETUP_TOKEN` 自行指定至少 32 字节且不超过 256 个字符的验证码。
 
 Windows 可以直接在 PowerShell 运行：
 
@@ -119,7 +119,7 @@ docker compose up -d --build
 docker compose logs -f world
 ```
 
-访问 `http://localhost:3000`。容器启动时应用数据库迁移，数据库和附件分别保存在 `world-data`、`world-storage` 命名卷。`.env` 中的 `ASSET_SECRET` 由 Compose 传入容器。停机可用 `docker compose down`；**不要加 `-v`，否则会删除数据卷**。
+访问 `http://localhost:3000`。第一次创建空间前，读取容器中的一次性验证码：`docker compose exec world cat /app/storage/.setup-token`。创建成功后该文件会自动删除。容器启动时应用数据库迁移，数据库和附件分别保存在 `world-data`、`world-storage` 命名卷。`.env` 中的 `ASSET_SECRET` 由 Compose 传入容器。停机可用 `docker compose down`；**不要加 `-v`，否则会删除数据卷**。
 
 容器与直接 Node 运行默认使用不同数据位置；切换部署方式需保留原账号身份，按部署说明中的离线迁移步骤操作。2026-11-17 已实际验证镜像构建、Compose 启动、健康检查、重启后记录与照片持久化，以及 ZIP 备份恢复，详见 `docs/VERIFICATION.md`。
 

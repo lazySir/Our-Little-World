@@ -2,6 +2,7 @@ import { test, expect, type Page, type Locator } from '@playwright/test';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { removeTestPhoto } from './backup-fixture.mts';
+import { readE2ESetupToken } from './setup-token.mts';
 const stamp = Date.now();
 const names = {
   wish: `一起看海 ${stamp}`,
@@ -112,6 +113,7 @@ test('a stale endpoint 401 cannot clear a session accepted by the new service', 
 }) => {
   await request.post('http://127.0.0.1:3001/api/auth/setup', {
     data: {
+      setupToken: await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',
@@ -172,6 +174,7 @@ test('two people can create, share and persist their complete little world', asy
   await page.goto('/auth');
   await expect(page.locator('.auth-card .el-skeleton')).toHaveCount(0);
   if (await page.getByRole('heading', { name: '给我们安一个家' }).isVisible()) {
+    await fill(page.locator('.auth-card'), '首次创建验证码', await readE2ESetupToken());
     await fill(page.locator('.auth-card'), '你的昵称', '小林');
     await fill(page.locator('.auth-card'), '账号', 'web_owner');
     await fill(page.locator('.auth-card'), '密码', 'little-world-e2e-123');
@@ -389,6 +392,7 @@ test('Web settings preserve the current endpoint and session when the new servic
 }) => {
   await request.post('http://127.0.0.1:3001/api/auth/setup', {
     data: {
+      setupToken: await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',
@@ -482,6 +486,7 @@ test('older meal orders remain reachable and manageable beyond the recent six', 
   const status = await (await request.get(`${apiBase}/auth/status`)).json();
   const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
     data: {
+      setupToken: await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',
@@ -577,6 +582,7 @@ test('ledger saves keep the active draft locked and recover after a failed reque
   const status = await (await request.get(`${apiBase}/auth/status`)).json();
   const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
     data: {
+      setupToken: await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',
@@ -644,6 +650,7 @@ test('ordering locks the submitted basket and preserves it after a failed reques
   const status = await (await request.get(`${apiBase}/auth/status`)).json();
   const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
     data: {
+      setupToken: await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',
@@ -727,6 +734,7 @@ test('authentication survives a failed profile refresh and both exits work offli
   if (!status.initialized) {
     const setup = await request.post(`${apiBase}/auth/setup`, {
       data: {
+        setupToken: await readE2ESetupToken(),
         username: 'web_owner',
         password: 'little-world-e2e-123',
         nickname: '小林',
@@ -769,6 +777,7 @@ test('mood saves protect pending inputs and preserve a failed draft for retry', 
   const status = await (await request.get(`${apiBase}/auth/status`)).json();
   const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
     data: {
+      setupToken: await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',
@@ -831,6 +840,7 @@ test('photo editors keep pending uploads attached and release controls after fai
   const status = await (await request.get(`${apiBase}/auth/status`)).json();
   const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
     data: {
+      setupToken: await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',
@@ -1039,6 +1049,7 @@ test('baby profile read failure cannot turn an existing profile into a blank rep
   const status = await (await request.get(`${apiBase}/auth/status`)).json();
   const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
     data: {
+      setupToken: await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',
@@ -1143,6 +1154,7 @@ test('ledger month filters and charts stay consistent after editing a category, 
   const status = await (await request.get(`${apiBase}/auth/status`)).json();
   const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
     data: {
+      setupToken: await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',
@@ -1419,6 +1431,7 @@ test('wish category edits and search stay consistent through completion, reopeni
   const status = await (await request.get(`${apiBase}/auth/status`)).json();
   const signedIn = await request.post(`${apiBase}/auth/${status.initialized ? 'login' : 'setup'}`, {
     data: {
+      setupToken: await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',

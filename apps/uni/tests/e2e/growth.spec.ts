@@ -7,6 +7,7 @@ import {
   type Route,
 } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { readE2ESetupToken } from '../../../../e2e/setup-token.mts';
 
 const api = 'http://127.0.0.1:3002/api';
 const growthUrl = `${api}/growth`;
@@ -64,6 +65,7 @@ async function signIn(page: Page) {
   await fill(page.locator('.auth-form'), '密码', 'uni-private-test-123');
   if (!initialized) {
     await fill(page.locator('.auth-form'), '怎么称呼你', '小熊');
+    await fill(page.locator('.auth-form'), '首次创建验证码', await readE2ESetupToken());
     await fill(page.locator('.auth-form'), '我们的小世界叫做', '成长曲线回归的小屋');
   }
   const signingIn = page.waitForResponse(`${api}/auth/${initialized ? 'login' : 'setup'}`);

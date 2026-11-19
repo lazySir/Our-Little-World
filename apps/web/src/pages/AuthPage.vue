@@ -24,6 +24,7 @@ const form = reactive({
   nickname: '',
   spaceName: '我们的小世界',
   startDate: today(),
+  setupToken: '',
   code: String(route.query.code || ''),
 });
 const rules = {
@@ -38,6 +39,7 @@ const rules = {
   nickname: [{ required: true, message: '我们怎么称呼你呢', trigger: 'blur' }],
   spaceName: [{ required: true, message: '给我们的家起个名字', trigger: 'blur' }],
   startDate: [{ required: true, message: '请选择在一起的日子', trigger: 'change' }],
+  setupToken: [{ required: true, message: '请从服务端读取首次创建验证码', trigger: 'blur' }],
   code: [{ required: true, message: '请输入另一半分享的邀请码', trigger: 'blur' }],
 };
 let checkSequence = 0;
@@ -81,6 +83,7 @@ async function submit() {
               nickname: form.nickname,
               spaceName: form.spaceName,
               startDate: form.startDate,
+              setupToken: form.setupToken,
             };
     const result = await api.post(`/auth/${mode.value}`, payload);
     session.accept(result);
@@ -199,6 +202,12 @@ onMounted(check);
                   mode === 'login' ? 'current-password' : 'new-password'
                 " /></el-form-item
             ><template v-if="mode === 'setup'"
+              ><el-form-item label="首次创建验证码" prop="setupToken"
+                ><el-input
+                  v-model="form.setupToken"
+                  placeholder="请从服务端 storage/.setup-token 中复制"
+                  autocomplete="off"
+                  maxlength="256" /></el-form-item
               ><el-form-item label="小世界的名字" prop="spaceName"
                 ><el-input v-model="form.spaceName" maxlength="60" /></el-form-item
               ><el-form-item label="我们在一起的日子" prop="startDate"

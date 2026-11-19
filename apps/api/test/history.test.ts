@@ -6,6 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { PrismaClient } from '@prisma/client';
 import request from 'supertest';
+import { readSetupToken } from './setup-fixture';
 
 let app: any, api: any, db: PrismaClient, directory: string;
 let token: string, partnerToken: string, ownerId: string, partnerId: string, spaceId: string;
@@ -45,6 +46,7 @@ before(async () => {
   api = request(app.getHttpServer());
   db = new PrismaClient();
   const setup = await api.post('/api/auth/setup').send({
+    setupToken: readSetupToken(path.join(directory, 'storage')),
     username: 'history_owner',
     password: 'history-password-123',
     nickname: '小林',

@@ -50,6 +50,13 @@
       />
       <template v-if="mode === 'setup'">
         <FormField
+          v-model="form.setupToken"
+          label="首次创建验证码"
+          required
+          placeholder="从服务端 storage/.setup-token 读取"
+          :maxlength="256"
+        />
+        <FormField
           v-model="form.spaceName"
           label="我们的小世界叫做"
           required
@@ -106,6 +113,7 @@ const form = reactive({
   nickname: '',
   spaceName: '我们的小世界',
   startDate: today(),
+  setupToken: '',
   code: '',
 });
 const tabs = computed(() => [
@@ -184,6 +192,10 @@ async function submit() {
     error.value = '请填写昵称，并设置至少 8 位的密码';
     return;
   }
+  if (mode.value === 'setup' && !form.setupToken.trim()) {
+    error.value = '请先填写服务端提供的首次创建验证码';
+    return;
+  }
   if (mode.value === 'join' && !form.code.trim()) {
     error.value = '请先填写对方发来的邀请码';
     return;
@@ -194,6 +206,7 @@ async function submit() {
       ...form,
       username: form.username.trim(),
       nickname: form.nickname.trim(),
+      setupToken: form.setupToken.trim(),
       code: form.code.trim(),
     });
   } catch (e) {

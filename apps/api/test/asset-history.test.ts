@@ -6,6 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import request from 'supertest';
 import sharp from 'sharp';
+import { readSetupToken } from './setup-fixture';
 
 let app: any, api: any, directory: string, token: string, photo: Buffer;
 const auth = () => ({ Authorization: `Bearer ${token}` });
@@ -27,6 +28,7 @@ before(async () => {
   await app.init();
   api = request(app.getHttpServer());
   const setup = await api.post('/api/auth/setup').send({
+    setupToken: readSetupToken(path.join(directory, 'storage')),
     username: 'asset_history_owner',
     password: 'asset-history-password-123',
     nickname: '小林',

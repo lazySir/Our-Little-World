@@ -8,6 +8,7 @@ import request from 'supertest';
 import sharp from 'sharp';
 import type { PrismaClient } from '@prisma/client';
 import type { WorldApplication } from '../src/app';
+import { readSetupToken } from './setup-fixture';
 
 const imageLimit = 10 * 1024 * 1024;
 let app: WorldApplication;
@@ -40,6 +41,7 @@ before(async () => {
   api = request(app.getHttpServer());
   db = app.get('PRISMA');
   const setup = await api.post('/api/auth/setup').send({
+    setupToken: readSetupToken(path.join(directory, 'storage')),
     username: 'asset_limits_owner',
     password: 'asset-limits-password-123',
     nickname: '小林',

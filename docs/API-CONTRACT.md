@@ -5,7 +5,7 @@ Prefix `/api`. JSON responses are direct objects/arrays, no wrapper. Failures: `
 ## Auth
 
 - `GET /auth/status` public → `{ initialized: boolean }`.
-- `POST /auth/setup` public → accepts `{ username,password,nickname,spaceName,startDate }`, once only; returns `{token,user,space}`.
+- `POST /auth/setup` public → accepts `{ setupToken,username,password,nickname,spaceName,startDate }`, once only. The generated one-time code has 256 bits of entropy and is stored on the server; a configured `SETUP_TOKEN` must contain at least 32 bytes and no more than 256 characters. Invalid or missing values return 403 without creating data. Generated token files are removed after successful creation.
 - `POST /auth/login` public `{username,password}` → `{token,user,space}`.
 - `POST /auth/join` public `{code,username,password,nickname}` → `{token,user,space}`; maximum 2 members.
 - `GET /auth/me` → `{user,space,partner}`. user `{id,username,nickname,role}`, space `{id,name,startDate,theme}`; partner same public user or null.

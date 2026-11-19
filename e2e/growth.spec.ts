@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Locator, type Route } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { readE2ESetupToken } from './setup-token.mts';
 
 const api = 'http://127.0.0.1:3001/api';
 const field = (box: Locator, label: string) =>
@@ -44,6 +45,7 @@ test('growth curves preserve same-day points and follow real edits, deletion and
   const status = await statusResponse.json();
   const signedIn = await request.post(`${api}/auth/${status.initialized ? 'login' : 'setup'}`, {
     data: {
+      setupToken: status.initialized ? undefined : await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',

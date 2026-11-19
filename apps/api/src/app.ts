@@ -45,6 +45,7 @@ import type { AuthenticatedRequest, AssetQuery } from './types';
 import { Mutex } from 'async-mutex';
 import { makeBackupController } from './backup';
 import { from, lastValueFrom } from 'rxjs';
+import { prepareSetupToken } from './setup-token';
 
 class ErrorFilter implements ExceptionFilter {
   catch(error: any, host: ArgumentsHost) {
@@ -79,7 +80,8 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   await db.$connect();
   await db.$queryRawUnsafe('PRAGMA journal_mode = WAL');
   await db.$queryRawUnsafe('PRAGMA busy_timeout = 5000');
-  const auth = new AuthService(db);
+  const setupToken = await prepareSetupToken(db, config.storage, process.env.SETUP_TOKEN);
+  const auth = new AuthService(db, setupToken);
   class AuthGuard implements CanActivate {
     async canActivate(context: ExecutionContext) {
       await auth.authenticate(context.switchToHttp().getRequest());

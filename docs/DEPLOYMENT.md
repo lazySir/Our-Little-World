@@ -24,6 +24,7 @@ HOST=0.0.0.0
 PORT=3000
 AUTO_BACKUP_HOURS=24
 ASSET_SECRET=
+SETUP_TOKEN=
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
@@ -46,7 +47,7 @@ Windows 启动器 `scripts/start-local.ps1` 默认安装依赖、初始化、构
 
 根 `.env` 更改 `PORT` 后，开发启动器会将 Web 的 `/api` 代理同步指向该端口，健康检查也读取同一配置。若特意连接另一台开发 API，可用 `API_PROXY_TARGET=http://另一台电脑IP:端口` 覆盖代理目标。
 
-第一次进入页面，自行建立空间与所有者账号。没有默认密码。通过空间设置生成 24 小时有效的一次性邀请码，供第二个人加入。程序应只运行一个 API 实例，不要同时用两个终端或容器写同一个 SQLite 文件。
+第一次进入页面，自行建立空间与所有者账号。没有默认密码。空间创建前，服务端会在 `storage/.setup-token` 生成权限受限的一次性验证码；PowerShell 可运行 `Get-Content .\storage\.setup-token` 读取并粘贴到首次创建页面。成功后生成的验证码文件会自动删除。也可在 `.env` 的 `SETUP_TOKEN` 自行指定至少 32 字节且不超过 256 个字符的验证码。不要经聊天、截图或公开日志分享验证码。通过空间设置生成 24 小时有效的一次性邀请码，供第二个人加入。程序应只运行一个 API 实例，不要同时用两个终端或容器写同一个 SQLite 文件。
 
 ## 3. 局域网
 
@@ -104,6 +105,8 @@ docker compose logs -f world
 Compose 默认发布到所有网卡的 `3000`。只供本机使用可在根 `.env` 加 `PUBLISH_HOST=127.0.0.1`；自定义外部端口可加 `PUBLISH_PORT=3080`，容器内部仍使用 3000。
 
 容器以普通 `node` 用户运行，启动时执行 `migrate deploy`。命名卷 `world-data` 保存 SQLite，`world-storage` 保存附件与服务备份。默认容器会异常重启，健康检查请求 `/api/health`。
+
+首次创建空间前，用 `docker compose exec world cat /app/storage/.setup-token` 读取容器内的一次性验证码并填入页面；创建成功后生成的验证码文件会自动删除。可选环境变量 `SETUP_TOKEN` 可指定至少 32 字节且不超过 256 个字符的自定义值。
 
 ```sh
 docker compose down

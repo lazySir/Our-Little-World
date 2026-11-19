@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test';
+import { readE2ESetupToken } from './setup-token.mts';
 
 const api = 'http://127.0.0.1:3001/api';
 function deferred() {
@@ -16,6 +17,7 @@ test('password form locks all fields while saving, preserves drafts on failure a
   const status = await statusResponse.json();
   const signedIn = await request.post(api + '/auth/' + (status.initialized ? 'login' : 'setup'), {
     data: {
+      setupToken: status.initialized ? undefined : await readE2ESetupToken(),
       username: 'web_owner',
       password: 'little-world-e2e-123',
       nickname: '小林',

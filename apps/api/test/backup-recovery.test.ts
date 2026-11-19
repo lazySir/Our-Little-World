@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import request from 'supertest';
 import sharp from 'sharp';
 import AdmZip from 'adm-zip';
+import { readSetupToken } from './setup-fixture';
 
 let app: any, api: any, directory: string, token: string;
 const auth = () => ({ Authorization: `Bearer ${token}` });
@@ -32,6 +33,7 @@ before(async () => {
   await app.init();
   api = request(app.getHttpServer());
   const setup = await api.post('/api/auth/setup').send({
+    setupToken: readSetupToken(path.join(directory, 'storage')),
     username: 'recovery_owner',
     password: 'recovery-password-123',
     nickname: '小林',

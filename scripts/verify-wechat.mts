@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -184,6 +184,7 @@ async function main() {
     ...process.env,
     DATABASE_URL: `file:${path.join(temporaryRoot, 'world.db').replace(/\\/g, '/')}`,
     STORAGE_DIR: path.join(temporaryRoot, 'storage'),
+    SETUP_TOKEN: '',
     ASSET_SECRET: randomBytes(48).toString('hex'),
     AUTO_BACKUP_HOURS: '0',
     HOST: '127.0.0.1',
@@ -350,6 +351,10 @@ async function main() {
       signal: AbortSignal.any([cancellation.signal, AbortSignal.timeout(5000)]),
     });
     assert.deepEqual(await status.json(), { initialized: false });
+    const setupToken = (
+      await readFile(path.join(environment.STORAGE_DIR, '.setup-token'), 'utf8')
+    ).trim();
+    secrets.push(setupToken);
 
     log(`Open own WeChat project on automation port ${options.automationPort}`);
     // Check again immediately before launch; a previous verification may have started during migration.
@@ -427,6 +432,7 @@ async function main() {
     await input('给自己起一个账号', 'sim_owner');
     await input('至少 8 位，建议使用字母和数字', password);
     await input('对方最熟悉的名字', '模拟器小熊');
+    await input('从服务端 storage/.setup-token 读取', setupToken);
     await tap('创建我们的小世界');
     page = await until(async () => {
       const current = await mini!.currentPage();

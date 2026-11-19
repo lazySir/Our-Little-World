@@ -4,6 +4,8 @@ import { HttpException } from '@nestjs/common';
 import type { PrismaClient, User } from '@prisma/client';
 import type { AuthenticatedRequest, SpaceUser } from './types';
 import { z, text, date, credentials, passwordInput } from './validation';
+import { consumeSetupToken, setupTokenMatches } from './setup-token';
+import type { SetupToken } from './setup-token';
 export function fail(status: number, message: string): never {
   throw new HttpException(message, status);
 }
@@ -15,7 +17,10 @@ export const publicUser = ({
   role,
 }: Pick<User, 'id' | 'username' | 'nickname' | 'role'>) => ({ id, username, nickname, role });
 export class AuthService {
-  constructor(private readonly db: PrismaClient) {}
+  constructor(
+    private readonly db: PrismaClient,
+    private setupToken: SetupToken | null,
+  ) {}
   async status() {
     return { initialized: Boolean(await this.db.space.count()) };
   }
@@ -41,6 +46,9 @@ export class AuthService {
   }
   async setup(body: unknown) {
     if ((await this.status()).initialized) fail(409, '空间已经创建，请登录或使用邀请码加入');
+    const tokenInput = z.object({ setupToken: z.string().max(256).optional() }).parse(body);
+    if (!setupTokenMatches(tokenInput.setupToken, this.setupToken?.value || null))
+      fail(403, '首次创建需要服务端的一次性验证码');
     const input = z
       .object({
         ...credentials,
@@ -64,7 +72,11 @@ export class AuthService {
         },
       });
     });
-    return this.session(user);
+    const result = await this.session(user);
+    const consumed = this.setupToken;
+    this.setupToken = null;
+    await consumeSetupToken(consumed);
+    return result;
   }
   async login(body: unknown) {
     const input = z

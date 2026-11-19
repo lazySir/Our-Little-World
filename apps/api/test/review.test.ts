@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import request from 'supertest';
 import sharp from 'sharp';
 import AdmZip from 'adm-zip';
+import { readSetupToken } from './setup-fixture';
 let app: any, api: any, directory: string, ownerToken: string, partnerToken: string;
 const owner = () => ({ Authorization: `Bearer ${ownerToken}` });
 before(async () => {
@@ -26,6 +27,7 @@ before(async () => {
   await app.init();
   api = request(app.getHttpServer());
   const setup = await api.post('/api/auth/setup').send({
+    setupToken: readSetupToken(path.join(directory, 'storage')),
     username: 'review_owner',
     password: 'review-password-123',
     nickname: '小林',

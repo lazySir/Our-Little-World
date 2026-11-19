@@ -1,5 +1,5 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -31,6 +31,7 @@ export async function startTestServer(kind: 'web' | 'uni') {
     ...process.env,
     DATABASE_URL: `file:${path.join(directory, 'world.db').replaceAll('\\', '/')}`,
     STORAGE_DIR: path.join(directory, 'storage'),
+    SETUP_TOKEN: '',
     ASSET_SECRET: `isolated-${kind}-browser-test-secret-at-least-32`,
     AUTO_BACKUP_HOURS: '0',
     PORT: String(apiPort),
@@ -115,6 +116,9 @@ export async function startTestServer(kind: 'web' | 'uni') {
       );
     launch(['--import', 'tsx', 'apps/api/src/main.ts']);
     await waitReady(`http://127.0.0.1:${apiPort}/api/health`);
+    process.env.E2E_SETUP_TOKEN = (
+      await readFile(path.join(environment.STORAGE_DIR, '.setup-token'), 'utf8').catch(() => '')
+    ).trim();
     const appRequire = createRequire(path.join(root, `apps/${kind}/package.json`));
     const cli =
       kind === 'uni'
