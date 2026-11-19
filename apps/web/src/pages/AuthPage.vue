@@ -84,7 +84,9 @@ async function submit() {
             };
     const result = await api.post(`/auth/${mode.value}`, payload);
     session.accept(result);
-    await session.refresh();
+    // The auth response already contains the user and space needed to enter.
+    await session.refresh().catch(() => {});
+    if (!session.authenticated) return;
     ElMessage.success(mode.value === 'login' ? '欢迎回家' : '小世界，从今天开始');
     router.replace(String(route.query.redirect || '/'));
   } catch (e) {

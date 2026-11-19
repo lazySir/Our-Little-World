@@ -20,6 +20,7 @@ function setup() {
     resolve: (value: any) => void;
     reject: (error: Error) => void;
   }[] = [];
+  const navigations: string[] = [];
   const api = {
     TOKEN_KEY: 'little-world-token',
     getBase: () => storage.get('little-world-api'),
@@ -73,18 +74,21 @@ function setup() {
       space: { id: 'new-space', name: '新空间' },
     });
   };
-  function page(name: 'SettingsPage' | 'AuthPage') {
-    const filename = fileURLToPath(new URL(`../src/pages/${name}.vue`, import.meta.url));
+  function page(name: 'SettingsPage' | 'AuthPage' | 'App') {
+    const filename = fileURLToPath(
+      new URL(name === 'App' ? '../src/App.vue' : `../src/pages/${name}.vue`, import.meta.url),
+    );
     const source = compileScript(parse(readFileSync(filename, 'utf8'), { filename }).descriptor, {
       id: 'connection-test',
     }).content;
     return execute(source, {
       '../api': api,
       '../stores/session': { useSession: () => store },
+      './stores/session': { useSession: () => store },
       '../domain': { today: () => '2026-11-17' },
-      vue: { ...require('vue'), onMounted() {} },
+      vue: { ...require('vue'), onMounted() {}, onUnmounted() {} },
       'vue-router': {
-        useRouter: () => ({ replace: async () => {} }),
+        useRouter: () => ({ replace: async (path: string) => navigations.push(path) }),
         useRoute: () => ({ query: {} }),
       },
       'element-plus': { ElMessage: { success() {}, error() {} }, ElMessageBox: {} },
@@ -94,9 +98,11 @@ function setup() {
     store,
     storage,
     requests,
+    navigations,
     acceptNew,
     settings: () => page('SettingsPage'),
     auth: () => page('AuthPage'),
+    app: () => page('App'),
   };
 }
 
@@ -183,4 +189,93 @@ test('auth cannot change the connection while credentials are being submitted', 
   await Promise.all([connecting, submitting]);
   assert.equal(count, 1);
   assert.equal(s.requests[0].path, '/auth/login');
+});
+
+for (const entry of ['settings', 'app'] as const) {
+  test(`${entry} logout returns to auth even when the service is unreachable`, async () => {
+    const s = setup();
+    s.store.accept({
+      token: 'old-token',
+      user: { id: 'owner', username: 'owner', nickname: '我', role: 'owner' },
+      space: { id: 'home', name: '我们', startDate: '2026-01-01', theme: 'cream' },
+    });
+    const view = s[entry]();
+    const exiting = view.logout();
+    assert.equal(s.requests[0].path, '/auth/logout');
+    s.requests[0].reject(new Error('service is unreachable'));
+    await assert.doesNotReject(exiting);
+    assert.equal(s.store.authenticated, false);
+    assert.equal(s.storage.has('little-world-token'), false);
+    assert.deepEqual(s.navigations, ['/auth']);
+  });
+}
+
+for (const mode of ['setup', 'join', 'login']) {
+  test(`successful ${mode} still enters the home when optional profile refresh fails`, async () => {
+    const s = setup();
+    const view = s.auth();
+    view.checking.value = false;
+    view.mode.value = mode;
+    view.formRef.value = { validate: async () => true };
+    const submitting = view.submit();
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    assert.equal(s.requests[0].path, `/auth/${mode}`);
+    s.requests[0].resolve({
+      token: 'new-token',
+      user: { id: 'owner', username: 'owner', nickname: '我', role: 'owner' },
+      space: { id: 'home', name: '我们', startDate: '2026-01-01', theme: 'cream' },
+    });
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    assert.equal(s.requests[1].path, '/auth/me');
+    s.requests[1].reject(new Error('profile refresh failed'));
+    await submitting;
+    assert.equal(s.store.authenticated, true);
+    assert.equal(s.storage.get('little-world-token'), 'new-token');
+    assert.deepEqual(s.navigations, ['/']);
+    assert.equal(view.error.value, '');
+    assert.equal(view.loading.value, false);
+  });
+}
+
+test('successful auth still enriches the session with partner details', async () => {
+  const s = setup();
+  const view = s.auth();
+  view.checking.value = false;
+  view.formRef.value = { validate: async () => true };
+  const submitting = view.submit();
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  const result = {
+    token: 'new-token',
+    user: { id: 'owner', username: 'owner', nickname: '我', role: 'owner' },
+    space: { id: 'home', name: '我们', startDate: '2026-01-01', theme: 'cream' },
+  };
+  s.requests[0].resolve(result);
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  const partner = { id: 'partner', username: 'partner', nickname: '你', role: 'member' };
+  s.requests[1].resolve({ user: result.user, space: result.space, partner });
+  await submitting;
+  assert.equal(s.store.partner.id, 'partner');
+  assert.deepEqual(s.navigations, ['/']);
+});
+
+test('a profile refresh failure cannot reenter home after the session was cleared', async () => {
+  const s = setup();
+  const view = s.auth();
+  view.checking.value = false;
+  view.formRef.value = { validate: async () => true };
+  const submitting = view.submit();
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  s.requests[0].resolve({
+    token: 'new-token',
+    user: { id: 'owner', username: 'owner', nickname: '我', role: 'owner' },
+    space: { id: 'home', name: '我们', startDate: '2026-01-01', theme: 'cream' },
+  });
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  s.store.clear();
+  s.requests[1].reject(new Error('session expired'));
+  await submitting;
+  assert.equal(s.store.authenticated, false);
+  assert.equal(s.storage.has('little-world-token'), false);
+  assert.deepEqual(s.navigations, []);
+  assert.equal(view.loading.value, false);
 });

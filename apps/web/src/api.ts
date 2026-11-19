@@ -44,7 +44,7 @@ export async function request<T = any>(path: string, options: ApiOptions = {}): 
         token &&
         base === getBase() &&
         token === localStorage.getItem(TOKEN_KEY) &&
-        !path.startsWith('/auth/')
+        (path === '/auth/me' || !path.startsWith('/auth/'))
       )
         window.dispatchEvent(new Event('session-expired'));
       throw new Error(details?.message || `请求失败（${response.status}）`);

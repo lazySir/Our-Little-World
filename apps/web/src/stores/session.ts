@@ -71,6 +71,8 @@ export const useSession = defineStore('session', {
     async logout() {
       try {
         await api.post('/auth/logout');
+      } catch {
+        // Leaving this device must also work while the service is unreachable.
       } finally {
         this.clear();
       }
