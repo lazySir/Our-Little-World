@@ -102,6 +102,15 @@ The daily-use audit found a confirmed data-loss path in both clients: an unknown
 - [x] Pass all 7 H5 cases, retain final traces/layer evidence and inspect the 390px picker screenshot. Verify final mp-weixin/H5 builds, compiled H5 inclusion and WeChat exclusion, test TypeScript/format checks and 2/2 cleanup. Independent review finds no blocking issue; commit and immediately push separately.
 - [x] Record the further native-minimal 9446 App-readiness timeout and successful isolated cleanup without claiming internal root cause or latest WeChat runtime acceptance. Preserve the unchecked simulator and real-device requirements above.
 
+## Daily-use correctness — wish conversion and orders
+
+- [x] Reproduce duplicate wish-to-memory POSTs in both real SFCs, add synchronous pending guards, and verify failure releases controls before a real retry creates exactly one persisted memory. Preserve the existing uni navigation after success.
+- [x] Reproduce stale order-history GETs overwriting create/complete/delete results in both clients; gate successful and failed reads by sequence. Pass ten focused SFC regressions, Web real-create and H5 real-create/complete/delete snapshot-delivery flows.
+- [x] Reproduce deleted menu selections remaining in the uni basket count. Base count on current menu items, preserving surviving selections and notes. Pass five real-page/resource regressions and the real H5 partial/full-deletion flow.
+- [x] Reproduce H5 native confirmation behind the Wot editor, inspect its actual BODY mount and 999/1200 layers, and add only the H5-specific `body uni-modal` layer 1400. Verify real cancel and confirm, inspect stable screenshots and check the rule is absent from WeChat output.
+- [x] Pass 234 unit tests, root TypeScript, all production builds and the complete 17-case Web browser suite. Preserve the 12-case H5 run that passed business checks but exited 1 during teardown; keep latest WeChat runtime/device requirements above unchecked.
+- [ ] Repair the independently confirmed teardown deadline/retry gaps with in-memory failure regressions, then repeat actual isolated lifecycle cleanup and complete H5 acceptance. Do not increase the existing total deadline or remove storage while owned processes may still be using it. Retain the older temporary directory whose manual deletion was rejected by automatic approval review.
+
 ## Commit discipline
 
 Each worker stages only their owned files, never `git add .` in shared repo. Root serializes commits on request to avoid index locks. No video, database, uploads, tokens, node_modules or build output committed. Destructive filesystem operations limited to verified workspace temporary/generated paths.

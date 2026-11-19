@@ -171,7 +171,7 @@ const filtered = computed(() =>
       `${x.name} ${x.description || ''}`.includes(query.value),
   ),
 );
-const cartCount = computed(() => Object.values(cart).reduce((a, b) => a + b, 0)),
+const cartCount = computed(() => items.value.reduce((sum, item) => sum + (cart[item.id] || 0), 0)),
   cartTotal = computed(() =>
     items.value.reduce((sum, item) => sum + (cart[item.id] || 0) * item.priceCents, 0),
   );
@@ -222,11 +222,14 @@ async function favorite(item) {
     notify(e.message);
   }
 }
+let orderLoadVersion = 0;
 async function loadOrders() {
+  const version = ++orderLoadVersion;
   try {
-    orders.value = await request('/orders');
+    const result = await request('/orders');
+    if (version === orderLoadVersion) orders.value = result;
   } catch (e) {
-    notify(e.message);
+    if (version === orderLoadVersion) notify(e.message);
   }
 }
 async function submitOrder() {

@@ -128,7 +128,10 @@ test('uni H5 wish conversion stays busy, rejects duplicate taps and retries one 
           contentType: 'application/json',
           body: JSON.stringify({ message: '回忆暂时无法保存，请重试' }),
         });
-      } else await route.continue();
+      } else {
+        const response = await route.fetch();
+        await route.fulfill({ response });
+      }
     })();
     tasks.push(task);
     return task;

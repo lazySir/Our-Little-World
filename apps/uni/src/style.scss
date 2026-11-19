@@ -30,6 +30,10 @@ button::after {
 uni-app .uni-picker-container {
   z-index: 1300;
 }
+/* H5 mounts native confirmations outside uni-app and above the open editor. */
+body uni-modal {
+  z-index: 1400;
+}
 /* #endif */
 .page {
   min-height: 100vh;

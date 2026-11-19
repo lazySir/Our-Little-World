@@ -119,12 +119,16 @@ function minus(i: MenuItem) {
   if (cart[i.id] === 1) delete cart[i.id];
   else cart[i.id]--;
 }
+let orderLoadSequence = 0;
 async function fetchOrders() {
+  const sequence = ++orderLoadSequence;
   try {
-    orders.value = await api.get('/orders');
+    const result = await api.get<Order[]>('/orders');
+    if (sequence !== orderLoadSequence) return;
+    orders.value = result;
     orderError.value = '';
   } catch (e) {
-    orderError.value = e.message;
+    if (sequence === orderLoadSequence) orderError.value = e.message;
   }
 }
 async function submitOrder() {
