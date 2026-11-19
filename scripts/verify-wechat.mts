@@ -454,6 +454,10 @@ async function main() {
       async () => (await read('moods')).some((entry) => entry.mood === 'great'),
       'persisted mood',
     );
+    await until(
+      async () => (await page!.$('.hero')) && !(await page!.$('.wd-button.is-loading')),
+      'home content after mood refresh',
+    );
     await step(() => mini!.screenshot({ path: path.join(artifacts, 'home.png') }), 'capture home');
     pass('mood persistence');
     page = await step(() => mini!.switchTab('/pages/wishes/index'), 'open wishes');
@@ -493,6 +497,7 @@ async function main() {
     for (const [route, title] of routes) {
       page = await step(() => mini!.reLaunch(`/pages/${route}/index`), `open ${route}`);
       await has(title);
+      await until(async () => !(await page!.$('.loading')), `loaded ${route} content`);
       const error = await step(() => page!.$('.error-box'), `read ${route} errors`);
       assert.ok(
         !error || !(await step(() => error.text(), `read ${route} error text`)),
