@@ -1312,10 +1312,12 @@ textarea {
     font-size: 10px;
     min-height: 44px;
   }
-  .mobile-nav a.active {
+  .mobile-nav a.active,
+  .mobile-nav button.active {
     color: var(--accent-dark);
   }
-  .mobile-nav a.active svg {
+  .mobile-nav a.active svg,
+  .mobile-nav button.active svg {
     fill: var(--accent-soft);
   }
   .home-hero {

@@ -377,9 +377,12 @@ test('two people can create, share and persist their complete little world', asy
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBeTruthy();
   await expect(page.locator('.mobile-nav')).toBeVisible();
-  await page.locator('.mobile-nav').getByRole('button', { name: '更多' }).click();
+  const moreButton = page.locator('.mobile-nav').getByRole('button', { name: '更多' });
+  await moreButton.click();
   await page.getByRole('link', { name: '时光信箱', exact: true }).last().click();
   await expect(page.getByRole('heading', { name: '时光信箱', exact: true })).toBeVisible();
+  await expect(moreButton).toHaveClass(/active/);
+  await expect(moreButton).toHaveAttribute('aria-current', 'location');
   await expect(page.locator('article').filter({ hasText: names.letter })).not.toContainText(
     '这段秘密必须留在未来',
   );
@@ -453,6 +456,11 @@ test('all pages fit a small phone and the server address stays reachable', async
     ['/settings', '我们的小设置'],
   ]) {
     await visit(page, url, title);
+    if (!['/', '/wishes', '/ledger', '/memories'].includes(url)) {
+      const moreButton = page.locator('.mobile-nav').getByRole('button', { name: '更多' });
+      await expect(moreButton).toHaveClass(/active/);
+      await expect(moreButton).toHaveAttribute('aria-current', 'location');
+    }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       url,

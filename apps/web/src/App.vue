@@ -9,6 +9,9 @@ const session = useSession(),
 const online = ref(navigator.onLine),
   more = ref(false);
 const theme = computed(() => session.space?.theme || 'cream');
+const mobileMoreActive = computed(
+  () => !['/', '/wishes', '/ledger', '/memories'].includes(route.path),
+);
 const nav = [
   { to: '/', name: '小世界', icon: 'home' },
   { to: '/wishes', name: '一起做', icon: 'wish' },
@@ -78,8 +81,8 @@ onUnmounted(() => {
             :class="{ active: route.path === '/settings' }"
             ><AppIcon name="settings" :size="19" />我们的小设置</router-link
           ><button class="user-switch" @click="logout" title="退出登录">
-            <span class="avatar">{{ session.user?.nickname?.slice(0, 1) }}</span
-            ><span>{{ session.user?.nickname }}<small>今天也要好好生活</small></span
+            <span class="avatar">{{ session.user?.nickname?.slice(0, 1) }}</span><span
+              >{{ session.user?.nickname }}<small>今天也要好好生活</small></span
             ><AppIcon name="logout" :size="17" />
           </button>
         </div>
@@ -109,7 +112,15 @@ onUnmounted(() => {
           :to="item.to"
           :class="{ active: route.path === item.to }"
           ><AppIcon :name="item.icon" :size="22" /><span>{{ item.name }}</span></router-link
-        ><button @click="more = true"><AppIcon name="more" /><span>更多</span></button>
+        ><button
+          :class="{ active: mobileMoreActive }"
+          :aria-current="mobileMoreActive ? 'location' : undefined"
+          :aria-expanded="more"
+          aria-haspopup="dialog"
+          @click="more = true"
+        >
+          <AppIcon name="more" /><span>更多</span>
+        </button>
       </nav>
       <el-drawer v-model="more" title="我们的小世界" direction="btt" size="auto" class="more-drawer"
         ><div class="more-grid">
