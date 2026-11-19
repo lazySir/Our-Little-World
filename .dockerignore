@@ -12,8 +12,8 @@ data
 storage
 backups
 reference-review
-test-results
-playwright-report
+**/test-results
+**/playwright-report
 deliverables
 .worktrees
 **/*.mp4
