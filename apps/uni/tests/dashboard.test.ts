@@ -47,6 +47,7 @@ function setup(t: any, withDate = true, pendingWrite?: Promise<void>) {
   };
   const writes: any[] = [];
   const notices: string[] = [];
+  const navigations: string[] = [];
   const session = { user: { id: 'owner' }, load: async () => true };
   let show!: (event?: unknown) => Promise<void>;
   let refresh!: (event?: unknown) => Promise<void>;
@@ -88,7 +89,9 @@ function setup(t: any, withDate = true, pendingWrite?: Promise<void>) {
       notify(message: string) {
         notices.push(message);
       },
-      navigate() {},
+      navigate(url: string) {
+        navigations.push(url);
+      },
     },
   };
   const module = { exports: {} as any };
@@ -124,6 +127,7 @@ function setup(t: any, withDate = true, pendingWrite?: Promise<void>) {
     view,
     writes,
     notices,
+    navigations,
     api: dependencies['../../lib/api'],
     session,
     show: (event?: unknown) => show(event),
@@ -136,6 +140,73 @@ function setup(t: any, withDate = true, pendingWrite?: Promise<void>) {
       dashboard.moods = [];
     },
   };
+}
+
+test('home previews up to four pending wishes between its feature grid and recent memories', async (t) => {
+  const s = setup(t);
+  await s.view.load();
+  s.view.dashboard.value.pendingWishes = Array.from({ length: 6 }, (_, index) => ({
+    id: `wish-${index}`,
+    title: `一起完成第 ${index + 1} 件事`,
+  }));
+  const rendered = nodes(s.render());
+  const preview = rendered.find((node) => node.props?.class?.split(' ').includes('home-wishes'));
+  assert.ok(preview, 'The actual home template must render a pending wish preview');
+  const rows = nodes(preview).filter((node) => node.type === 'wd-cell');
+  assert.deepEqual(
+    rows.map((node) => node.props.title),
+    ['一起完成第 1 件事', '一起完成第 2 件事', '一起完成第 3 件事', '一起完成第 4 件事'],
+  );
+  const featureIndex = rendered.findIndex((node) => node.props?.class === 'feature-grid');
+  const previewIndex = rendered.indexOf(preview);
+  const headingIndex = rendered.findIndex((node) => node.children === '我们的待办愿望');
+  const memoryIndex = rendered.findIndex((node) => node.children === '最近的回忆');
+  assert.ok(
+    featureIndex < headingIndex && headingIndex < previewIndex && previewIndex < memoryIndex,
+  );
+});
+
+test('home wish preview includes a target date only when the wish has one', async (t) => {
+  const s = setup(t);
+  await s.view.load();
+  s.view.dashboard.value.pendingWishes = [
+    { id: 'dated', title: '一起看日落', targetDate: '2026-11-22' },
+    { id: 'undated', title: '找一家喜欢的小店' },
+    { id: 'null-date', title: '去公园散步', targetDate: null },
+  ];
+  const rows = nodes(s.render()).filter((node) => node.type === 'wd-cell');
+  assert.equal(rows.length, 3, 'The real template must render each pending wish');
+  assert.equal(rows[0].props.label, '目标 2026-11-22');
+  assert.equal(rows[1].props.label, '');
+  assert.equal(rows[2].props.label, '');
+});
+
+test('clicking a rendered home wish opens the existing wish list', async (t) => {
+  const s = setup(t);
+  await s.view.load();
+  s.view.dashboard.value.pendingWishes = [{ id: 'wish', title: '一起看日落' }];
+  const row = nodes(s.render()).find((node) => node.type === 'wd-cell');
+  assert.ok(row, 'The actual home template must render a clickable wish');
+  assert.equal(row.props['is-link'], true, 'Wot cells must enable their click event');
+  row.props.onClick();
+  assert.deepEqual(s.navigations, ['/pages/wishes/index']);
+});
+
+for (const wishes of [undefined, []]) {
+  test(`home offers a first wish action when pending wishes are ${wishes ? 'empty' : 'missing'}`, async (t) => {
+    const s = setup(t);
+    await s.view.load();
+    s.view.dashboard.value.pendingWishes = wishes;
+    const rendered = nodes(s.render());
+    const empty = rendered.find((node) => node.props?.action === '写下第一个愿望');
+    assert.ok(empty, 'The actual home template must render the first wish action');
+    assert.equal(
+      rendered.some((node) => node.type === 'wd-cell'),
+      false,
+    );
+    empty.props.onAction();
+    assert.deepEqual(s.navigations, ['/pages/wishes/index']);
+  });
 }
 
 test('home mood writes let the service choose its date and remain visible after reload', async (t) => {

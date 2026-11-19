@@ -75,6 +75,30 @@
         </view>
       </view>
       <view class="section-head">
+        <view class="section-title">我们的待办愿望</view>
+        <view class="text-action" @click="go('/pages/wishes/index')">查看全部 →</view>
+      </view>
+      <view v-if="dashboard?.pendingWishes?.length" class="card home-wishes">
+        <wd-cell-group border>
+          <wd-cell
+            v-for="wish in dashboard.pendingWishes.slice(0, 4)"
+            :key="wish.id"
+            :title="wish.title"
+            :label="wish.targetDate ? `目标 ${wish.targetDate}` : ''"
+            :is-link="true"
+            @click="go('/pages/wishes/index')"
+          />
+        </wd-cell-group>
+      </view>
+      <EmptyState
+        v-else
+        symbol="✦"
+        title="愿望清单等你们一起写"
+        description="从一件想一起完成的小事开始，慢慢收藏两个人的期待。"
+        action="写下第一个愿望"
+        @action="go('/pages/wishes/index')"
+      />
+      <view class="section-head">
         <view class="section-title">最近的回忆</view>
         <view class="text-action" @click="go('/pages/memories/index')">查看全部 →</view>
       </view>
@@ -230,3 +254,16 @@ async function saveMood() {
 onShow(() => load());
 onPullDownRefresh(() => load());
 </script>
+<style scoped lang="scss">
+.home-wishes {
+  :deep(.wd-cell__left) {
+    @apply min-w-0;
+  }
+  :deep(.wd-cell__right) {
+    @apply flex-none;
+  }
+  :deep(.wd-cell__title) {
+    overflow-wrap: anywhere;
+  }
+}
+</style>

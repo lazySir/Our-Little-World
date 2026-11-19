@@ -132,6 +132,9 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await page.locator('.page textarea').first().fill('今天也在认真记录我们的生活');
   await click(page, '保存今天的心情');
   await expect(page.locator('.loading')).toHaveCount(0);
+  await expect(page.getByText('我们的待办愿望', { exact: true })).toBeVisible();
+  await click(page, '写下第一个愿望');
+  await expect(page.locator('.title')).toHaveText('一起做');
 
   await visit(page, 'wishes', '一起做');
   await click(page, '＋ 添加');
@@ -141,9 +144,29 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await expect(page.locator('.card-title').filter({ hasText: names.wish })).toBeVisible();
   await page.reload();
   await expect(page.locator('.card-title').filter({ hasText: names.wish })).toBeVisible();
+  await visit(page, 'home', '今天，也在好好生活');
+  const homeWish = page.locator('.home-wishes').getByText(names.wish, { exact: true });
+  await expect(homeWish).toBeVisible();
+  const wishLayout = await page
+    .locator('.home-wishes .wd-cell__wrapper')
+    .first()
+    .evaluate((row) => ({
+      rowWidth: row.getBoundingClientRect().width,
+      titleWidth: row.querySelector('.wd-cell__left')!.getBoundingClientRect().width,
+    }));
+  expect(wishLayout.titleWidth).toBeGreaterThan(wishLayout.rowWidth * 0.7);
+  await page.screenshot({ path: 'test-results/home-wishes-h5.png', fullPage: true });
+  await homeWish.click();
+  await expect(page.locator('.title')).toHaveText('一起做');
+  await expect(page.locator('.loading')).toHaveCount(0);
   const wish = page.locator('.card').filter({ hasText: names.wish });
   await wish.locator('.check').click();
   await expect(wish).toHaveClass(/done/);
+  await visit(page, 'home', '今天，也在好好生活');
+  await expect(page.locator('.error-box')).toHaveCount(0);
+  await expect(page.getByText('写下第一个愿望', { exact: true })).toBeVisible();
+  await expect(page.locator('.home-wishes').getByText(names.wish, { exact: true })).toHaveCount(0);
+  await visit(page, 'wishes', '一起做');
   await click(wish, '写成一段回忆 →');
   await expect(page.locator('.title')).toHaveText('回忆相册');
 

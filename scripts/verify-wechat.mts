@@ -24,18 +24,26 @@ import {
 
 interface Element {
   text(): Promise<string>;
+  offset(): Promise<{ top: number; left: number }>;
+  size(): Promise<{ width: number; height: number }>;
   attribute(name: string): Promise<string | null>;
   input(value: string): Promise<void>;
   tap(): Promise<void>;
 }
 interface Page {
   path: string;
+  scrollTop(): Promise<string | number>;
   $(selector: string): Promise<Element | null>;
   $$(selector: string): Promise<Element[]>;
 }
 interface MiniProgram {
   on(event: 'exception', listener: (error: unknown) => void): void;
-  systemInfo(): Promise<{ platform: string; SDKVersion: string; windowWidth: number }>;
+  systemInfo(): Promise<{
+    platform: string;
+    SDKVersion: string;
+    windowWidth: number;
+    windowHeight: number;
+  }>;
   currentPage(): Promise<Page | undefined>;
   reLaunch(url: string): Promise<Page | undefined>;
   switchTab(url: string): Promise<Page | undefined>;
@@ -380,6 +388,7 @@ async function main() {
       'connect to own WeChat project',
       31000,
     );
+    mini.on('exception', (error) => exceptions.push(error));
     const ready = await step(
       () =>
         waitForAppReady(
@@ -407,7 +416,6 @@ async function main() {
     const info = ready.info;
     assert.equal(info.platform, 'devtools');
     console.log(`WeChat SDK ${info.SDKVersion}; viewport ${info.windowWidth}`);
-    mini.on('exception', (error) => exceptions.push(error));
     await step(() => mini!.callWxMethod('clearStorageSync'), 'clear own simulator storage');
     await step(
       () => mini!.callWxMethod('setStorageSync', 'little-world-api', base),
@@ -460,7 +468,12 @@ async function main() {
     );
     await step(() => mini!.screenshot({ path: path.join(artifacts, 'home.png') }), 'capture home');
     pass('mood persistence');
-    page = await step(() => mini!.switchTab('/pages/wishes/index'), 'open wishes');
+    await has('我们的待办愿望');
+    await tap('写下第一个愿望');
+    page = await until(async () => {
+      const current = await mini!.currentPage();
+      return current?.path === 'pages/wishes/index' && current;
+    }, 'wish list from empty home');
     await tap('＋ 添加');
     await input('例如：去看一场海边日落', '一起看日落');
     await tap('保存这一刻');
@@ -475,6 +488,37 @@ async function main() {
     assert.equal(edited.id, wish.id);
     assert.equal(edited.title, '一起看星星');
     pass('wish creation and edit through WeChat PATCH transport');
+    page = await step(() => mini!.switchTab('/pages/home/index'), 'open home wish preview');
+    const homeWish = await control('.home-wishes .wd-cell', '一起看星星');
+    const homeWishPosition = await step(() => homeWish.offset(), 'read home wish position');
+    await step(
+      () =>
+        mini!.callWxMethod('pageScrollTo', {
+          scrollTop: Math.max(0, Number(homeWishPosition.top) - 80),
+          duration: 0,
+        }),
+      'show home wish preview',
+    );
+    await until(async () => {
+      const [position, size, scrollTop] = await Promise.all([
+        homeWish.offset(),
+        homeWish.size(),
+        page!.scrollTop(),
+      ]);
+      const top = Number(position.top) - Number(scrollTop);
+      return top >= 0 && Number(size.height) > 0 && top + Number(size.height) <= info.windowHeight;
+    }, 'home wish preview fully visible');
+    await step(
+      () => mini!.screenshot({ path: path.join(artifacts, 'home-wishes.png') }),
+      'capture saved home wish',
+    );
+    await step(() => homeWish.tap(), 'open saved wish from home');
+    page = await until(async () => {
+      const current = await mini!.currentPage();
+      return current?.path === 'pages/wishes/index' && current;
+    }, 'wish list from home preview');
+    await has('一起看星星');
+    pass('home previews a saved wish and opens its list');
     page = await step(() => mini!.navigateTo('/pages/ledger/index'), 'open ledger');
     await tap('＋ 记一笔');
     await input('0.00', '12.34');

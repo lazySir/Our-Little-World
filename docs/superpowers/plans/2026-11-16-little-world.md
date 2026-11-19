@@ -69,6 +69,16 @@
 - Repeatable WeChat guest-simulator acceptance passed 8 core/media checks, including actual native photo upload/download and ZIP restore, with no runtime or cleanup errors. Actual AppID, allowed HTTPS domains, device permissions, preview and file-sharing acceptance remain unchecked above.
 - Local production retained its existing space on port 3003. Read-only health/status and production login rendering at 1440px/375px passed, without horizontal overflow or page script errors. Docker runtime evidence remains the dated November 17 baseline; the engine was not running for this later iteration.
 
+## Completion audit correction — mini program home wishes
+
+The requirement-by-requirement audit found that the mini program home did not render `dashboard.pendingWishes`, although the API and Web already support it. Keep the existing home layout and reuse Wot cells plus the shared empty-state component. Show at most four pending titles with optional target dates between the feature shortcuts and recent memories. Each row, the section link and the empty-state action open the existing wishes tab. Do not add a second completion action or another API request.
+
+- [x] Extend `apps/uni/tests/dashboard.test.ts` to render the real SFC and verify data rows, the four-item limit, optional dates, empty state and navigation. Observe the missing-section failures before implementation.
+- [x] Add the section to `apps/uni/src/pages/home/index.vue` without changing mood-save or refresh behavior. Run `npm run test:uni` and `npm run typecheck`.
+- [x] Extend `apps/uni/tests/e2e/h5.spec.ts` and `scripts/verify-wechat.mts` to check a real saved wish on the home page and its navigation; verify that completing a wish removes it from the H5 preview.
+- [x] Run H5 browser acceptance and H5/mp-weixin builds; inspect the H5 preview. Reproduce and fix Wot's title-width restriction before the final four-test browser run. Update verification records with the actual simulator failure and the old-home comparison. Keep explicit staging and immediate push discipline below.
+- [ ] Re-run the 7 core / 9 complete WeChat checks and inspect the actual `home-wishes.png`. Five candidate attempts and a separately built `efe03ea` home baseline all timed out before App readiness; no new business flow was validated. Full unit suite remains 196 (shared 12, API 43, Web 47, uni 72, scripts 22). Real AppID/domain/device acceptance above is also still outstanding.
+
 ## Commit discipline
 
 Each worker stages only their owned files, never `git add .` in shared repo. Root serializes commits on request to avoid index locks. No video, database, uploads, tokens, node_modules or build output committed. Destructive filesystem operations limited to verified workspace temporary/generated paths.
