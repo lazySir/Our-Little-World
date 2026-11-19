@@ -4,10 +4,26 @@ import { UnifiedViteWeappTailwindcssPlugin } from 'weapp-tailwindcss/vite';
 import tailwindcss from 'tailwindcss';
 import autoprefixer from 'autoprefixer';
 import { fileURLToPath } from 'node:url';
+import { uniEchartsLifecycle } from './scripts/echarts-lifecycle';
+import { uniEchartsAliases, uniEchartsPaths } from './scripts/prepare-echarts';
 
 const uni = (uniModule as unknown as { default?: () => PluginOption }).default || uniModule;
 export default defineConfig({
+  resolve: { alias: uniEchartsAliases() },
+  optimizeDeps: {
+    exclude: ['uni-echarts'],
+    include: [
+      'echarts/core',
+      'echarts/charts',
+      'echarts/components',
+      'echarts/renderers',
+      '@our-little-world/shared/date',
+      '@our-little-world/shared/money',
+      '@our-little-world/shared/growth',
+    ],
+  },
   plugins: [
+    uniEchartsLifecycle(uniEchartsPaths.component, uniEchartsPaths.sharedCore),
     uni(),
     UnifiedViteWeappTailwindcssPlugin({
       appType: 'uni-app-vite',

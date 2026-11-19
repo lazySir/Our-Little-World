@@ -6,6 +6,8 @@ import { today, growthTypes } from '../domain';
 import { useResource } from '../composables/resource';
 import type { Baby, Growth, Asset } from '../types';
 import PhotoUpload from '../components/PhotoUpload.vue';
+import GrowthChart from '../components/GrowthChart.vue';
+import { projectGrowthMeasurements } from '@our-little-world/shared/growth';
 const baby = ref<Baby | null>(null),
   babyLoading = ref(true),
   babyLoaded = ref(false),
@@ -46,12 +48,9 @@ const editorBusy = computed(() => uploading.value || saving.value);
 const profileBusy = computed(() => profileUploading.value || profileSaving.value);
 const profileReady = computed(() => babyLoaded.value && !babyLoading.value);
 let babyLoadVersion = 0;
-const latestGrowth = computed(
-  () =>
-    [...items.value]
-      .filter((i) => i.type === 'growth')
-      .sort((a, b) => b.date.localeCompare(a.date))[0],
-);
+const measurements = computed(() => projectGrowthMeasurements(items.value));
+const latestHeight = computed(() => measurements.value.height.at(-1));
+const latestWeight = computed(() => measurements.value.weight.at(-1));
 const age = computed(() => {
   if (!baby.value?.birthday) return '记录每一个第一次';
   return `来到我们身边的第 ${Math.max(1, Math.floor((new Date(today()).getTime() - new Date(baby.value.birthday).getTime()) / 86400000) + 1)} 天`;
@@ -188,10 +187,10 @@ onMounted(loadBaby);
     </div>
     <div class="baby-measurements">
       <div>
-        <small>最近身高</small><strong>{{ latestGrowth?.heightCm ?? '—' }}<span>cm</span></strong>
+        <small>最近身高</small><strong>{{ latestHeight?.value ?? '—' }}<span>cm</span></strong>
       </div>
       <div>
-        <small>最近体重</small><strong>{{ latestGrowth?.weightKg ?? '—' }}<span>kg</span></strong>
+        <small>最近体重</small><strong>{{ latestWeight?.value ?? '—' }}<span>kg</span></strong>
       </div>
     </div>
     <button class="icon-button" title="编辑宝宝档案" @click="editProfile">
@@ -207,77 +206,78 @@ onMounted(loadBaby);
       @action="editProfile"
     />
   </div>
-  <template v-if="baby"
-    ><div class="baby-note">
-      <AppIcon
-        name="heart"
-        :size="14"
-      />这里是家庭成长记录。每个宝宝都有自己的节奏，让爱和陪伴慢慢发生。
+  <div class="baby-note">
+    <AppIcon
+      name="heart"
+      :size="14"
+    />这里是家庭成长记录。每个宝宝都有自己的节奏，让爱和陪伴慢慢发生。
+  </div>
+  <LoadState :loading="loading" :error="error" @retry="load"
+    ><GrowthChart :records="items" />
+    <div class="toolbar">
+      <div class="filter-tabs">
+        <button class="filter-tab" :class="{ active: tab === 'all' }" @click="tab = 'all'">
+          全部记录</button
+        ><button
+          v-for="(label, key) in growthTypes"
+          :key="key"
+          class="filter-tab"
+          :class="{ active: tab === key }"
+          @click="tab = key"
+        >
+          {{ label }}
+        </button>
+      </div>
     </div>
-    <LoadState :loading="loading" :error="error" @retry="load"
-      ><div class="toolbar">
-        <div class="filter-tabs">
-          <button class="filter-tab" :class="{ active: tab === 'all' }" @click="tab = 'all'">
-            全部记录</button
-          ><button
-            v-for="(label, key) in growthTypes"
-            :key="key"
-            class="filter-tab"
-            :class="{ active: tab === key }"
-            @click="tab = key"
-          >
-            {{ label }}
-          </button>
+    <div v-if="filtered.length" class="growth-timeline">
+      <article v-for="item in filtered" :key="item.id" class="panel record-card">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <span class="tag green">{{ growthTypes[item.type] }}</span>
+            <h3 class="mt-3">{{ item.title }}</h3>
+            <p class="record-date mt-2">{{ item.date }}</p>
+          </div>
+          <div class="flex shrink-0 gap-0.5">
+            <button class="icon-button" title="编辑成长记录" @click="edit(item)">
+              <AppIcon name="edit" :size="16" /></button
+            ><button class="icon-button" title="删除成长记录" @click="remove(item)">
+              <AppIcon name="trash" :size="16" />
+            </button>
+          </div>
         </div>
-      </div>
-      <div v-if="filtered.length" class="growth-timeline">
-        <article v-for="item in filtered" :key="item.id" class="panel record-card">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <span class="tag green">{{ growthTypes[item.type] }}</span>
-              <h3 class="mt-3">{{ item.title }}</h3>
-              <p class="record-date mt-2">{{ item.date }}</p>
-            </div>
-            <div class="flex shrink-0 gap-0.5">
-              <button class="icon-button" title="编辑成长记录" @click="edit(item)">
-                <AppIcon name="edit" :size="16" /></button
-              ><button class="icon-button" title="删除成长记录" @click="remove(item)">
-                <AppIcon name="trash" :size="16" />
-              </button>
-            </div>
-          </div>
-          <div v-if="item.type === 'growth'" class="growth-values">
-            <span v-if="item.heightCm">{{ item.heightCm }} <small>cm</small></span
-            ><span v-if="item.weightKg">{{ item.weightKg }} <small>kg</small></span>
-          </div>
-          <div v-if="item.amountMl" class="growth-values">
-            <span>{{ item.amountMl }} <small>ml</small></span>
-          </div>
-          <div v-if="item.durationMinutes" class="growth-values">
-            <span>{{ item.durationMinutes }} <small>分钟</small></span>
-          </div>
-          <p v-if="item.content" class="body-text">{{ item.content }}</p>
-          <div v-if="item.assets?.length" class="photos-grid">
-            <el-image
-              v-for="asset in item.assets"
-              :key="asset.id"
-              :src="assetUrl(asset)"
-              :preview-src-list="item.assets.map(assetUrl)"
-              fit="cover"
-              preview-teleported
-            />
-          </div>
-        </article>
-      </div>
-      <div v-else class="panel">
-        <EmptyState
-          title="每一次小进步，都值得被记住"
-          description="第一次微笑、第一次翻身，或者今天的身高体重，都是珍贵的成长。"
-          icon="baby"
-          action="记下第一条成长"
-          @action="edit()"
-        /></div></LoadState></template
-  ><el-dialog
+        <div v-if="item.type === 'growth'" class="growth-values">
+          <span v-if="item.heightCm">{{ item.heightCm }} <small>cm</small></span
+          ><span v-if="item.weightKg">{{ item.weightKg }} <small>kg</small></span>
+        </div>
+        <div v-if="item.amountMl" class="growth-values">
+          <span>{{ item.amountMl }} <small>ml</small></span>
+        </div>
+        <div v-if="item.durationMinutes" class="growth-values">
+          <span>{{ item.durationMinutes }} <small>分钟</small></span>
+        </div>
+        <p v-if="item.content" class="body-text">{{ item.content }}</p>
+        <div v-if="item.assets?.length" class="photos-grid">
+          <el-image
+            v-for="asset in item.assets"
+            :key="asset.id"
+            :src="assetUrl(asset)"
+            :preview-src-list="item.assets.map(assetUrl)"
+            fit="cover"
+            preview-teleported
+          />
+        </div>
+      </article>
+    </div>
+    <div v-else class="panel">
+      <EmptyState
+        title="每一次小进步，都值得被记住"
+        description="第一次微笑、第一次翻身，或者今天的身高体重，都是珍贵的成长。"
+        icon="baby"
+        action="记下第一条成长"
+        @action="edit()"
+      /></div
+  ></LoadState>
+  <el-dialog
     v-model="profileOpen"
     :title="baby ? '宝宝的小档案' : '欢迎，小小家人'"
     width="min(520px,94vw)"

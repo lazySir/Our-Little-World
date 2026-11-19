@@ -126,7 +126,11 @@ function mountPage(page: string) {
             shows.push(callback);
           },
           onPullDownRefresh() {},
+          onResize() {},
         };
+      // Canvas rendering is a platform boundary; keep the real chart/page logic above it.
+      if (specifier === 'uni-echarts') return { render: () => null };
+      if (specifier === 'uni-echarts/shared') return { provideEcharts() {} };
       if (/lib\/api$/.test(specifier) || specifier === './api') return api;
       if (/stores\/session$/.test(specifier)) return { useSession: () => session };
       if (/lib\/domain$/.test(specifier)) return domain;

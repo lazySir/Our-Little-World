@@ -44,6 +44,7 @@
       description="现在或未来有需要时，再为宝宝建一个温柔的小档案。"
       action="建立宝宝档案"
       @action="editBaby" />
+    <GrowthChart v-if="!loading && !error" ref="growthChart" :records="items" />
     <view class="toolbar">
       <input class="search" v-model="query" placeholder="搜索成长记录" />
       <wd-button size="small" @click="openNew">＋ 记录</wd-button>
@@ -164,13 +165,14 @@
   ></view>
 </template>
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
-import { onShow } from '@dcloudio/uni-app';
+import { ref, reactive, computed, nextTick, shallowRef } from 'vue';
+import { onShow, onResize } from '@dcloudio/uni-app';
 import PageHeading from '../../components/PageHeading.vue';
 import EmptyState from '../../components/EmptyState.vue';
 import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
 import PhotoPicker from '../../components/PhotoPicker.vue';
+import GrowthChart from '../../components/GrowthChart.vue';
 import { useResource } from '../../lib/useResource';
 import { request, notify, assetUrl, previewPhotos } from '../../lib/api';
 import { today, daysBetween } from '../../lib/domain';
@@ -190,6 +192,7 @@ const { session, items, loading, error, saving, editor, formError, save, remove 
   filter = ref('all'),
   editing = ref(null);
 const uploading = ref(false);
+const growthChart = shallowRef<{ resize: () => Promise<void> } | null>(null);
 const types = [
     { value: 'growth', label: '身高体重' },
     { value: 'feeding', label: '喂养' },
@@ -336,5 +339,11 @@ async function saveForm() {
   }
   await save(payload, editing.value?.id);
 }
+async function resizeGrowthChart() {
+  await nextTick();
+  await growthChart.value?.resize();
+}
 onShow(loadBaby);
+onShow(resizeGrowthChart);
+onResize(resizeGrowthChart);
 </script>

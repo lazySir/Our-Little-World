@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { prepareUniEcharts } from './prepare-echarts';
 const require = createRequire(import.meta.url);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const source = dirname(require.resolve('wot-design-uni/package.json'));
@@ -33,3 +34,5 @@ const offlineStyles = iconStyles.replace(/@font-face\s*\{[^}]*\}/g, (face) => {
 if (!embedded) throw new Error('Wot 图标字体声明缺失，请检查组件库版本。');
 await writeFile(iconStylesPath, offlineStyles);
 console.log('Wot Design Uni 已从锁定的 npm 依赖同步到应用内组件目录。');
+await prepareUniEcharts();
+console.log('Uni ECharts 已从锁定的 npm 依赖同步到应用内组件目录。');

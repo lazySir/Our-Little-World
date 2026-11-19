@@ -88,6 +88,7 @@ function setup(initial: Baby | null = existing) {
       shows.push(callback);
     },
     onPullDownRefresh() {},
+    onResize() {},
   };
   const evaluate = (source: string, dependencies: Record<string, unknown>) => {
     const module = { exports: {} as any };
