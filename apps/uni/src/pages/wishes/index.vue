@@ -50,7 +50,14 @@
         </view>
         <view v-if="item.completedAt" class="between" style="margin-top: 12rpx">
           <view class="meta">完成于 {{ item.completedAt.slice(0, 10) }}</view>
-          <view class="text-action" @click="toMemory(item)">写成一段回忆 →</view>
+          <wd-button
+            size="small"
+            plain
+            :loading="convertingId === item.id"
+            :disabled="!!convertingId"
+            @click="toMemory(item)"
+            >写成一段回忆 →</wd-button
+          >
         </view>
       </view>
       <EmptyState
@@ -103,7 +110,8 @@ const { session, items, loading, error, saving, editor, formError, load, save, r
   useResource('wishes');
 const query = ref(''),
   filter = ref('all'),
-  editing = ref(null);
+  editing = ref(null),
+  convertingId = ref('');
 const tabs = [
   { value: 'all', label: '全部' },
   { value: 'todo', label: '还没完成' },
@@ -168,6 +176,8 @@ async function toggle(item) {
   }
 }
 async function toMemory(item) {
+  if (convertingId.value) return;
+  convertingId.value = item.id;
   try {
     await request('/memories', 'POST', {
       title: item.title,
@@ -181,6 +191,8 @@ async function toMemory(item) {
     navigate('/pages/memories/index');
   } catch (e) {
     notify(e.message);
+  } finally {
+    convertingId.value = '';
   }
 }
 </script>

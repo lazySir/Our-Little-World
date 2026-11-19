@@ -88,6 +88,7 @@ const query = ref('');
 const tab = ref('all');
 const dialog = ref(false);
 const editing = ref<any>(null);
+const convertingId = ref('');
 const assets = ref<Asset[]>([]);
 const uploaded = ref(false);
 const editorBusy = computed(() => uploaded.value || saving.value);
@@ -239,6 +240,8 @@ function canDelete(item) {
   return props.kind !== 'letters' || item.authorId === session.user.id;
 }
 async function convertToMemory(item) {
+  if (convertingId.value) return;
+  convertingId.value = item.id;
   try {
     await api.post('/memories', {
       title: item.title,
@@ -251,6 +254,8 @@ async function convertToMemory(item) {
     ElMessage.success('已把完成的愿望收藏为回忆');
   } catch (e) {
     ElMessage.error(e.message);
+  } finally {
+    convertingId.value = '';
   }
 }
 </script>
@@ -357,7 +362,13 @@ async function convertToMemory(item) {
           <span v-for="tag in item.tags" :key="tag" class="tag"># {{ tag }}</span>
         </div>
         <div v-if="kind === 'wishes'" class="card-footer">
-          <el-button v-if="item.status === 'done'" text size="small" @click="convertToMemory(item)"
+          <el-button
+            v-if="item.status === 'done'"
+            text
+            size="small"
+            :loading="convertingId === item.id"
+            :disabled="!!convertingId"
+            @click="convertToMemory(item)"
             >收藏为回忆</el-button
           ><span v-else class="muted">{{
             item.targetDate ? '目标：' + item.targetDate : '还没有设定日期'
