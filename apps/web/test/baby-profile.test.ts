@@ -226,6 +226,10 @@ test('a deleted growth source stays hidden until its read succeeds, then restore
     rendered.find((node) => node.props?.['data-record-id'] === 'remaining-growth-record')?.type,
     'article',
   );
+  assert.ok(rendered.some((node) => node.type === 'GrowthChart'));
+  assert.ok(rendered.some((node) => node.props?.class === 'baby-profile panel'));
+  assert.ok(rendered.some((node) => node.props?.class === 'toolbar'));
+  assert.ok(s.action(), 'The regular page action must return with the regular list');
 });
 
 test('a birthday source offers retry before treating a successfully read missing profile as deleted', async () => {

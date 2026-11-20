@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import { api, assetUrl } from '../api';
+import { api, assetUrl, refreshAssetOnError } from '../api';
 import { today, growthTypes } from '../domain';
 import { useResource } from '../composables/resource';
 import { useRecordFocus } from '../composables/record-focus';
@@ -77,6 +77,10 @@ const sourceGrowth = computed(() =>
     ? items.value.find((item) => item.id === props.recordId) || null
     : null,
 );
+const sourceGrowthMissing = computed(
+  () => sourceIsGrowth.value && sourceReady.value && !sourceGrowth.value,
+);
+const showRegularPage = computed(() => !props.recordId || sourceGrowthMissing.value);
 const focusRecord = useRecordFocus();
 let babyLoadVersion = 0;
 const measurements = computed(() => projectGrowthMeasurements(items.value));
@@ -197,7 +201,7 @@ onMounted(loadBaby);
 <template>
   <PageHeader title="宝宝成长" description="小小的你，每一天都在长大；小小的事，我们都想记住。"
     ><el-button
-      v-if="!recordId"
+      v-if="showRegularPage"
       type="primary"
       :disabled="!profileReady"
       @click="baby ? edit() : editProfile()"
@@ -207,7 +211,7 @@ onMounted(loadBaby);
   <LoadState v-if="!sourceIsGrowth" :loading="babyLoading" :error="babyError" @retry="loadBaby" />
   <CalendarSourceStatus v-if="sourceReady" path="/baby" :missing="!sourceBaby && !sourceGrowth" />
   <section
-    v-if="baby && profileReady && (!recordId || sourceBaby)"
+    v-if="baby && profileReady && (showRegularPage || sourceBaby)"
     :ref="sourceBaby ? focusRecord : undefined"
     :data-record-id="baby.id"
     :tabindex="sourceBaby ? -1 : undefined"
@@ -215,7 +219,7 @@ onMounted(loadBaby);
     class="baby-profile panel"
   >
     <div class="baby-avatar">
-      <el-image v-if="baby.asset" :src="assetUrl(baby.asset)" fit="cover" /><AppIcon
+      <el-image v-if="baby.asset" :src="assetUrl(baby.asset)" @error="refreshAssetOnError(baby.asset)" fit="cover" /><AppIcon
         v-else
         name="baby"
         :size="49"
@@ -237,11 +241,11 @@ onMounted(loadBaby);
         <small>最近体重</small><strong>{{ latestWeight?.value ?? '—' }}<span>kg</span></strong>
       </div>
     </div>
-    <button v-if="!recordId" class="icon-button" title="编辑宝宝档案" @click="editProfile">
+    <button v-if="showRegularPage" class="icon-button" title="编辑宝宝档案" @click="editProfile">
       <AppIcon name="edit" :size="18" />
     </button>
   </section>
-  <div v-else-if="!recordId && profileReady" class="panel baby-onboarding">
+  <div v-else-if="showRegularPage && profileReady" class="panel baby-onboarding">
     <EmptyState
       title="给小小的家人，留一片温柔的地方"
       description="创建宝宝档案后，就可以记录身高体重、喂养睡眠与每一个第一次。"
@@ -250,7 +254,7 @@ onMounted(loadBaby);
       @action="editProfile"
     />
   </div>
-  <div v-if="!recordId" class="baby-note">
+  <div v-if="showRegularPage" class="baby-note">
     <AppIcon
       name="heart"
       :size="14"
@@ -258,7 +262,7 @@ onMounted(loadBaby);
   </div>
   <LoadState v-if="!sourceIsBirthday" :loading="loading" :error="error" @retry="load"
     ><section
-      v-if="!recordId && (albumPhotos.length || (baby && profileReady))"
+      v-if="showRegularPage && (albumPhotos.length || (baby && profileReady))"
       class="baby-album"
       aria-labelledby="baby-album-title"
     >
@@ -273,6 +277,7 @@ onMounted(loadBaby);
         <figure v-for="(photo, index) in albumPhotos" :key="photo.id" class="baby-album-photo">
           <el-image
             :src="assetUrl(photo.asset)"
+            @error="refreshAssetOnError(photo.asset)"
             :preview-src-list="albumPhotos.map(({ asset }) => assetUrl(asset))"
             :initial-index="index"
             :alt="`${photo.title}，${photo.date}`"
@@ -292,8 +297,8 @@ onMounted(loadBaby);
         icon="baby"
       />
     </section>
-    <GrowthChart v-if="!recordId" :records="items" />
-    <div v-if="!recordId" class="toolbar">
+    <GrowthChart v-if="showRegularPage" :records="items" />
+    <div v-if="showRegularPage" class="toolbar">
       <div class="filter-tabs">
         <button class="filter-tab" :class="{ active: tab === 'all' }" @click="tab = 'all'">
           全部记录</button
@@ -348,6 +353,7 @@ onMounted(loadBaby);
             v-for="asset in item.assets"
             :key="asset.id"
             :src="assetUrl(asset)"
+            @error="refreshAssetOnError(asset)"
             :preview-src-list="item.assets.map(assetUrl)"
             fit="cover"
             preview-teleported
@@ -355,7 +361,7 @@ onMounted(loadBaby);
         </div>
       </article>
     </div>
-    <div v-else-if="!recordId" class="panel">
+    <div v-else-if="showRegularPage" class="panel">
       <EmptyState
         title="每一次小进步，都值得被记住"
         description="第一次微笑、第一次翻身，或者今天的身高体重，都是珍贵的成长。"
