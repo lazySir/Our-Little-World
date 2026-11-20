@@ -145,6 +145,93 @@ docker compose down
 
 迁移到新机器时，先安装同一版本并停止服务，再复制原来的 `data`、`storage` 和 `.env`，保留原账号身份。若只保留 ZIP，可在停机状态将其中 `database.sqlite` 作为目标数据库，将 `uploads` 内容放入 `storage/uploads`，再运行初始化应用迁移后启动；配置中的数据库路径要与实际文件一致。网页恢复面向原空间内的回滚，不能把旧作者 ID 直接导入重新注册的账号。
 
+### Windows 用 ZIP 迁移
+
+下面的 PowerShell 步骤适用于全新目标目录。先安装与原机相同或更新的项目版本，并确认服务已停止。先把原机 `.env` 安全复制到目标项目根目录，它包含保持账号会话与附件签名有效所需的 `ASSET_SECRET`；确认 `DATABASE_URL` 指向 `file:./data/world.db`。不要把 ZIP 解压到现有数据库或附件目录；若目标已有数据，先复制到其他位置并完成独立备份。假设 ZIP 保存在 `D:\\Backup\\little-world-backup.zip`，项目目录是 `D:\\Apps\\Our-Little-World`：
+
+```powershell
+$Root = 'D:\\Apps\\Our-Little-World'
+$Zip = 'D:\\Backup\\little-world-backup.zip'
+$EnvFile = Join-Path $Root '.env'
+$Stage = Join-Path $env:TEMP ('little-world-migration-' + [guid]::NewGuid().ToString('N'))
+$Database = Join-Path $Root 'data\\world.db'
+$Uploads = Join-Path $Root 'storage\\uploads'
+
+if (Test-Path -LiteralPath $Database) { throw "目标数据库已存在：$Database" }
+if (!(Test-Path -LiteralPath $EnvFile)) { throw '请先将原机 .env 复制到目标项目根目录' }
+if (Test-Path -LiteralPath $Uploads -PathType Container) {
+  $ExistingUploads = @(Get-ChildItem -LiteralPath $Uploads -Force)
+  if ($ExistingUploads.Count -gt 0) { throw "目标附件目录非空：$Uploads" }
+}
+New-Item -ItemType Directory -Force -Path $Stage | Out-Null
+Expand-Archive -LiteralPath $Zip -DestinationPath $Stage
+
+$ManifestPath = Join-Path $Stage 'manifest.json'
+$DatabaseBackup = Join-Path $Stage 'database.sqlite'
+if (!(Test-Path -LiteralPath $ManifestPath) -or !(Test-Path -LiteralPath $DatabaseBackup)) {
+  throw 'ZIP 缺少 manifest.json 或 database.sqlite'
+}
+$Manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
+if ($Manifest.product -ne 'our-little-world' -or $Manifest.version -ne 1 -or $Manifest.complete -ne $true) {
+  throw 'ZIP 不是本项目支持的完整备份'
+}
+
+New-Item -ItemType Directory -Force -Path (Join-Path $Root 'data') | Out-Null
+New-Item -ItemType Directory -Force -Path $Uploads | Out-Null
+Copy-Item -LiteralPath $DatabaseBackup -Destination $Database
+$BackupUploads = Join-Path $Stage 'uploads'
+if (Test-Path -LiteralPath $BackupUploads -PathType Container) {
+  Get-ChildItem -LiteralPath $BackupUploads -File | Copy-Item -Destination $Uploads
+}
+
+Set-Location $Root
+npm ci
+npm run init
+npm run build
+npm start
+```
+
+`npm run init` 会生成 Prisma Client 并应用已提交迁移，不会重置数据库。首次启动后用原账号登录，抽查记录、账本、时光信解锁规则和照片；确认无误后再删除 `$Stage`。ZIP 内的 `data.json` 只用于核对，不要另外导入数据库。
+
+### Docker 卷的离线副本
+
+Docker 部署优先使用应用内 ZIP。若需要保留原始命名卷，先停服务，再用 Docker 的临时 Alpine 容器把两个卷分别打包到宿主机；`docker volume ls` 可查看 Compose 实际生成的完整卷名：
+
+```powershell
+docker compose stop world
+$BackupDir = Join-Path (Get-Location) 'offline-backup'
+New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
+$DataArchive = Join-Path $BackupDir 'world-data.tgz'
+$StorageArchive = Join-Path $BackupDir 'world-storage.tgz'
+if ((Test-Path -LiteralPath $DataArchive) -or (Test-Path -LiteralPath $StorageArchive)) { throw '备份文件已存在，请改用新的输出目录' }
+docker volume ls
+$DataVolume = '实际卷名_world-data'
+$StorageVolume = '实际卷名_world-storage'
+if (-not (docker volume inspect $DataVolume 2>$null)) { throw '请将 DataVolume 替换为 docker volume ls 中存在的完整卷名' }
+if (-not (docker volume inspect $StorageVolume 2>$null)) { throw '请将 StorageVolume 替换为 docker volume ls 中存在的完整卷名' }
+docker run --rm --mount "type=volume,source=$DataVolume,target=/from,readonly" --mount "type=bind,source=$BackupDir,target=/to" alpine sh -c 'tar czf /to/world-data.tgz -C /from .'
+if ($LASTEXITCODE -ne 0) { throw '数据库卷备份失败' }
+docker run --rm --mount "type=volume,source=$StorageVolume,target=/from,readonly" --mount "type=bind,source=$BackupDir,target=/to" alpine sh -c 'tar czf /to/world-storage.tgz -C /from .'
+if ($LASTEXITCODE -ne 0) { throw '附件卷备份失败' }
+```
+
+恢复到另一台机器时，先使用独立的 Compose 项目名创建全新的空卷，并保持服务未启动。将以下两个变量填为目标机 `docker volume ls` 显示的完整卷名；不要将数据解进非空卷。把压缩包放入当前目录的 `offline-backup`：
+
+```powershell
+$ComposeProject = '新项目名'
+$DataVolume = "${ComposeProject}_world-data"
+$StorageVolume = "${ComposeProject}_world-storage"
+$BackupDir = (Resolve-Path .\\offline-backup).Path
+docker run --rm --mount "type=volume,source=$DataVolume,target=/to" --mount "type=bind,source=$BackupDir,target=/from,readonly" alpine sh -c 'tar xzf /from/world-data.tgz -C /to'
+if ($LASTEXITCODE -ne 0) { throw '数据库卷恢复失败' }
+docker run --rm --mount "type=volume,source=$StorageVolume,target=/to" --mount "type=bind,source=$BackupDir,target=/from,readonly" alpine sh -c 'tar xzf /from/world-storage.tgz -C /to'
+if ($LASTEXITCODE -ne 0) { throw '附件卷恢复失败' }
+docker compose -p $ComposeProject up -d --build
+docker compose logs --tail=100 world
+```
+
+不要在服务运行时复制 SQLite 卷，也不要用 `docker compose down -v` 做日常停机；后者会删除卷和其中的数据。
+
 至少演练一次恢复：检查登录、数量、账本金额、时光信解锁规则和随机几张图片。备份放在不同磁盘比和原数据放在同一个磁盘可靠。
 
 ## 9. 升级

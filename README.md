@@ -219,4 +219,6 @@ docker compose logs -f world
 
 `.env` 中持久密钥也应私下备份。最稳妥的离线保全方式是先停止服务，再一起复制 `data`、`storage` 与 `.env`。SQLite 启动时可能有 `-wal`/`-shm` 文件，运行中不要只复制主 `.db`。至少做一次真实恢复检查，确认照片和记录能打开。
 
+跨机器迁移时请先停服务并保留原 `.env`、`ASSET_SECRET`、SQLite 数据库和附件；Windows ZIP 迁移与 Docker 命名卷的可复制 PowerShell 步骤见 [部署说明的备份、恢复和迁移章节](docs/DEPLOYMENT.md#8-备份恢复和迁移)。
+
 完整的路径、HTTPS、升级、恢复和故障处理见 [部署说明](docs/DEPLOYMENT.md)。
