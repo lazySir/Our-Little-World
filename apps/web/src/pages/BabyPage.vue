@@ -8,6 +8,7 @@ import type { Baby, Growth, Asset } from '../types';
 import PhotoUpload from '../components/PhotoUpload.vue';
 import GrowthChart from '../components/GrowthChart.vue';
 import { projectGrowthMeasurements } from '@our-little-world/shared/growth';
+import { collectBabyAlbumPhotos } from '@our-little-world/shared/baby-album';
 const baby = ref<Baby | null>(null),
   babyLoading = ref(true),
   babyLoaded = ref(false),
@@ -49,6 +50,7 @@ const profileBusy = computed(() => profileUploading.value || profileSaving.value
 const profileReady = computed(() => babyLoaded.value && !babyLoading.value);
 let babyLoadVersion = 0;
 const measurements = computed(() => projectGrowthMeasurements(items.value));
+const albumPhotos = computed(() => collectBabyAlbumPhotos(items.value));
 const latestHeight = computed(() => measurements.value.height.at(-1));
 const latestWeight = computed(() => measurements.value.weight.at(-1));
 const age = computed(() => {
@@ -213,7 +215,42 @@ onMounted(loadBaby);
     />这里是家庭成长记录。每个宝宝都有自己的节奏，让爱和陪伴慢慢发生。
   </div>
   <LoadState :loading="loading" :error="error" @retry="load"
-    ><GrowthChart :records="items" />
+    ><section
+      v-if="albumPhotos.length || (baby && profileReady)"
+      class="baby-album"
+      aria-labelledby="baby-album-title"
+    >
+      <div class="baby-album-heading">
+        <div>
+          <h2 id="baby-album-title">宝宝相册</h2>
+          <p>从成长记录中自动整理的照片</p>
+        </div>
+        <span class="baby-album-count">{{ albumPhotos.length }} 张</span>
+      </div>
+      <div v-if="albumPhotos.length" class="baby-album-grid">
+        <figure v-for="(photo, index) in albumPhotos" :key="photo.id" class="baby-album-photo">
+          <el-image
+            :src="assetUrl(photo.asset)"
+            :preview-src-list="albumPhotos.map(({ asset }) => assetUrl(asset))"
+            :initial-index="index"
+            :alt="`${photo.title}，${photo.date}`"
+            fit="cover"
+            preview-teleported
+          />
+          <figcaption>
+            <strong>{{ photo.title }}</strong>
+            <time :datetime="photo.date">{{ photo.date }}</time>
+          </figcaption>
+        </figure>
+      </div>
+      <EmptyState
+        v-else
+        title="相册还在等待第一张照片"
+        description="在成长记录中添加照片，它们会自动收进这里。"
+        icon="baby"
+      />
+    </section>
+    <GrowthChart :records="items" />
     <div class="toolbar">
       <div class="filter-tabs">
         <button class="filter-tab" :class="{ active: tab === 'all' }" @click="tab = 'all'">

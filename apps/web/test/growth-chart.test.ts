@@ -175,3 +175,57 @@ test('Web baby summary retains each latest metric and passes original records de
   assert.ok(chart, 'The original resource data must reach the chart component');
   assert.equal(chart.props.records, all.value);
 });
+
+test('Web baby album shows each attached photo once in newest record order', () => {
+  const all = ref([
+    {
+      id: 'older',
+      date: '2026-11-01',
+      title: '第一次抬头',
+      type: 'milestone',
+      assets: [{ id: 'shared', url: '/shared' }, { id: 'older-photo', url: '/older' }],
+    },
+    {
+      id: 'newer',
+      date: '2026-11-03',
+      title: '今天会笑了',
+      type: 'milestone',
+      assets: [{ id: 'shared', url: '/shared' }, { id: 'new-photo', url: '/new' }],
+    },
+  ]);
+  const s = component(
+    '../src/pages/BabyPage.vue',
+    {},
+    {
+      vue: { ...require('vue'), onMounted() {} },
+      '../api': { api: { get: async () => null }, assetUrl: (asset: any) => asset.url },
+      '../domain': domain,
+      '../composables/resource': {
+        useResource: () => ({
+          items: all,
+          loading: ref(false),
+          error: ref(''),
+          saving: ref(false),
+          load() {},
+          save() {},
+          remove() {},
+        }),
+      },
+    },
+  );
+  s.view.baby.value = { name: '小团子' };
+
+  assert.deepEqual(
+    s.view.albumPhotos.value.map((photo: any) => [photo.id, photo.title, photo.date]),
+    [
+      ['shared', '今天会笑了', '2026-11-03'],
+      ['new-photo', '今天会笑了', '2026-11-03'],
+      ['older-photo', '第一次抬头', '2026-11-01'],
+    ],
+  );
+  assert.equal(
+    s.nodes().filter((node) => node.props?.class?.includes?.('baby-album-photo')).length,
+    3,
+    'The visible album must render its deduplicated photo entries',
+  );
+});

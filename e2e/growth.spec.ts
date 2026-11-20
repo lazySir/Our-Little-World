@@ -1,5 +1,7 @@
 import { test, expect, type Page, type Locator, type Route } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { readE2ESetupToken } from './setup-token.mts';
 
 const api = 'http://127.0.0.1:3001/api';
@@ -265,5 +267,78 @@ test('growth curves preserve same-day points and follow real edits, deletion and
       const response = await request.delete(`${api}/growth/${id}`, { headers });
       expect(response.ok(), await response.text()).toBeTruthy();
     }
+  }
+});
+
+test('baby album collects growth photos and opens the image preview', async ({ page, request }) => {
+  const api = 'http://127.0.0.1:3001/api';
+  const status = await (await request.get(api + '/auth/status')).json();
+  const signedIn = await request.post(api + '/auth/' + (status.initialized ? 'login' : 'setup'), {
+    data: {
+      setupToken: status.initialized ? undefined : await readE2ESetupToken(),
+      username: 'web_owner',
+      password: 'little-world-e2e-123',
+      nickname: '小林',
+      spaceName: '小林与小禾的小世界',
+      startDate: '2024-02-29',
+    },
+  });
+  expect(signedIn.ok(), await signedIn.text()).toBeTruthy();
+  const { token } = await signedIn.json();
+  const headers = { Authorization: 'Bearer ' + token };
+  const photoResponse = await request.post(api + '/assets', {
+    headers,
+    multipart: {
+      file: {
+        name: 'album.png',
+        mimeType: 'image/png',
+        buffer: await readFile(path.resolve(process.cwd(), 'apps/uni/src/static/little-house.png')),
+      },
+    },
+  });
+  expect(photoResponse.ok(), await photoResponse.text()).toBeTruthy();
+  const photo = await photoResponse.json();
+  const growthResponse = await request.post(api + '/growth', {
+    headers,
+    data: {
+      title: '第一次微笑',
+      date: '2026-11-03',
+      type: 'milestone',
+      content: '今天笑得特别甜',
+      assetIds: [photo.id],
+    },
+  });
+  expect(growthResponse.ok(), await growthResponse.text()).toBeTruthy();
+  const growth = await growthResponse.json();
+  const filterGrowth = async (route: Route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const response = await route.fetch();
+    const rows = await response.json();
+    await route.fulfill({
+      response,
+      json: rows.filter((row: { assetIds?: string[] }) => row.assetIds?.includes(photo.id)),
+    });
+  };
+  try {
+    await page.route('**/api/growth', filterGrowth);
+    await page.addInitScript((value) => localStorage.setItem('little-world-token', value), token);
+    await page.goto('/baby');
+    await expect(page.getByRole('heading', { name: '宝宝成长', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '宝宝相册', exact: true })).toBeVisible();
+    await expect(page.locator('.baby-album-photo')).toHaveCount(1);
+    await expect(page.locator('.baby-album-photo')).toContainText('第一次微笑');
+    await expect
+      .poll(() =>
+        page.locator('.baby-album-photo img').evaluate((image: HTMLImageElement) => image.naturalWidth),
+      )
+      .toBeGreaterThan(0);
+    await page.screenshot({ path: 'test-results/growth-web-album.jpg', fullPage: true, type: 'jpeg', quality: 88 });
+    await page.locator('.baby-album-photo .el-image').click();
+    await expect(page.locator('.el-image-viewer__wrapper')).toBeVisible();
+    await expect(page.locator('.el-image-viewer__img')).toBeVisible();
+  } finally {
+    await page.unroute('**/api/growth', filterGrowth);
+    await request.delete(api + '/growth/' + growth.id, { headers });
+    await request.delete(api + '/assets/' + photo.id, { headers });
   }
 });

@@ -2314,6 +2314,69 @@ textarea {
   line-height: 1.9;
   margin: 20px 2px 27px;
 }
+.baby-album {
+  margin: 0 0 30px;
+}
+.baby-album-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.baby-album-heading h2 {
+  margin: 0;
+  color: #656e58;
+  font-size: 17px;
+  font-weight: 650;
+}
+.baby-album-heading p {
+  margin: 5px 0 0;
+  color: #9b927f;
+  font-size: 11px;
+}
+.baby-album-count {
+  flex: 0 0 auto;
+  color: #7b876c;
+  font-size: 11px;
+}
+.baby-album-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.baby-album-photo {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #f2f0e7;
+}
+.baby-album-photo .el-image {
+  display: block;
+  width: 100%;
+  height: 155px;
+}
+.baby-album-photo figcaption {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px 10px;
+}
+.baby-album-photo figcaption strong,
+.baby-album-photo figcaption time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.baby-album-photo figcaption strong {
+  color: #56544b;
+  font-size: 11px;
+  font-weight: 600;
+}
+.baby-album-photo figcaption time {
+  color: #99917f;
+  font-size: 10px;
+}
 .growth-timeline {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2423,6 +2486,13 @@ textarea {
   .growth-timeline {
     grid-template-columns: 1fr;
     gap: 17px;
+  }
+  .baby-album-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .baby-album-photo .el-image {
+    height: 132px;
   }
   .growth-timeline .record-card {
     padding: 23px;

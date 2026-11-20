@@ -226,7 +226,7 @@ test('chart exposes the library resize method without assuming a canvas size', a
   assert.equal(resized, 1);
 });
 
-function setupPage() {
+function setupPage(previewPhotos = () => {}) {
   const shows: (() => unknown)[] = [];
   const resizes: (() => unknown)[] = [];
   const resource = {
@@ -255,7 +255,7 @@ function setupPage() {
         request: async () => null,
         notify() {},
         assetUrl: () => '',
-        previewPhotos() {},
+        previewPhotos,
       },
       '../../lib/domain': domain,
     },
@@ -298,4 +298,37 @@ test('baby page forwards size changes and returning to the page after its next r
   assert.equal(resized, 1);
   await Promise.all(s.shows.map((show) => show()));
   assert.equal(resized, 2);
+});
+
+test('baby page album groups photos from growth records and opens the selected photo', () => {
+  const selected: unknown[][] = [];
+  const s = setupPage((assets: unknown[], index: number) => selected.push([assets, index]));
+  s.resource.items.value = [
+    {
+      id: 'older',
+      date: '2026-11-01',
+      title: '第一次抬头',
+      type: 'milestone',
+      assets: [{ id: 'older-photo', url: '/older' }],
+    },
+    {
+      id: 'newer',
+      date: '2026-11-03',
+      title: '今天会笑了',
+      type: 'milestone',
+      assets: [{ id: 'new-photo', url: '/new' }],
+    },
+  ];
+  const albumPhotos = s.view.albumPhotos.value;
+  assert.deepEqual(
+    albumPhotos.map((photo: any) => [photo.id, photo.title, photo.date]),
+    [
+      ['new-photo', '今天会笑了', '2026-11-03'],
+      ['older-photo', '第一次抬头', '2026-11-01'],
+    ],
+  );
+  const gallery = nodes(s.render()).filter((node) => node.props?.class === 'baby-album-photo ui-reset');
+  assert.equal(gallery.length, 2);
+  gallery[1].props.onClick();
+  assert.deepEqual(selected, [[albumPhotos.map((photo: any) => photo.asset), 1]]);
 });

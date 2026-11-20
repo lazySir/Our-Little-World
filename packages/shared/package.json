@@ -15,6 +15,10 @@
     "./growth": {
       "types": "./dist/growth.d.ts",
       "default": "./dist/growth.js"
+    },
+    "./baby-album": {
+      "types": "./dist/baby-album.d.ts",
+      "default": "./dist/baby-album.js"
     }
   },
   "scripts": {

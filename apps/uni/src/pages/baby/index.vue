@@ -44,6 +44,39 @@
       description="现在或未来有需要时，再为宝宝建一个温柔的小档案。"
       action="建立宝宝档案"
       @action="editBaby" />
+    <view
+      v-if="albumPhotos.length || (babyReady && baby)"
+      class="baby-album"
+      aria-labelledby="baby-album-title"
+    >
+      <view class="baby-album-heading">
+        <view>
+          <view id="baby-album-title" class="section-title">宝宝相册</view>
+          <view class="meta">从成长记录中自动整理的照片</view>
+        </view>
+        <view class="pill sage">{{ albumPhotos.length }} 张</view>
+      </view>
+      <view v-if="albumPhotos.length" class="baby-album-grid">
+        <button
+          v-for="(photo, index) in albumPhotos"
+          :key="photo.id"
+          class="baby-album-photo ui-reset"
+          :aria-label="`预览${photo.title}照片，${photo.date}`"
+          @click="previewPhotos(albumPhotos.map((entry) => entry.asset), index)"
+        >
+          <image class="baby-album-image" :src="assetUrl(photo.asset)" mode="aspectFill" />
+          <view class="baby-album-caption">
+            <view class="baby-album-title">{{ photo.title }}</view>
+            <view class="meta">{{ photo.date }}</view>
+          </view>
+        </button>
+      </view>
+      <EmptyState
+        v-else
+        symbol="✿"
+        title="相册还在等待第一张照片"
+        description="在成长记录中添加照片，它们会自动收进这里。" />
+    </view>
     <GrowthChart v-if="!loading && !error" ref="growthChart" :records="items" />
     <view class="toolbar">
       <input class="search" v-model="query" placeholder="搜索成长记录" />
@@ -185,6 +218,7 @@ import GrowthChart from '../../components/GrowthChart.vue';
 import { useResource } from '../../lib/useResource';
 import { request, notify, assetUrl, previewPhotos } from '../../lib/api';
 import { today, daysBetween } from '../../lib/domain';
+import { collectBabyAlbumPhotos } from '@our-little-world/shared/baby-album';
 import type { Baby } from '../../types';
 const { session, items, loading, error, saving, editor, formError, save, remove } =
     useResource('growth'),
@@ -235,6 +269,7 @@ const filtered = computed(() =>
     )
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
+const albumPhotos = computed(() => collectBabyAlbumPhotos(items.value));
 const typeLabel = (value) => types.find((x) => x.value === value)?.label || value;
 let babyLoadVersion = 0;
 async function loadBaby() {
