@@ -449,6 +449,7 @@ onMounted(loadBaby);
             :min="1"
             :max="250"
             :precision="1"
+            :step="0.1"
             controls-position="right" /></el-form-item
         ><el-form-item label="体重（kg）"
           ><el-input-number
@@ -456,6 +457,7 @@ onMounted(loadBaby);
             :min="0.1"
             :max="200"
             :precision="2"
+            :step="0.01"
             controls-position="right"
         /></el-form-item>
       </div>

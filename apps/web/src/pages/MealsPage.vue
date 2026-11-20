@@ -355,7 +355,7 @@ onMounted(fetchOrders);
             v-model="form.priceCents"
             :min="0"
             :precision="2"
-            :step="1"
+            :step="0.01"
             controls-position="right"
           /><span class="form-hint">不填写价格也可以收藏</span></el-form-item
         >
