@@ -29,7 +29,7 @@
       <wd-button size="small" plain @click="load">重新连接</wd-button>
     </view>
     <view v-if="loading" class="loading">正在整理你们的日子…</view>
-    <template v-else>
+    <template v-else-if="hasLoaded">
       <view class="card calendar-card">
         <view class="calendar-weekdays">
           <text v-for="day in weekDays" :key="day">{{ day }}</text>
@@ -114,6 +114,7 @@ const session = useSession();
 const month = ref(today().slice(0, 7));
 const data = ref<CalendarData>({ month: month.value, date: '', events: [] });
 const loading = ref(true);
+const hasLoaded = ref(false);
 const error = ref('');
 const selectedDate = ref('');
 let firstShow = true;
@@ -184,6 +185,7 @@ async function load() {
     const result = await request<CalendarData>(`/calendar?month=${requestedMonth}`);
     if (sequence !== loadSequence) return;
     data.value = result;
+    hasLoaded.value = true;
     month.value = result.month;
     if (!selectedDate.value.startsWith(`${result.month}-`))
       selectedDate.value = result.events[0]?.date || `${result.month}-01`;

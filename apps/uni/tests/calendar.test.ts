@@ -3,10 +3,31 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { parse, compileScript } from '@vue/compiler-sfc';
+import { parse, compileScript, compileTemplate } from '@vue/compiler-sfc';
+import { proxyRefs } from 'vue';
 import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
+const nodes = (node: any): any[] =>
+  Array.isArray(node)
+    ? node.flatMap(nodes)
+    : node && typeof node === 'object'
+      ? [node, ...nodes(node.children)]
+      : [];
+const textOf = (node: any): string =>
+  Array.isArray(node)
+    ? node.map(textOf).join('')
+    : node && typeof node === 'object'
+      ? textOf(node.children)
+      : typeof node === 'string'
+        ? node
+        : '';
+const hasClass = (node: any, expected: string): boolean => {
+  const value = node?.props?.class;
+  if (typeof value === 'string') return value.split(/\s+/).includes(expected);
+  if (Array.isArray(value)) return value.some((item) => hasClass({ props: { class: item } }, expected));
+  return Boolean(value && typeof value === 'object' && value[expected]);
+};
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -24,7 +45,8 @@ function setup() {
   let show!: () => void | Promise<void>;
   let currentDate = '2026-11-20';
   const filename = fileURLToPath(new URL('../src/pages/calendar/index.vue', import.meta.url));
-  const descriptor = parse(readFileSync(filename, 'utf8'), { filename }).descriptor;
+  const source = readFileSync(filename, 'utf8');
+  const descriptor = parse(source, { filename }).descriptor;
   const script = compileScript(descriptor, { id: 'calendar-test' });
   const output = ts.transpileModule(script.content, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -53,6 +75,8 @@ function setup() {
     '../../stores/session': { useSession: () => ({ theme: 'cream' }) },
     '../../lib/calendar-source': {
       useCalendarSource: () => ({ calendarSource: { value: undefined }, clearCalendarSource() {} }),
+      hasCalendarSource: () => false,
+      openCalendarSource() {},
     },
   };
   new Function('require', 'module', 'exports', 'uni', output)(
@@ -61,7 +85,34 @@ function setup() {
     module.exports,
     { stopPullDownRefresh() {} },
   );
-  return { view: module.exports.default.setup({}, { expose() {} }), reads, paths, triggerShow: () => show() };
+  const template = compileTemplate({
+    source: descriptor.template!.content,
+    filename,
+    id: 'calendar-test',
+    compilerOptions: { isCustomElement: () => true, bindingMetadata: script.bindings },
+  });
+  assert.deepEqual(template.errors, []);
+  const templateOutput = ts.transpileModule(template.code, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const templateModule = { exports: {} as any };
+  new Function('require', 'module', 'exports', templateOutput)(
+    (specifier: string) =>
+      specifier === 'vue'
+        ? { ...require('vue'), withCtx: (slot: unknown) => slot, withDirectives: (node: unknown) => node }
+        : require(specifier),
+    templateModule,
+    templateModule.exports,
+  );
+  const view = module.exports.default.setup({}, { expose() {} });
+  const context = proxyRefs(view);
+  return {
+    view,
+    reads,
+    paths,
+    triggerShow: () => show(),
+    render: () => nodes(templateModule.exports.render(context, [], {}, context)),
+  };
 }
 
 test('a stale mini program calendar response cannot replace a newer successful load', async () => {
@@ -77,6 +128,40 @@ test('a stale mini program calendar response cannot replace a newer successful l
   assert.deepEqual(s.view.data.value, latest);
   assert.equal(s.view.error.value, '');
   assert.equal(s.view.loading.value, false);
+});
+
+test('a first calendar read failure does not render a false empty calendar and refresh failure keeps saved events', async () => {
+  const s = setup();
+  const firstRead = s.view.load();
+  s.reads[0].reject(new Error('日历暂时不可用'));
+  await firstRead;
+
+  let rendered = s.render();
+  assert.ok(textOf(rendered).includes('日历暂时不可用'));
+  assert.equal(
+    rendered.some((node) => hasClass(node, 'calendar-card')),
+    false,
+  );
+  assert.equal(textOf(rendered).includes('这一天还没有安排'), false);
+
+  const successfulRead = s.view.load();
+  s.reads[1].resolve({
+    month: '2026-11',
+    date: '2026-11-20',
+    events: [{ id: 'saved', kind: 'wish', date: '2026-11-20', title: '一起看海' }],
+  });
+  await successfulRead;
+
+  const failedRefresh = s.view.load();
+  s.reads[2].reject(new Error('暂时断开连接'));
+  await failedRefresh;
+  rendered = s.render();
+  assert.ok(textOf(rendered).includes('暂时断开连接'));
+  assert.equal(
+    rendered.some((node) => hasClass(node, 'calendar-card')),
+    true,
+  );
+  assert.ok(textOf(rendered).includes('一起看海'));
 });
 
 test('mini program calendar template exposes semantic controls for filters and dates', () => {
