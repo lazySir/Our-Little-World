@@ -222,12 +222,16 @@ $ComposeProject = '新项目名'
 $DataVolume = "${ComposeProject}_world-data"
 $StorageVolume = "${ComposeProject}_world-storage"
 $BackupDir = (Resolve-Path .\\offline-backup).Path
+if (!(Test-Path -LiteralPath (Join-Path $BackupDir 'world-data.tgz')) -or !(Test-Path -LiteralPath (Join-Path $BackupDir 'world-storage.tgz'))) { throw '缺少数据库卷或附件卷备份文件' }
+if (docker volume inspect $DataVolume 2>$null) { throw "目标卷已存在，请使用新的 Compose 项目名：$DataVolume" }
+if (docker volume inspect $StorageVolume 2>$null) { throw "目标卷已存在，请使用新的 Compose 项目名：$StorageVolume" }
 docker run --rm --mount "type=volume,source=$DataVolume,target=/to" --mount "type=bind,source=$BackupDir,target=/from,readonly" alpine sh -c 'tar xzf /from/world-data.tgz -C /to'
 if ($LASTEXITCODE -ne 0) { throw '数据库卷恢复失败' }
 docker run --rm --mount "type=volume,source=$StorageVolume,target=/to" --mount "type=bind,source=$BackupDir,target=/from,readonly" alpine sh -c 'tar xzf /from/world-storage.tgz -C /to'
 if ($LASTEXITCODE -ne 0) { throw '附件卷恢复失败' }
 docker compose -p $ComposeProject up -d --build
-docker compose logs --tail=100 world
+if ($LASTEXITCODE -ne 0) { throw 'Docker Compose 启动失败' }
+docker compose -p $ComposeProject logs --tail=100 world
 ```
 
 不要在服务运行时复制 SQLite 卷，也不要用 `docker compose down -v` 做日常停机；后者会删除卷和其中的数据。
