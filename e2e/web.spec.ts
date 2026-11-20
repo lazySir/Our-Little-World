@@ -498,7 +498,9 @@ test('all pages fit a small phone and the server address stays reachable', async
     localStorage.setItem('little-world-api', 'http://127.0.0.1:9/api');
   });
   await page.goto('/auth');
-  await expect(page.locator('.el-alert')).toBeVisible();
+  await expect(
+    page.getByRole('alert').filter({ hasText: '暂时连接不到小世界，请检查网络与服务是否启动' }),
+  ).toBeVisible();
   await page.getByRole('button', { name: '连接我的私人服务' }).click();
   await expect(dialog(page).getByRole('heading', { name: '连接我的私人服务' })).toBeVisible();
   await expect(dialog(page).locator('input')).toHaveValue('http://127.0.0.1:9/api');
@@ -1511,12 +1513,13 @@ test('wish category edits and search stay consistent through completion, reopeni
   await expect(
     page.getByRole('heading', { name: '没有找到匹配的记录', exact: true }),
   ).toBeVisible();
-  await page.getByRole('button', { name: '清除搜索', exact: true }).click();
+  await page.getByRole('button', { name: '清除筛选', exact: true }).click();
   await expect(search).toHaveValue('');
   await expect(cards.filter({ hasText: `${prefix} 周末烘焙` })).toBeVisible();
-  await expect(main).toHaveCount(0);
+  await expect(main).toHaveCount(1);
+  await expect(main).toBeVisible();
   await search.fill(prefix);
-  await expect(cards).toHaveCount(1);
+  await expect(cards).toHaveCount(3);
   await pendingTab.click();
   await expect(cards).toHaveCount(2);
   await main.getByRole('button', { name: '编辑', exact: true }).click();
