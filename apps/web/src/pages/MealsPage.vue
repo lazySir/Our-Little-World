@@ -2,7 +2,7 @@
 import type { MenuItem, Order, Asset } from '../types';
 import { computed, reactive, ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { api, assetUrl } from '../api';
+import { api, assetUrl, refreshAssetOnError } from '../api';
 import { useResource } from '../composables/resource';
 import { menuCategories, money } from '../domain';
 import PhotoUpload from '../components/PhotoUpload.vue';
@@ -257,6 +257,7 @@ onMounted(fetchOrders);
         <el-image
           v-if="item.asset"
           :src="assetUrl(item.asset)"
+          @error="refreshAssetOnError(item.asset)"
           fit="cover"
           class="meal-photo"
           :preview-src-list="[assetUrl(item.asset)]"

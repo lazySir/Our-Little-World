@@ -1,4 +1,5 @@
 import type { ApiOptions, Asset } from './types';
+import { createAssetRefresher } from '@our-little-world/shared/asset-refresh';
 export const TOKEN_KEY = 'little-world-token';
 export const BASE_KEY = 'little-world-api';
 export const getBase = () =>
@@ -89,6 +90,14 @@ export async function upload(file: File) {
   const form = new FormData();
   form.append('file', file);
   return request<Asset>('/assets', { method: 'POST', body: form });
+}
+export const refreshAsset = createAssetRefresher<Asset>((id) =>
+  request<Asset>('/assets/' + encodeURIComponent(id) + '/url'),
+);
+export async function refreshAssetOnError(asset?: Asset) {
+  try {
+    await refreshAsset(asset);
+  } catch {}
 }
 export async function download(path: string, name: string) {
   const blob = await request<Blob>(path, { binary: true });

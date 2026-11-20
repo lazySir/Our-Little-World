@@ -2,7 +2,7 @@
 import type { Asset } from '../types';
 import { computed, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { api, assetUrl } from '../api';
+import { api, assetUrl, refreshAssetOnError } from '../api';
 import { today, tomorrow, splitTags, wishCategories, nextAnniversary } from '../domain';
 import { useSession } from '../stores/session';
 import { useResource } from '../composables/resource';
@@ -352,6 +352,7 @@ async function convertToMemory(item) {
         <div v-if="(kind === 'memories' || kind === 'work') && image(item)" class="photos-grid">
           <el-image
             :src="image(item)"
+            @error="refreshAssetOnError(item.assets?.[0])"
             :preview-src-list="item.assets?.map(assetUrl)"
             fit="cover"
             preview-teleported

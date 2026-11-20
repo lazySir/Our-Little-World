@@ -19,6 +19,10 @@
     "./baby-album": {
       "types": "./dist/baby-album.d.ts",
       "default": "./dist/baby-album.js"
+    },
+    "./asset-refresh": {
+      "types": "./dist/asset-refresh.d.ts",
+      "default": "./dist/asset-refresh.js"
     }
   },
   "scripts": {

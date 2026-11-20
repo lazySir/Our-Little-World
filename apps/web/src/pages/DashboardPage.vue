@@ -3,7 +3,7 @@ import type { Dashboard, Memory } from '../types';
 import { ref, computed, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useSession } from '../stores/session';
-import { api, assetUrl } from '../api';
+import { api, assetUrl, refreshAssetOnError } from '../api';
 import { today, money, nextAnniversary, moodTypes } from '../domain';
 import HouseArt from '../components/HouseArt.vue';
 const session = useSession(),
@@ -59,8 +59,11 @@ async function saveMood() {
     saving.value = false;
   }
 }
+function coverAsset(item: Memory) {
+  return item.assets?.[0];
+}
 function cover(item: Memory) {
-  return assetUrl(item.assets?.[0]);
+  return assetUrl(coverAsset(item));
 }
 onMounted(load);
 </script>
@@ -234,7 +237,7 @@ onMounted(load);
           to="/memories"
           class="recent-memory panel"
           :class="`memory-tone-${index}`"
-          ><el-image v-if="cover(item)" :src="cover(item)" fit="cover" />
+          ><el-image v-if="cover(item)" :src="cover(item)" @error="refreshAssetOnError(coverAsset(item))" fit="cover" />
           <div v-else class="memory-no-photo">
             <AppIcon name="photo" :size="35" /><span>A LITTLE MOMENT</span>
           </div>

@@ -49,6 +49,7 @@
           >
             <image
               :src="assetUrl(item.asset)"
+              @error="refreshAssetOnError(item.asset)"
               mode="aspectFill"
               style="width: 130rpx; height: 130rpx; border-radius: 20rpx"
             />
@@ -188,7 +189,7 @@ import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
 import PhotoPicker from '../../components/PhotoPicker.vue';
 import { useResource } from '../../lib/useResource';
-import { request, notify, confirm, assetUrl, previewPhotos } from '../../lib/api';
+import { request, notify, confirm, assetUrl, previewPhotos, refreshAssetOnError } from '../../lib/api';
 import { money, centsFromInput, buildOrderItems } from '../../lib/domain';
 const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
     useResource('menu'),

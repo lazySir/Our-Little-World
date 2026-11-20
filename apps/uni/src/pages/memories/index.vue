@@ -50,7 +50,7 @@
             :aria-label="`预览 ${item.title} 的第 ${index + 1} 张照片`"
             @click="previewPhotos(item.assets, index)"
           >
-            <image class="photo" :src="assetUrl(asset)" mode="aspectFill" />
+            <image class="photo" :src="assetUrl(asset)" mode="aspectFill" @error="refreshAssetOnError(asset)" />
           </button>
         </view>
         <view class="actions">
@@ -105,7 +105,7 @@ import CalendarSourceNotice from '../../components/CalendarSourceNotice.vue';
 import { useCalendarSource } from '../../lib/calendar-source';
 import PhotoPicker from '../../components/PhotoPicker.vue';
 import { useResource } from '../../lib/useResource';
-import { assetUrl, previewPhotos } from '../../lib/api';
+import { assetUrl, previewPhotos, refreshAssetOnError } from '../../lib/api';
 import { today, splitTags } from '../../lib/domain';
 const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
   useResource('memories');

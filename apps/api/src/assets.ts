@@ -6,6 +6,9 @@ import type { Asset, PrismaClient } from './db/client';
 import type { SpaceUser, AssetQuery } from './types';
 import { fail } from './auth';
 import config = require('./config');
+
+const ASSET_URL_TTL_MS = 30 * 60 * 1000;
+
 export class AssetsService {
   readonly directory: string;
   constructor(private readonly db: PrismaClient) {
@@ -15,7 +18,7 @@ export class AssetsService {
     return crypto.createHmac('sha256', config.assetSecret).update(`${id}:${expires}`).digest('hex');
   }
   shape(asset: Asset) {
-    const expires = Date.now() + 7 * 86400000;
+    const expires = Date.now() + ASSET_URL_TTL_MS;
     return {
       id: asset.id,
       url: `/api/assets/${asset.id}/file?expires=${expires}&signature=${this.signature(asset.id, expires)}`,
@@ -32,6 +35,11 @@ export class AssetsService {
         orderBy: { createdAt: 'desc' },
       })
     ).map((a) => this.shape(a));
+  }
+  async renew(user: SpaceUser, id: string) {
+    const asset = await this.db.asset.findFirst({ where: { id, spaceId: user.spaceId } });
+    if (!asset) fail(404, '图片不存在');
+    return this.shape(asset);
   }
   async upload(user: SpaceUser, file?: Express.Multer.File) {
     if (!file) fail(400, '请选择图片');
@@ -77,7 +85,7 @@ export class AssetsService {
     if (
       !/^\d+$/.test(String(expires)) ||
       Number(expires) < Date.now() ||
-      Number(expires) > Date.now() + 8 * 86400000 ||
+      Number(expires) > Date.now() + ASSET_URL_TTL_MS ||
       !/^[a-f0-9]{64}$/.test(signature || '')
     )
       fail(403, '图片链接已失效，请刷新页面');

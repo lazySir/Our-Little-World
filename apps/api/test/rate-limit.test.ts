@@ -6,10 +6,10 @@ import { configureTrustedProxies, createRateLimitMiddleware } from '../src/rate-
 const closeLimiters: Array<() => void> = [];
 after(() => closeLimiters.forEach((close) => close()));
 
-function createTestApi(trustedProxies = '') {
+function createTestApi(trustedProxies = '', authLimit?: number) {
   const app = express();
   configureTrustedProxies(app, trustedProxies);
-  const limiter = createRateLimitMiddleware();
+  const limiter = createRateLimitMiddleware({ authLimit });
   closeLimiters.push(limiter.close);
   app.use(limiter);
   app.post('/api/auth/login', (_req, res) => res.status(401).json({ message: 'invalid login' }));
@@ -42,4 +42,18 @@ test('trusted proxy clients receive independent authentication buckets', async (
   );
   const otherClient = await api.post('/api/auth/login').set('X-Forwarded-For', '203.0.113.11');
   assert.equal(otherClient.status, 401, JSON.stringify(otherClient.body));
+});
+
+test('authentication throttling accepts the configured number of requests', async () => {
+  const api = createTestApi('', 22);
+  for (let attempt = 0; attempt < 22; attempt++) {
+    assert.equal((await api.post('/api/auth/login')).status, 401);
+  }
+  assert.equal((await api.post('/api/auth/login')).status, 429);
+});
+
+test('fractional positive limits still allow one request', async () => {
+  const api = createTestApi('', 0.5);
+  assert.equal((await api.post('/api/auth/login')).status, 401);
+  assert.equal((await api.post('/api/auth/login')).status, 429);
 });

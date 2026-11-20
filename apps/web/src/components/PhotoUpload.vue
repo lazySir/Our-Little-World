@@ -2,7 +2,7 @@
 import type { Asset } from '../types';
 import { computed, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { upload, assetUrl } from '../api';
+import { upload, assetUrl, refreshAssetOnError } from '../api';
 const props = withDefaults(
   defineProps<{ modelValue?: string[]; assets?: Asset[]; limit?: number; disabled?: boolean }>(),
   { modelValue: () => [], assets: () => [], limit: 12 },
@@ -55,6 +55,7 @@ async function choose(event: Event) {
       <div v-for="photo in photos" :key="photo.id" class="upload-photo">
         <el-image
           :src="assetUrl(photo)"
+          @error="refreshAssetOnError(photo)"
           fit="cover"
           :preview-src-list="photos.map(assetUrl)"
           preview-teleported

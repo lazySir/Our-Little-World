@@ -36,7 +36,7 @@
 
 Npm workspaces，业务源码统一 TypeScript：apps/web（Vue 3/Vite/Element Plus/Tailwind/Pinia/Router/ECharts），apps/uni（Vue 3/uni-app/Vite/Wot Design Uni/Tailwind + weapp-tailwindcss），apps/api（NestJS 11/TypeScript/Prisma 7/SQLite，使用 `@prisma/adapter-better-sqlite3` 驱动），packages/shared（日期、金额、类别常量）。部署脚本采用 TypeScript `.mts`，Windows 入口采用 PowerShell。
 
-Web 支持电脑和手机浏览器，也可在浏览器支持时添加到主屏幕。uni-app 输出微信小程序，并保留 H5 构建用于浏览器联调。两端使用相同的业务接口和持久化数据。
+Web 支持电脑和手机浏览器，也可在浏览器支持时添加到主屏幕；PWA 提供独立窗口和离线页面外壳，但不缓存私人记录、会话或图片。uni-app 输出微信小程序，并保留 H5 构建用于浏览器联调。两端使用相同的业务接口和持久化数据。
 
 NestJS 提供统一 /api。数据库及附件只由服务端访问；每项资源均限定当前空间。密码哈希、随机会话、限流、参数校验、上传类型/大小校验、附件签名访问、授权备份。SQLite 使用 WAL，Prisma 管理版本迁移。
 

@@ -7,7 +7,7 @@
           :aria-label="`预览第 ${index + 1} 张照片`"
           @click="previewPhotos(modelValue, index)"
         >
-          <image class="photo" :src="assetUrl(photo)" mode="aspectFill" />
+          <image class="photo" :src="assetUrl(photo)" mode="aspectFill" @error="refreshAssetOnError(photo)" />
         </button>
         <button
           v-if="!busy && !disabled"
@@ -34,7 +34,7 @@
 </template>
 <script setup lang="ts">
 import { ref } from 'vue';
-import { choosePhotos, uploadFile, assetUrl, previewPhotos } from '../lib/api';
+import { choosePhotos, uploadFile, assetUrl, previewPhotos, refreshAssetOnError } from '../lib/api';
 import type { Asset } from '../types';
 const props = withDefaults(
   defineProps<{

@@ -34,6 +34,7 @@ export async function startTestServer(kind: 'web' | 'uni') {
     SETUP_TOKEN: '',
     ASSET_SECRET: `isolated-${kind}-browser-test-secret-at-least-32`,
     AUTO_BACKUP_HOURS: '0',
+    AUTH_RATE_LIMIT: '200',
     PORT: String(apiPort),
     HOST: '127.0.0.1',
     RUST_LOG: 'info',

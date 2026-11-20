@@ -40,8 +40,9 @@ Every resource below supports `GET /<path>` array, `POST /<path>` object, `PATCH
 
 - `POST /assets` multipart field `file` JPEG/PNG/WebP/GIF <=10MiB → `{id,url,mime,size,originalName}`.
 - `GET /assets` → asset array, same shape.
+- `GET /assets/:id/url` authenticated → `{id,url,mime,size,originalName}` with a new 30-minute signed URL. Only assets in the caller's space can be renewed; other-space or missing assets return 404.
 - Every asset referenced by resource must belong to same space; include `assets: [{id,url,...}]` in list/detail responses of memories/work/growth and optional `asset` in menu/baby.
-- `GET /assets/:id/file?expires=...&signature=...` returns binary only after valid signature; URL contains no session token. Assets not publicly enumerable.
+- `GET /assets/:id/file?expires=...&signature=...` returns binary only after a valid short-lived signature (30 minutes maximum); URL contains no session token and responses are marked `private, no-store`. Clients renew a URL after an image load error; uni-app also renews before opening the native preview. Assets are not publicly enumerable.
 - `DELETE /assets/:id` guarded and rejects still referenced files.
 
 ## Data portability

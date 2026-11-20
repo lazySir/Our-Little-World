@@ -1,5 +1,6 @@
 import { normalizeBase, resolveAsset, decodeResponse } from './domain';
 import { toUniRequest } from './transport';
+import { createAssetRefresher, isAssetUrlExpiring } from '@our-little-world/shared/asset-refresh';
 import type { ApiMethod } from './transport';
 import type { Asset, ApiError } from '../types';
 const BASE_KEY = 'little-world-api';
@@ -67,6 +68,15 @@ export async function request<T = any>(
     ),
   );
 }
+export const refreshAsset = createAssetRefresher<Asset>((id) =>
+  request<Asset>(`/assets/${encodeURIComponent(id)}/url`),
+);
+export async function refreshAssetOnError(asset?: Asset) {
+  try {
+    await refreshAsset(asset);
+  } catch {}
+}
+
 export function validateStatus(value: unknown): { initialized: boolean } {
   if (typeof (value as { initialized?: unknown } | null)?.initialized !== 'boolean')
     throw new Error('服务地址没有返回小世界数据，请检查接口地址');
@@ -136,7 +146,12 @@ export function confirm(message: string, title = '再确认一下'): Promise<boo
     }),
   );
 }
-export function previewPhotos(assets: Asset[], current = 0) {
+export async function previewPhotos(assets: Asset[], current = 0) {
+  await Promise.all(
+    assets
+      .filter((asset) => isAssetUrlExpiring(asset.url))
+      .map((asset) => refreshAsset(asset).catch(() => asset)),
+  );
   const urls = assets.map(assetUrl).filter(Boolean);
   if (urls.length) uni.previewImage({ urls, current: urls[current] || urls[0] });
 }

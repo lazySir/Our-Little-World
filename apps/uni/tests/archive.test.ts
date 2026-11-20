@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import ts from 'typescript';
 import * as domain from '../src/lib/domain';
 import * as transport from '../src/lib/transport';
+import * as assetRefresh from '../../../packages/shared/src/asset-refresh.ts';
 
 const require = createRequire(import.meta.url);
 const { initPreContext, preJs } = require('@dcloudio/uni-cli-shared/dist/preprocess/index.js');
@@ -21,7 +22,12 @@ function loadApi(platform: 'mp-weixin' | 'h5', runtime: Record<string, any>) {
   }).outputText;
   const module = { exports: {} as typeof import('../src/lib/api') };
   new Function('require', 'module', 'exports', 'uni', 'fetch', output)(
-    (specifier: string) => (specifier === './domain' ? domain : transport),
+    (specifier: string) =>
+      specifier === './domain'
+        ? domain
+        : specifier === '@our-little-world/shared/asset-refresh'
+          ? assetRefresh
+          : transport,
     module,
     module.exports,
     runtime,
@@ -33,7 +39,9 @@ function loadApi(platform: 'mp-weixin' | 'h5', runtime: Record<string, any>) {
 function wechat() {
   const shares: any[] = [],
     saves: any[] = [],
-    downloads: any[] = [];
+    downloads: any[] = [],
+    requests: any[] = [],
+    previews: any[] = [];
   const file = { statusCode: 200, tempFilePath: 'wxfile://temporary-backup.zip' };
   const runtime = {
     canIUse: () => true,
@@ -51,9 +59,42 @@ function wechat() {
       shares.push(options);
       options.success({ errMsg: 'shareFileMessage:ok' });
     },
+    request(options: any) {
+      requests.push(options);
+      options.success({ statusCode: 200, data: { id: 'photo-1', url: 'https://home.example/fresh' } });
+    },
+    previewImage(options: any) {
+      previews.push(options);
+    },
   };
-  return { runtime, file, shares, saves, downloads };
+  return { runtime, file, shares, saves, downloads, requests, previews };
 }
+
+test('WeChat photo preview does not renew a still-valid URL', async () => {
+  const view = wechat();
+  const api = loadApi('mp-weixin', view.runtime);
+  const asset = {
+    id: 'photo-1',
+    url: `https://home.example/photo?expires=${Date.now() + 60_000}&signature=old`,
+  };
+
+  await api.previewPhotos([asset]);
+
+  assert.equal(view.requests.length, 0);
+  assert.deepEqual(view.previews[0].urls, [asset.url]);
+});
+
+test('WeChat photo preview renews a URL that is about to expire', async () => {
+  const view = wechat();
+  const api = loadApi('mp-weixin', view.runtime);
+  const asset = { id: 'photo-1', url: `https://home.example/photo?expires=${Date.now() - 1}&signature=old` };
+
+  await api.previewPhotos([asset]);
+
+  assert.equal(view.requests.length, 1);
+  assert.equal(view.requests[0].url, 'https://home.example/api/assets/photo-1/url');
+  assert.equal(view.previews[0].urls[0], 'https://home.example/fresh');
+});
 
 test('WeChat shares the downloaded temporary archive without accumulating saved files', async () => {
   const view = wechat();

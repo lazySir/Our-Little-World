@@ -24,6 +24,7 @@
           v-if="baby.asset || baby.avatar"
           class="avatar-photo"
           :src="assetUrl(baby.asset || baby.avatar)"
+          @error="refreshAssetOnError(baby.asset || baby.avatar)"
           mode="aspectFill"
         />
         <view
@@ -79,7 +80,7 @@
             )
           "
         >
-          <image class="baby-album-image" :src="assetUrl(photo.asset)" mode="aspectFill" />
+          <image class="baby-album-image" :src="assetUrl(photo.asset)" mode="aspectFill" @error="refreshAssetOnError(photo.asset)" />
           <view class="baby-album-caption">
             <view class="baby-album-title">{{ photo.title }}</view>
             <view class="meta">{{ photo.date }}</view>
@@ -158,7 +159,7 @@
               :aria-label="`预览${item.title}照片 ${index + 1}`"
               @click="previewPhotos(item.assets, index)"
             >
-              <image class="photo" :src="assetUrl(asset)" mode="aspectFill" />
+              <image class="photo" :src="assetUrl(asset)" mode="aspectFill" @error="refreshAssetOnError(asset)" />
             </button>
           </view>
           <view class="actions">
@@ -250,7 +251,7 @@ import GrowthChart from '../../components/GrowthChart.vue';
 import CalendarSourceNotice from '../../components/CalendarSourceNotice.vue';
 import { useCalendarSource } from '../../lib/calendar-source';
 import { useResource } from '../../lib/useResource';
-import { request, notify, assetUrl, previewPhotos } from '../../lib/api';
+import { request, notify, assetUrl, previewPhotos, refreshAssetOnError } from '../../lib/api';
 import { today, daysBetween } from '../../lib/domain';
 import { collectBabyAlbumPhotos } from '@our-little-world/shared/baby-album';
 import type { Baby } from '../../types';

@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import request from 'supertest';
 import sharp from 'sharp';
 import { readSetupToken } from './setup-fixture';
@@ -18,11 +19,15 @@ before(async () => {
   process.env.STORAGE_DIR = path.join(directory, 'storage');
   process.env.ASSET_SECRET = 'asset-history-isolated-secret-1234567890';
   process.env.AUTO_BACKUP_HOURS = '0';
-  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy', '--config', 'prisma.config.ts'], {
-    cwd: path.join(__dirname, '..'),
-    stdio: 'pipe',
-    env: { ...process.env, RUST_LOG: 'info' },
-  });
+  execFileSync(
+    process.execPath,
+    [require.resolve('prisma/build/index.js'), 'migrate', 'deploy', '--config', 'prisma.config.ts'],
+    {
+      cwd: path.join(__dirname, '..'),
+      stdio: 'pipe',
+      env: { ...process.env, RUST_LOG: 'info' },
+    },
+  );
   const { createApp } = await import('../src/app');
   app = await createApp({ logger: false });
   await app.init();
@@ -100,4 +105,59 @@ test('all 1001 asset records remain available including the oldest signed photo'
   assert.equal(served.status, 200);
   assert.deepEqual(served.body, photo);
   assert.equal((await api.get('/api/assets')).status, 401);
+});
+
+test('signed photo URLs are short lived, tamper resistant, and not cacheable', async () => {
+  const listed = await api.get('/api/assets').set(auth());
+  assert.equal(listed.status, 200);
+  const oldest = listed.body.find((asset: any) => asset.id === oldestId);
+  assert.ok(oldest?.url);
+  const parsed = new URL(`http://localhost${oldest.url}`);
+  const expires = Number(parsed.searchParams.get('expires'));
+  assert.ok(expires > Date.now());
+  assert.ok(expires - Date.now() <= 30 * 60 * 1000 + 1_000);
+
+  const expired = Date.now() - 1;
+  const expiredSignature = crypto
+    .createHmac('sha256', process.env.ASSET_SECRET!)
+    .update(`${oldestId}:${expired}`)
+    .digest('hex');
+  assert.equal(
+    (await api.get(`/api/assets/${oldestId}/file?expires=${expired}&signature=${expiredSignature}`))
+      .status,
+    403,
+  );
+
+  const originalSignature = parsed.searchParams.get('signature')!;
+  const tampered = (originalSignature[0] === '0' ? '1' : '0') + originalSignature.slice(1);
+  assert.equal(
+    (await api.get(`/api/assets/${oldestId}/file?expires=${expires}&signature=${tampered}`)).status,
+    403,
+  );
+
+  const tooFar = Date.now() + 30 * 60 * 1000 + 1_000;
+  const tooFarSignature = crypto
+    .createHmac('sha256', process.env.ASSET_SECRET!)
+    .update(`${oldestId}:${tooFar}`)
+    .digest('hex');
+  assert.equal(
+    (await api.get(`/api/assets/${oldestId}/file?expires=${tooFar}&signature=${tooFarSignature}`))
+      .status,
+    403,
+  );
+
+  const served = await api.get(oldest.url).buffer(true);
+  assert.equal(served.status, 200);
+  assert.equal(served.headers['cache-control'], 'private, no-store, max-age=0');
+  assert.equal(served.headers.pragma, 'no-cache');
+});
+
+test('authorized users can renew only their own asset URLs', async () => {
+  const renewed = await api.get('/api/assets/' + oldestId + '/url').set(auth());
+  assert.equal(renewed.status, 200, JSON.stringify(renewed.body));
+  assert.equal(renewed.body.id, oldestId);
+  assert.match(renewed.body.url, new RegExp('/api/assets/' + oldestId + '/file\\\\?'));
+
+  assert.equal((await api.get('/api/assets/' + oldestId + '/url')).status, 401);
+  assert.equal((await api.get('/api/assets/outside-asset/url').set(auth())).status, 404);
 });

@@ -83,7 +83,11 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   await db.$queryRawUnsafe('PRAGMA busy_timeout = 5000');
   const setupToken = await prepareSetupToken(db, config.storage, process.env.SETUP_TOKEN);
   const auth = new AuthService(db, setupToken);
-  const rateLimit = createRateLimitMiddleware();
+  const rateLimit = createRateLimitMiddleware({
+    authLimit: Number(process.env.AUTH_RATE_LIMIT),
+    generalLimit: Number(process.env.GENERAL_RATE_LIMIT),
+    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS),
+  });
   class AuthGuard implements CanActivate {
     async canActivate(context: ExecutionContext) {
       await auth.authenticate(context.switchToHttp().getRequest());
@@ -204,6 +208,9 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
     list(req) {
       return assets.list(req.user);
     }
+    renew(req, id) {
+      return assets.renew(req.user, id);
+    }
     upload(req, file) {
       return assets.upload(req.user, file);
     }
@@ -215,7 +222,8 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
       res
         .set({
           'Content-Type': asset.mime,
-          'Cache-Control': 'private, max-age=86400',
+          'Cache-Control': 'private, no-store, max-age=0',
+          Pragma: 'no-cache',
           'Content-Disposition': 'inline',
           'X-Content-Type-Options': 'nosniff',
         })
@@ -224,6 +232,7 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   }
   Controller('assets')(AssetsController);
   route(AssetsController, Get, 'list', '', [Req()]);
+  route(AssetsController, Get, 'renew', ':id/url', [Req(), Param('id')]);
   route(AssetsController, Post, 'upload', '', [Req(), UploadedFile()]);
   UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }))(
     AssetsController.prototype,

@@ -33,6 +33,7 @@
           :src="assetUrl(asset)"
           mode="aspectFill"
           @click="previewPhotos(item.assets, index)"
+          @error="refreshAssetOnError(asset)"
         />
       </view>
       <view class="actions">
@@ -83,7 +84,7 @@ import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
 import PhotoPicker from '../../components/PhotoPicker.vue';
 import { useResource } from '../../lib/useResource';
-import { assetUrl, previewPhotos } from '../../lib/api';
+import { assetUrl, previewPhotos, refreshAssetOnError } from '../../lib/api';
 import { today, splitTags } from '../../lib/domain';
 const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
     useResource('work'),
