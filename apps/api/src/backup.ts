@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import AdmZip from 'adm-zip';
 import { createPrismaClient } from './db/client';
 import type { PrismaClient } from './db/client';
@@ -220,6 +221,7 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
       if (req.user.role !== 'owner') fail(403, '只有创建者可以恢复空间');
       if (!file) fail(400, '请选择备份 ZIP');
       let zip: any, data: any;
+      let snapshotPath: string | undefined;
       try {
         zip = new AdmZip(file.buffer);
         const rows = zip.getEntries();
@@ -245,10 +247,18 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
           )
             throw new Error();
         }
+        const requiredEntries = ['manifest.json', 'data.json', 'database.sqlite'];
+        if (requiredEntries.some((name) => !entryNames.has(name))) throw new Error();
         const manifest = JSON.parse(zip.readAsText('manifest.json'));
         data = JSON.parse(zip.readAsText('data.json'));
         if (manifest.complete === false)
           fail(400, '此恢复前保护副本的附件不完整，不能作为完整备份恢复');
+        if (manifest.complete !== true) throw new Error();
+        if (
+          (manifest.missingAssets?.length ?? 0) !== 0 ||
+          (manifest.damagedAssets?.length ?? 0) !== 0
+        )
+          throw new Error();
         if (
           manifest.product !== 'our-little-world' ||
           manifest.version !== VERSION ||
@@ -259,6 +269,29 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
         )
           throw new Error();
         if (data.space?.id !== req.user.spaceId) fail(400, '只能恢复当前空间的备份');
+        // Verify the embedded SQLite file is readable and represents the same logical snapshot
+        // as data.json before any current records or attachments are changed.
+        snapshotPath = path.join(config.storage, 'restore-snapshot-' + crypto.randomUUID() + '.db');
+        await fs.writeFile(snapshotPath, zip.readFile('database.sqlite'));
+        const snapshotDb = createPrismaClient('file:' + snapshotPath.replace(/\\/g, '/'));
+        try {
+          await snapshotDb.$connect();
+          const integrity: any[] = await snapshotDb.$queryRawUnsafe('PRAGMA integrity_check');
+          if (integrity.length !== 1 || integrity[0].integrity_check !== 'ok') throw new Error();
+          const snapshotData = await dataset(snapshotDb, { spaceId: data.space.id }, true);
+          const normalize = (value: any) => {
+            const copy = JSON.parse(JSON.stringify(value));
+            delete copy.exportedAt;
+            for (const key of ['users', 'entries', 'assets'])
+              if (Array.isArray(copy[key]))
+                copy[key].sort((a: any, b: any) => a.id.localeCompare(b.id));
+            return copy;
+          };
+          if (!isDeepStrictEqual(normalize(snapshotData), normalize(data)))
+            throw new Error();
+        } finally {
+          await snapshotDb.$disconnect();
+        }
         assertBackupBudget({
           records: data.entries.length,
           assets: data.assets.length,
@@ -345,6 +378,8 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
       } catch (error: any) {
         if (error.getStatus) throw error;
         fail(400, '备份文件无效、版本不兼容或超过大小限制');
+      } finally {
+        if (snapshotPath) await fs.unlink(snapshotPath).catch(() => {});
       }
       const backups = path.join(config.storage, 'backups');
       await fs.mkdir(backups, { recursive: true });

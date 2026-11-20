@@ -296,8 +296,7 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   app.useGlobalInterceptors({
     intercept(context, next) {
       const req = context.switchToHttp().getRequest<express.Request>();
-      const fullBackupDownload = req.method === 'GET' && req.path === '/api/backup/download';
-      if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !fullBackupDownload)
+      if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.path !== '/api/backup/download')
         return next.handle();
       // Hold the lock until the actual handler settles, even if its client leaves.
       return from(

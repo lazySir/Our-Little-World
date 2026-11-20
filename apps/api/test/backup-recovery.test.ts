@@ -542,6 +542,67 @@ test('an invalid zip changes neither the current records nor the available files
   );
 });
 
+test('restore requires a complete archive and matching SQLite snapshot before changing data', async () => {
+  const created = await api
+    .post('/api/wishes')
+    .set(auth())
+    .send({ title: '当前数据必须保留' });
+  assert.equal(created.status, 201);
+  const backup = await api.get('/api/backup/download').set(auth()).buffer(true).parse(binary);
+  assert.equal(backup.status, 200);
+  const exportBefore = await api.get('/api/backup/export').set(auth());
+  const backupDirectory = path.join(directory, 'storage', 'backups');
+  const uploadDirectory = path.join(directory, 'storage', 'uploads');
+  const filesBefore = await readdir(uploadDirectory);
+  const backupsBefore = await readdir(backupDirectory).catch((error: any) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  const assertRejectedWithoutChanges = async (bytes: Buffer, filename: string) => {
+    const response = await api
+      .post('/api/backup/restore')
+      .set(auth())
+      .attach('file', bytes, { filename });
+    assert.equal(response.status, 400, JSON.stringify(response.body));
+    const exportAfter = await api.get('/api/backup/export').set(auth());
+    const { exportedAt: _beforeTime, ...before } = exportBefore.body;
+    const { exportedAt: _afterTime, ...after } = exportAfter.body;
+    assert.deepEqual(after, before);
+    assert.deepEqual(await readdir(uploadDirectory), filesBefore);
+    assert.deepEqual(await readdir(backupDirectory).catch((error: any) => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    }), backupsBefore);
+  };
+
+  for (const name of ['manifest.json', 'data.json', 'database.sqlite']) {
+    const missingRequiredFile = new AdmZip(backup.body);
+    missingRequiredFile.deleteFile(name);
+    await assertRejectedWithoutChanges(
+      missingRequiredFile.toBuffer(),
+      'missing-' + name.replace('.json', '').replace('.sqlite', '') + '.zip',
+    );
+  }
+
+  const missingCompleteFlag = new AdmZip(backup.body);
+  const manifest = JSON.parse(missingCompleteFlag.readAsText('manifest.json'));
+  delete manifest.complete;
+  missingCompleteFlag.updateFile('manifest.json', Buffer.from(JSON.stringify(manifest)));
+  await assertRejectedWithoutChanges(missingCompleteFlag.toBuffer(), 'missing-complete-flag.zip');
+
+  const corruptDatabase = new AdmZip(backup.body);
+  corruptDatabase.updateFile('database.sqlite', Buffer.from('not a sqlite database'));
+  await assertRejectedWithoutChanges(corruptDatabase.toBuffer(), 'corrupt-database.zip');
+
+  const divergentData = new AdmZip(backup.body);
+  const data = JSON.parse(divergentData.readAsText('data.json'));
+  const wish = data.entries.find((row: any) => row.id === created.body.id);
+  assert.ok(wish);
+  wish.data = JSON.stringify({ title: '逻辑数据与 SQLite 快照不一致' });
+  divergentData.updateFile('data.json', Buffer.from(JSON.stringify(data)));
+  await assertRejectedWithoutChanges(divergentData.toBuffer(), 'divergent-snapshot.zip');
+});
+
 test('restore rejects duplicate archive entry names before changing data or files', async () => {
   const backup = await api.get('/api/backup/download').set(auth()).buffer(true).parse(binary);
   assert.equal(backup.status, 200);
