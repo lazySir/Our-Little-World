@@ -56,6 +56,7 @@ const features = [
   { path: '/pages/anniversaries/index', name: '纪念日', desc: '重要的日子，一个都不漏', icon: '♡' },
   { path: '/pages/calendar/index', name: '共享日历', desc: '把接下来的日子放在一起', icon: '⌑' },
   { path: '/pages/baby/index', name: '宝宝成长', desc: '可选的家庭成长档案', icon: '⌂' },
+  { path: '/pages/pregnancy/index', name: '孕期手记', desc: '记录重要时刻与此刻心情', icon: '♡' },
   { path: '/pages/work/index', name: '工作手记', desc: '给工作留下轻量记录', icon: '▤' },
   { path: '/pages/letters/index', name: '时光信箱', desc: '写给未来某一天的信', icon: '✉' },
 ];

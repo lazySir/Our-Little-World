@@ -113,8 +113,9 @@ test('a completed wish converts once through a delayed failure and real retry on
     releaseRetry();
     expect((await saved).ok()).toBeTruthy();
     await expect(page.getByText('已把完成的愿望收藏为回忆', { exact: true })).toHaveCount(1);
-    await expect(convert).toBeEnabled();
-    await expect(convert).not.toHaveClass(/is-loading/);
+    const converted = card.getByRole('button', { name: '已收藏为回忆', exact: true });
+    await expect(converted).toBeDisabled();
+    await expect(converted).not.toHaveClass(/is-loading/);
     expect(postAttempts).toBe(2);
     const memories = await request.get(`${apiBase}/memories`, { headers });
     expect(memories.ok()).toBeTruthy();

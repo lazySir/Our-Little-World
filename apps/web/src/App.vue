@@ -22,6 +22,7 @@ const nav = [
   { to: '/anniversaries', name: '纪念日', icon: 'calendar' },
   { to: '/calendar', name: '共享日历', icon: 'calendar' },
   { to: '/baby', name: '宝宝成长', icon: 'baby' },
+  { to: '/pregnancy', name: '孕期手记', icon: 'baby' },
   { to: '/work', name: '工作手记', icon: 'work' },
   { to: '/letters', name: '时光信箱', icon: 'letter' },
 ];

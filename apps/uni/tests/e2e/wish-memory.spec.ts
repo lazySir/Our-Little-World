@@ -114,7 +114,7 @@ test('uni H5 wish conversion stays busy, rejects duplicate taps and retries one 
   expect(created.ok(), await created.text()).toBeTruthy();
   await visit(page, 'wishes', '一起做');
   const card = page.locator('.card').filter({ hasText: title });
-  const convert = card.locator('uni-button').filter({ hasText: '写成一段回忆' });
+  const convert = card.locator('uni-button').filter({ hasText: '收藏为回忆' });
   await expect(card).toHaveClass(/done/);
   const gate = deferred();
   const tasks: Promise<void>[] = [];

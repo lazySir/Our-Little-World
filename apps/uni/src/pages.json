@@ -11,6 +11,7 @@
     {"path":"pages/anniversaries/index","style":{"navigationBarTitleText":"纪念日","enablePullDownRefresh":true}},
     {"path":"pages/calendar/index","style":{"navigationBarTitleText":"共享日历","enablePullDownRefresh":true}},
     {"path":"pages/baby/index","style":{"navigationBarTitleText":"宝宝成长","enablePullDownRefresh":true}},
+    {"path":"pages/pregnancy/index","style":{"navigationBarTitleText":"孕期手记","enablePullDownRefresh":true}},
     {"path":"pages/work/index","style":{"navigationBarTitleText":"工作手记","enablePullDownRefresh":true}},
     {"path":"pages/letters/index","style":{"navigationBarTitleText":"时光信箱","enablePullDownRefresh":true}},
     {"path":"pages/settings/index","style":{"navigationBarTitleText":"我们的设置"}}

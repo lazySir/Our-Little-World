@@ -169,7 +169,7 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await expect(page.getByText('写下第一个愿望', { exact: true })).toBeVisible();
   await expect(page.locator('.home-wishes').getByText(names.wish, { exact: true })).toHaveCount(0);
   await visit(page, 'wishes', '一起做');
-  await click(wish, '写成一段回忆 →');
+  await click(wish, '收藏为回忆');
   await expect(page.locator('.title')).toHaveText('回忆相册');
 
   await visit(page, 'menu', '今天吃什么');

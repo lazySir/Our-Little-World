@@ -64,6 +64,13 @@ test('all domain modules persist, update, list and delete records', async () => 
     anniversaries: { title: '在一起', date: '2024-02-29' },
     memories: { title: '第一张合照', date: '2026-11-17' },
     growth: { title: '长高啦', date: '2026-11-17', type: 'growth', heightCm: 70, weightKg: 8 },
+    pregnancy: {
+      title: '第一次产检',
+      date: '2026-11-17',
+      type: 'checkup',
+      content: '把今天的感受记下来',
+      assetIds: [],
+    },
     work: { title: '完成项目', date: '2026-11-17', content: '今天完成第一版' },
     moods: { mood: 'good', date: '2026-11-17' },
   };
@@ -90,6 +97,146 @@ test('all domain modules persist, update, list and delete records', async () => 
       404,
     );
   }
+});
+
+test('pregnancy records stay date-based, validated and visible to both space members', async () => {
+  const created = await api
+    .post('/api/pregnancy')
+    .set(auth())
+    .send({
+      title: '第一次产检',
+      date: '2026-11-18',
+      type: 'checkup',
+      content: '今天有点紧张，也很期待。',
+      assetIds: [],
+    });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  assert.deepEqual(
+    {
+      title: created.body.title,
+      date: created.body.date,
+      type: created.body.type,
+      content: created.body.content,
+      assetIds: created.body.assetIds,
+    },
+    {
+      title: '第一次产检',
+      date: '2026-11-18',
+      type: 'checkup',
+      content: '今天有点紧张，也很期待。',
+      assetIds: [],
+    },
+  );
+  assert.equal(created.body.authorId, (await api.get('/api/auth/me').set(auth())).body.user.id);
+
+  const partnerList = await api
+    .get('/api/pregnancy')
+    .set({ Authorization: `Bearer ${partnerToken}` });
+  assert.equal(partnerList.status, 200);
+  assert.ok(partnerList.body.some((record: any) => record.id === created.body.id));
+
+  const edited = await api
+    .patch(`/api/pregnancy/${created.body.id}`)
+    .set(auth())
+    .send({ type: 'milestone', title: '第一次产检完成' });
+  assert.equal(edited.status, 200, JSON.stringify(edited.body));
+  assert.equal(edited.body.date, '2026-11-18');
+  assert.equal(edited.body.content, '今天有点紧张，也很期待。');
+  assert.equal(edited.body.type, 'milestone');
+
+  const partnerEdited = await api
+    .patch(`/api/pregnancy/${created.body.id}`)
+    .set({ Authorization: `Bearer ${partnerToken}` })
+    .send({ content: '另一半也补充了一句。' });
+  assert.equal(partnerEdited.status, 200, JSON.stringify(partnerEdited.body));
+  assert.equal(partnerEdited.body.content, '另一半也补充了一句。');
+
+  assert.equal(
+    (
+      await api
+        .post('/api/pregnancy')
+        .set(auth())
+        .send({ title: '无效类型', date: '2026-11-18', type: 'diagnosis' })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await api
+        .post('/api/pregnancy')
+        .set(auth())
+        .send({ title: '无效日期', date: '2026-02-30', type: 'note' })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await api
+        .delete(`/api/pregnancy/${created.body.id}`)
+        .set({ Authorization: `Bearer ${partnerToken}` })
+    ).status,
+    200,
+  );
+});
+test('pregnancy attachments resolve for both members and reject other-space assets', async () => {
+  const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#e8a38b' } })
+    .png()
+    .toBuffer();
+  const uploaded = await api
+    .post('/api/assets')
+    .set(auth())
+    .attach('file', image, { filename: 'pregnancy.png', contentType: 'image/png' });
+  assert.equal(uploaded.status, 201, JSON.stringify(uploaded.body));
+  const uploadedSecond = await api
+    .post('/api/assets')
+    .set(auth())
+    .attach('file', image, { filename: 'pregnancy-second.png', contentType: 'image/png' });
+  assert.equal(uploadedSecond.status, 201, JSON.stringify(uploadedSecond.body));
+
+  const created = await api
+    .post('/api/pregnancy')
+    .set(auth())
+    .send({
+      title: '留下今天的照片',
+      date: '2026-11-21',
+      type: 'milestone',
+      assetIds: [uploaded.body.id, uploadedSecond.body.id],
+    });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  assert.deepEqual(created.body.assets.map((asset: any) => asset.id), [uploaded.body.id, uploadedSecond.body.id]);
+  assert.equal(created.body.assets[0].mime, 'image/webp');
+
+  const partnerList = await api
+    .get('/api/pregnancy')
+    .set({ Authorization: `Bearer ${partnerToken}` });
+  const shared = partnerList.body.find((record: any) => record.id === created.body.id);
+  assert.equal(partnerList.status, 200);
+  assert.deepEqual(shared.assets.map((asset: any) => asset.id), [uploaded.body.id, uploadedSecond.body.id]);
+
+  const db = app.get('PRISMA');
+  const otherSpace = await db.space.create({
+    data: { name: '其他空间', startDate: '2026-11-21' },
+  });
+  const foreignAsset = await db.asset.create({
+    data: {
+      spaceId: otherSpace.id,
+      filename: 'foreign-pregnancy.webp',
+      originalName: 'foreign.png',
+      mime: 'image/webp',
+      size: 1,
+    },
+  });
+  const rejected = await api
+    .post('/api/pregnancy')
+    .set(auth())
+    .send({
+      title: '不应引用其他空间照片',
+      date: '2026-11-21',
+      type: 'note',
+      assetIds: [foreignAsset.id],
+    });
+  assert.equal(rejected.status, 400, JSON.stringify(rejected.body));
+  assert.equal((await api.delete(`/api/pregnancy/${created.body.id}`).set(auth())).status, 200);
 });
 test('validation rejects bad calendar dates, fractions of cents and missing assets', async () => {
   assert.equal(

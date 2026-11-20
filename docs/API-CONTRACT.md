@@ -30,6 +30,7 @@ Every resource below supports `GET /<path>` array, `POST /<path>` object, `PATCH
 - `anniversaries`: `{title,date,recurring:true,description:'',icon:'heart'}`.
 - `memories`: `{title,content:'',date,assetIds:[],tags:[],kind:'couple|baby'}`.
 - `growth`: `{title,date,type:'growth|feeding|sleep|health|milestone',content:'',heightCm:null|number,weightKg:null|number,amountMl:null|number,durationMinutes:null|number,assetIds:[]}`.
+- `pregnancy`: `{title,date,type:'checkup|milestone|mood|note',content:'',assetIds:[]}`. Pregnancy records are shared by both authenticated members of the same two-person space; either member may create, edit, or delete them. The `date` is a local calendar date (`YYYY-MM-DD`), `title` is required, `content` defaults to an empty string, and `assetIds` may only reference assets from the same space. The API stores descriptive records only and does not calculate gestational age or provide medical advice.
 - `work`: `{title,date,content:'',tags:[],assetIds:[]}`.
 - `letters`: `{title,content,unlockDate,recipient:'partner|both'}`. GET adds `{isLocked:boolean,author:{nickname}}`; omit content until unlockDate even for author. Only author may edit/delete; PATCH forbidden after unlock.
 - `moods`: `{mood:'great|good|okay|low|tired',note:'',date}`. POST upserts the current user's date; omitting `date` uses the service's calendar day at save time (`TZ`, default `Asia/Shanghai`). An explicit date retains historical upserts; null is invalid. Stored and restored moods always require a valid date, and PATCH preserves the existing date when omitted. GET adds author nickname. Only author may edit/delete.
@@ -46,6 +47,7 @@ Every resource below supports `GET /<path>` array, `POST /<path>` object, `PATCH
 - `GET /assets` → asset array, same shape.
 - `GET /assets/:id/url` authenticated → `{id,url,mime,size,originalName}` with a new 30-minute signed URL. Only assets in the caller's space can be renewed; other-space or missing assets return 404.
 - Every asset referenced by resource must belong to same space; include `assets: [{id,url,...}]` in list/detail responses of memories/work/growth and optional `asset` in menu/baby.
+- Pregnancy record responses include resolved `assets: [{id,url,mime,size,originalName}]` for referenced images. Because pregnancy records are space-shared, these attachments are visible to both members and follow the same signed URL and ownership checks as the parent record.
 - `GET /assets/:id/file?expires=...&signature=...` returns binary only after a valid short-lived signature (30 minutes maximum); URL contains no session token and responses are marked `private, no-store`. Clients renew a URL after an image load error; uni-app also renews before opening the native preview. Assets are not publicly enumerable.
 - `DELETE /assets/:id` guarded and rejects still referenced files.
 

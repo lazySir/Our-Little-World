@@ -89,6 +89,13 @@ const schemas = {
     durationMinutes: optional(positive.max(1440)),
     assetIds: assets,
   }),
+  pregnancy: z.object({
+    title,
+    date,
+    type: z.enum(['checkup', 'milestone', 'mood', 'note']),
+    content: note,
+    assetIds: assets,
+  }),
   work: z.object({ title, date, content: note, tags, assetIds: assets }),
   letters: z.object({
     title,

@@ -274,8 +274,9 @@ test('two people can create, share and persist their complete little world', asy
   await page.reload();
   const memory = page.locator('article').filter({ hasText: names.memory });
   await expect(memory).toContainText('# 周末');
-  await expect(memory.locator('img')).toBeVisible();
-  await memory.locator('img').click();
+  await expect(memory.locator('img')).toHaveCount(2);
+  await expect(memory.locator('img').first()).toBeVisible();
+  await memory.locator('img').first().click();
   await expect(page.locator('.el-image-viewer__wrapper')).toBeVisible();
   await page.keyboard.press('Escape');
   await visit(page, '/anniversaries', '纪念日');

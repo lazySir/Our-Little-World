@@ -49,6 +49,11 @@ const router = createRouter({
       props: (route) => ({ ...recordProps(route), profileSource: route.query.source === 'baby' }),
       meta: { title: '宝宝成长' },
     },
+    {
+      path: '/pregnancy',
+      component: () => import('./pages/PregnancyPage.vue'),
+      meta: { title: '孕期手记' },
+    },
     { path: '/work', component: () => import('./pages/WorkPage.vue'), meta: { title: '工作手记' } },
     {
       path: '/letters',

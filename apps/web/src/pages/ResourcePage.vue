@@ -83,6 +83,23 @@ const configs: Record<string, any> = {
     empty: '给未来写一封信吧',
     emptyDesc: '把现在的心情交给时间，未来的我们会收到。',
   },
+  pregnancy: {
+    path: '/pregnancy',
+    title: '孕期手记',
+    desc: '把这段日子里的重要时刻、心情和照片，慢慢记下来。',
+    icon: 'heart',
+    action: '写一条手记',
+    search: '搜索手记',
+    tabs: [
+      { key: 'all', label: '全部' },
+      { key: 'checkup', label: '产检' },
+      { key: 'milestone', label: '里程碑' },
+      { key: 'mood', label: '心情' },
+      { key: 'note', label: '备忘' },
+    ],
+    empty: '这段日子还没有手记',
+    emptyDesc: '记录下今天的心情、产检，或想留住的小小瞬间。',
+  },
 };
 const config = computed(() => configs[props.kind]);
 const { items, loading, error, saving, load, save, remove } = useResource(config.value.path);
@@ -93,6 +110,7 @@ const sourceRecord = computed(() =>
 const focusRecord = useRecordFocus();
 const query = ref('');
 const tab = ref('all');
+const hasFilter = computed(() => !!query.value.trim() || tab.value !== 'all');
 const dialog = ref(false);
 const editing = ref<any>(null);
 const convertingId = ref('');
@@ -117,6 +135,7 @@ const form = reactive<any>({
   assetIds: [],
   unlockDate: tomorrow(),
   recipient: 'partner',
+  type: 'note',
 });
 const categoryOptions = [
   { label: '想去的地方', value: 'travel' },
@@ -124,6 +143,13 @@ const categoryOptions = [
   { label: '生活小事', value: 'life' },
   { label: '其他期待', value: 'other' },
 ];
+const typeOptions = [
+  { label: '产检', value: 'checkup' },
+  { label: '里程碑', value: 'milestone' },
+  { label: '心情', value: 'mood' },
+  { label: '备忘', value: 'note' },
+];
+const pregnancyTypeLabels = Object.fromEntries(typeOptions.map((item) => [item.value, item.label]));
 function resetForm(item: any = null) {
   if (editorBusy.value) return;
   editing.value = item;
@@ -146,6 +172,7 @@ function resetForm(item: any = null) {
       assetIds: [],
       unlockDate: tomorrow(),
       recipient: 'partner',
+      type: 'note',
     },
     item
       ? {
@@ -186,6 +213,8 @@ async function submit() {
       return;
     }
   }
+  if (props.kind === 'pregnancy')
+    payload = pick(['title', 'date', 'type', 'content', 'assetIds']);
   if (props.kind === 'wishes' && form.status === 'done' && !form.completedAt)
     payload.completedAt = today();
   try {
@@ -199,6 +228,8 @@ function matchesTab(i, key) {
   if (key === 'upcoming') return nextAnniversary(i).days >= 0 && nextAnniversary(i).days <= 90;
   if (key === 'locked') return i.isLocked;
   if (key === 'open') return !i.isLocked;
+  if (props.kind === 'pregnancy' && ['checkup', 'milestone', 'mood', 'note'].includes(key))
+    return i.type === key;
   return true;
 }
 const filtered = computed(() => {
@@ -218,6 +249,10 @@ const filtered = computed(() => {
     (b.date || b.createdAt || '').localeCompare(a.date || a.createdAt || ''),
   );
 });
+function clearFilters() {
+  query.value = '';
+  tab.value = 'all';
+}
 async function toggleWish(item) {
   await save(
     {
@@ -237,10 +272,8 @@ async function ensureAssets() {
 }
 function openNew() {
   resetForm();
-  if (props.kind === 'memories' || props.kind === 'work') ensureAssets();
-}
-function image(item) {
-  return assetUrl(item.assets?.[0]);
+  if (props.kind === 'memories' || props.kind === 'work' || props.kind === 'pregnancy')
+    ensureAssets();
 }
 function canEdit(item) {
   return props.kind !== 'letters' || (item.authorId === session.user.id && item.isLocked);
@@ -298,7 +331,7 @@ async function convertToMemory(item) {
     <div
       v-if="filtered.length && (!recordId || sourceReady)"
       class="card-grid"
-      :class="{ two: !sourceRecord && (kind === 'memories' || kind === 'work') }"
+      :class="{ two: !sourceRecord && (kind === 'memories' || kind === 'work' || kind === 'pregnancy') }"
     >
       <article
         v-for="item in filtered"
@@ -327,7 +360,10 @@ async function convertToMemory(item) {
                 class="tag"
                 :class="item.kind === 'baby' ? 'rose' : ''"
                 >{{ item.kind === 'baby' ? '宝宝' : '我们的故事' }}</span
-              ><span v-if="kind === 'letters'" class="tag" :class="item.isLocked ? '' : 'green'"
+              ><span v-if="kind === 'pregnancy'" class="tag rose">
+                {{ pregnancyTypeLabels[item.type] || item.type }}
+              </span>
+              <span v-if="kind === 'letters'" class="tag" :class="item.isLocked ? '' : 'green'"
                 ><AppIcon :name="item.isLocked ? 'lock' : 'letter'" :size="12" />{{
                   item.isLocked ? '未到解锁日' : '已打开'
                 }}</span
@@ -343,7 +379,7 @@ async function convertToMemory(item) {
               title="编辑"
               @click="
                 resetForm(item);
-                (kind === 'memories' || kind === 'work') && ensureAssets();
+                (kind === 'memories' || kind === 'work' || kind === 'pregnancy') && ensureAssets();
               "
             >
               <AppIcon name="edit" :size="16" /></button
@@ -352,10 +388,17 @@ async function convertToMemory(item) {
             </button>
           </div>
         </div>
-        <div v-if="(kind === 'memories' || kind === 'work') && image(item)" class="photos-grid">
+        <div
+          v-if="(kind === 'memories' || kind === 'work' || kind === 'pregnancy') && item.assets?.length"
+          class="photos-grid"
+        >
           <el-image
-            :src="image(item)"
-            @error="refreshAssetOnError(item.assets?.[0])"
+            v-for="(asset, index) in item.assets"
+            :key="asset.id"
+            :src="assetUrl(asset)"
+            :alt="`${item.title} 的第 ${Number(index) + 1} 张照片`"
+            :initial-index="index"
+            @error="refreshAssetOnError(asset)"
             :preview-src-list="item.assets?.map(assetUrl)"
             fit="cover"
             preview-teleported
@@ -417,11 +460,11 @@ async function convertToMemory(item) {
     </div>
     <div v-else-if="!recordId || sourceReady" class="panel">
       <EmptyState
-        :title="query ? '没有找到匹配的记录' : config.empty"
-        :description="query ? '换一个关键词试试看' : config.emptyDesc"
+        :title="hasFilter ? '没有找到匹配的记录' : config.empty"
+        :description="hasFilter ? '换一个关键词或筛选条件试试看' : config.emptyDesc"
         :icon="config.icon"
-        :action="query ? '清除搜索' : config.action"
-        @action="query ? (query = '') : openNew()"
+        :action="hasFilter ? '清除筛选' : config.action"
+        @action="hasFilter ? clearFilters() : openNew()"
       />
     </div>
   </LoadState>
@@ -527,6 +570,37 @@ async function convertToMemory(item) {
         <p v-if="editing" class="dialog-tip">
           信的正文已经交给时间保管。你可以调整标题、解锁日期和收件人。
         </p></template
+      ><template v-else-if="kind === 'pregnancy'"
+        ><div class="form-grid">
+          <el-form-item label="记录日期" required
+            ><el-date-picker
+              v-model="form.date"
+              type="date"
+              value-format="YYYY-MM-DD" /></el-form-item
+          ><el-form-item label="记录类型" required
+            ><el-select v-model="form.type" placeholder="选择类型"
+              ><el-option
+                v-for="option in typeOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value" /></el-select></el-form-item>
+        </div>
+        <el-form-item label="写点什么"
+          ><el-input
+            v-model="form.content"
+            type="textarea"
+            :rows="6"
+            maxlength="10000"
+            show-word-limit
+            placeholder="记下当时的心情、对话或想留住的细节。" /></el-form-item
+        ><el-form-item label="照片"
+          ><PhotoUpload
+            v-model="form.assetIds"
+            :assets="[...assets, ...(editing?.assets || [])]"
+            :limit="12"
+            :disabled="saving"
+            @busy="uploaded = $event" /></el-form-item
+      ></template
       ><template v-else
         ><div class="form-grid">
           <el-form-item label="日期" required
