@@ -10,7 +10,10 @@
       <view class="muted grow">锁住的信件，到期后才能读</view>
       <wd-button size="small" @click="openNew">＋ 写封信</wd-button>
     </view>
-    <view v-if="error" class="error-box">{{ error }}</view>
+    <view v-if="error" class="error-box">
+      <view>{{ error }}</view>
+      <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
+    </view>
     <view v-if="loading" class="loading">未来的信箱打开中…</view>
     <view v-for="item in items" :key="item.id" class="card letter">
       <view class="row">
@@ -34,8 +37,8 @@
       <view v-else class="card-text">{{ item.content }}</view>
       <view class="meta">开启日期 · {{ item.unlockDate }}</view>
       <view v-if="item.authorId === session.user?.id" class="actions">
-        <view v-if="item.isLocked" class="text-action" @click="edit(item)">重写这封信</view>
-        <view class="text-action delete" @click="remove(item)">删除</view>
+        <button v-if="item.isLocked" class="text-action ui-reset" @click="edit(item)">重写这封信</button>
+        <button class="text-action delete ui-reset" @click="remove(item)">删除</button>
       </view>
     </view>
     <EmptyState
@@ -89,7 +92,7 @@ import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
 import { useResource } from '../../lib/useResource';
 import { today, daysBetween } from '../../lib/domain';
-const { session, items, loading, error, saving, editor, formError, save, remove } =
+const { session, items, loading, error, saving, editor, formError, load, save, remove } =
     useResource('letters'),
   editing = ref(null),
   form = reactive({ title: '', content: '', unlockDate: '', recipient: 'both' });

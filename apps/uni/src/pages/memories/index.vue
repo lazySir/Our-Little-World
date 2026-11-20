@@ -10,16 +10,21 @@
       <wd-button size="small" @click="openNew">＋ 写一篇</wd-button>
     </view>
     <view class="chips">
-      <view
+      <button
         v-for="tab in tabs"
         :key="tab.value"
-        class="chip"
+        class="chip ui-reset"
         :class="{ active: kind === tab.value }"
+        :aria-label="`${tab.label}，${kind === tab.value ? '已选中' : '切换分类'}`"
+        :aria-pressed="kind === tab.value"
         @click="kind = tab.value"
-        >{{ tab.label }}</view
+        >{{ tab.label }}</button
       >
     </view>
-    <view v-if="error" class="error-box">{{ error }}</view>
+    <view v-if="error" class="error-box">
+      <view>{{ error }}</view>
+      <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
+    </view>
     <view v-if="loading" class="loading">正在翻开相册…</view>
     <template v-else>
       <view v-for="item in filtered" :key="item.id" class="card">
@@ -32,18 +37,17 @@
           <view v-for="tag in item.tags" :key="tag" class="pill"># {{ tag }}</view>
         </view>
         <view v-if="item.assets?.length" class="photo-grid">
-          <image
+          <button
             v-for="(asset, index) in item.assets.slice(0, 6)"
             :key="asset.id"
-            class="photo"
-            :src="assetUrl(asset)"
-            mode="aspectFill"
+            class="photo-preview ui-reset"
+            :aria-label="`预览 ${item.title} 的第 ${index + 1} 张照片`"
             @click="previewPhotos(item.assets, index)"
-          />
+          ><image class="photo" :src="assetUrl(asset)" mode="aspectFill" /></button>
         </view>
         <view class="actions">
-          <view class="text-action" @click="edit(item)">编辑</view>
-          <view class="text-action delete" @click="remove(item)">删除</view>
+          <button class="text-action ui-reset" @click="edit(item)">编辑</button>
+          <button class="text-action delete ui-reset" @click="remove(item)">删除</button>
         </view>
       </view>
       <EmptyState

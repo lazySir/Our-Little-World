@@ -34,6 +34,8 @@ Every resource below supports `GET /<path>` array, `POST /<path>` object, `PATCH
 
 `GET /dashboard` → `{date,daysTogether,counts:{wishes,memories,anniversaries,work},monthly:{incomeCents,expenseCents,balanceCents},recentMemories:[],upcomingAnniversaries:[],pendingWishes:[],moods:[]}`. `date` is the service's current calendar day (`YYYY-MM-DD`, configured by `TZ`, default `Asia/Shanghai`), captured once for the entire response. Days together, monthly totals, upcoming anniversaries and today's moods use this date. Home clients use it for date/month labels and anniversary countdowns, omit mood dates so a page left open across midnight saves on the new service day, and reset the mood input when the response contains no current-user mood. Explicit record-date forms keep the user's selected calendar date. Dashboard can also derive from resource endpoints if needed.
 
+`GET /calendar?month=YYYY-MM` → `{month,date,events:CalendarEvent[]}`. `month` is optional and defaults to the service's current month; invalid months return 400. Each event has `{id,sourceId,kind,date,title}` and may include `description`, `recurring`, `locked`, or `icon`. `kind` is `anniversary|wish|letter|memory|growth|baby`. The authenticated space's dated records are aggregated for the requested month, including annual anniversary and baby-birthday occurrences; February 29 recurrences fall on February 28 in non-leap years. Events are ordered by date, kind, title, then source ID. Future letters expose only title and `locked:true`; their content is never included.
+
 ## Assets
 
 - `POST /assets` multipart field `file` JPEG/PNG/WebP/GIF <=10MiB → `{id,url,mime,size,originalName}`.

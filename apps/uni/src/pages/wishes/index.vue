@@ -11,16 +11,21 @@
       <wd-button size="small" @click="openNew">＋ 添加</wd-button>
     </view>
     <view class="chips">
-      <view
+      <button
         v-for="tab in tabs"
         :key="tab.value"
-        class="chip"
+        class="chip ui-reset"
         :class="{ active: filter === tab.value }"
+        :aria-label="`${tab.label}，${filter === tab.value ? '已选中' : '切换筛选'}`"
+        :aria-pressed="filter === tab.value"
         @click="filter = tab.value"
-        >{{ tab.label }} {{ tab.value === 'all' ? '' : `· ${count(tab.value)}` }}</view
+        >{{ tab.label }} {{ tab.value === 'all' ? '' : `· ${count(tab.value)}` }}</button
       >
     </view>
-    <view v-if="error" class="error-box">{{ error }}</view>
+    <view v-if="error" class="error-box">
+      <view>{{ error }}</view>
+      <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
+    </view>
     <view v-if="loading" class="loading">正在打开你们的清单…</view>
     <template v-else>
       <view
@@ -31,11 +36,13 @@
       >
         <view class="between">
           <view class="row grow">
-            <view
-              class="check"
+            <button
+              class="check ui-reset"
               :class="{ checked: item.status === 'done' }"
+              :aria-label="`${item.title}，${item.status === 'done' ? '已完成' : '标记为完成'}`"
+              :aria-pressed="item.status === 'done'"
               @click="toggle(item)"
-              >{{ item.status === 'done' ? '✓' : '' }}</view
+              >{{ item.status === 'done' ? '✓' : '' }}</button
             >
             <view class="grow">
               <view class="card-title">{{ item.title }}</view>
@@ -46,7 +53,7 @@
               </view>
             </view>
           </view>
-          <view class="text-action" @click="edit(item)">编辑</view>
+          <button class="text-action ui-reset" @click="edit(item)">编辑</button>
         </view>
         <view v-if="item.completedAt" class="between" style="margin-top: 12rpx">
           <view class="meta">完成于 {{ item.completedAt.slice(0, 10) }}</view>
@@ -92,7 +99,7 @@
       /><FormField v-model="form.targetDate" label="希望哪天完成" kind="date" /><view
         v-if="editing"
         class="actions"
-        ><view class="text-action delete" @click="remove(editing)">删除这件事</view></view
+        ><button class="text-action delete ui-reset" @click="remove(editing)">删除这件事</button></view
       ></EditorSheet
     ></view
   >

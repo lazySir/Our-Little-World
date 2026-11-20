@@ -6,6 +6,7 @@
 
 ## 最新结果
 
+- 11 月 20 日共享日历与 uni 可访问性复验：`npm test` 348/348、根 `npm run typecheck`、API/Web/微信小程序/uni H5 构建通过；Web E2E 19/19、uni H5 E2E 16/16、设置草稿专项 3/3、隔离环境清理 2/2 通过。日历桌面与手机 Web 截图已检查，README、产品说明、API 合同与 uni 说明已同步。微信开发者工具及真机运行仍按下方验证边界处理。
 - 11 月 20 日首次建号与功能回归（Prisma 7 迁移前基线）：`npm test` 336/336 通过（shared 26、API 51、Web 77、uni 160、部署与验收脚本 22）；根 `npm run typecheck` 通过。浏览器 Web 19/19、小程序 H5 16/16；独立 `npm run test:e2e:unit` 12/12。
 - 11 月 20 日 Prisma 7 + SQLite 迁移复验：`npm test` 347/347 通过（shared 26、API 57、Web 77、uni 165、部署与验收脚本 22），根 `npm run typecheck` 通过；API、Web、微信小程序和 uni H5 构建通过。Web E2E 19/19、uni H5 E2E 16/16、演示数据隔离检查通过。生产依赖安全审计无已知漏洞。Docker 引擎本轮未运行，因此没有把既有 Docker 镜像/Compose 验收作为迁移后复验结果。README 已补充桌面 Web、手机 Web、小程序 H5 联调和回忆相册截图、系统架构图与功能变更同步维护约定。
 - 11 月 20 日首次建号验证码接入微信验收脚本后尝试官方模拟器运行：按本机 IDE 的 18469 端口重试后，CLI 成功打开隔离项目，但开发者工具日志报告 `devtools is not loaded properly` 和到微信服务的 TLS 握手断开，模拟器页面就绪探测超时，未进入业务检查；本次不能视为微信运行通过。系统网络可连接微信服务域名，故障定位在当前开发者工具加载状态，需待 IDE 恢复后重跑。

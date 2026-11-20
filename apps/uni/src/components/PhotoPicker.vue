@@ -2,17 +2,30 @@
   <view>
     <view class="photo-grid">
       <view v-for="(photo, index) in modelValue" :key="photo.id" class="photo-wrap">
-        <image
-          class="photo"
-          :src="assetUrl(photo)"
-          mode="aspectFill"
+        <button
+          class="photo-preview ui-reset"
+          :aria-label="`预览第 ${index + 1} 张照片`"
           @click="previewPhotos(modelValue, index)"
-        />
-        <view v-if="!busy && !disabled" class="remove-photo" @click="remove(index)">×</view>
+        >
+          <image class="photo" :src="assetUrl(photo)" mode="aspectFill" />
+        </button>
+        <button
+          v-if="!busy && !disabled"
+          class="remove-photo ui-reset"
+          aria-label="删除这张照片"
+          @click="remove(index)"
+        >
+          ×
+        </button>
       </view>
-      <view v-if="modelValue.length < max && !disabled" class="upload-tile" @click="add">
+      <button
+        v-if="modelValue.length < max && !disabled"
+        class="upload-tile"
+        aria-label="添加照片，可从相册选择或拍摄"
+        @click="add"
+      >
         <view>{{ busy ? '上传中…' : '＋ 添加照片' }}<view class="small">相册 / 拍摄</view> </view>
-      </view>
+      </button>
     </view>
     <view class="form-note">{{ modelValue.length }} / {{ max }} 张 · 每张不超过 10 MB</view>
     <view class="form-note">服务端仅保存优化后的照片，重要原片请另行保存。</view>

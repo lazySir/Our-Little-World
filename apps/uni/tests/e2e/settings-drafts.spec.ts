@@ -215,7 +215,7 @@ for (const resource of ['auth/profile', 'space'] as const) {
       await fill(currentPage(page), '怎么称呼我', nickname);
       await fill(currentPage(page), '小世界的名字', name);
       await nextDay(page);
-      await currentPage(page).getByText('玫瑰日记', { exact: true }).click();
+      await currentPage(page).locator('uni-button.theme-option').filter({ hasText: '玫瑰日记' }).click();
       await assertDrafts(page, nickname, name);
       const failure = page.waitForResponse(
         (response) => response.url() === `${api}/${resource}` && response.status() === 503,

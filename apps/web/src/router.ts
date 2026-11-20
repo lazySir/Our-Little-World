@@ -31,6 +31,11 @@ const router = createRouter({
       component: () => import('./pages/AnniversariesPage.vue'),
       meta: { title: '纪念日' },
     },
+    {
+      path: '/calendar',
+      component: () => import('./pages/CalendarPage.vue'),
+      meta: { title: '共享日历' },
+    },
     { path: '/baby', component: () => import('./pages/BabyPage.vue'), meta: { title: '宝宝成长' } },
     { path: '/work', component: () => import('./pages/WorkPage.vue'), meta: { title: '工作手记' } },
     {

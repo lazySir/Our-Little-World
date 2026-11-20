@@ -48,7 +48,14 @@
       />
       <view class="form-label">喜欢哪种颜色</view>
       <view class="feature-grid" style="grid-template-columns: repeat(3, 1fr)">
-        <view v-for="theme in themes" :key="theme.value" @click="selectTheme(theme.value)">
+        <button
+          v-for="theme in themes"
+          :key="theme.value"
+          class="theme-option ui-reset"
+          :aria-label="`${theme.label}${space.theme === theme.value ? '，已选中' : ''}`"
+          :aria-pressed="space.theme === theme.value"
+          @click="selectTheme(theme.value)"
+        >
           <view
             class="theme-swatch"
             :style="{
@@ -62,7 +69,7 @@
           <view class="center small" :class="{ accent: space.theme === theme.value }">{{
             theme.label
           }}</view>
-        </view>
+        </button>
       </view>
       <wd-button
         block
@@ -89,7 +96,7 @@
         <view v-if="invitation" class="note" style="margin: 20rpx 0">
           <view class="card-title">{{ invitation.code }}</view>
           <view class="meta">有效至 {{ new Date(invitation.expiresAt).toLocaleString() }}</view>
-          <view class="text-action" @click="copy(invitation.code)">复制邀请码</view>
+          <button class="text-action ui-reset" @click="copy(invitation.code)">复制邀请码</button>
         </view>
         <wd-button block plain :loading="busy === 'invite'" @click="invite"
           >生成专属邀请码</wd-button

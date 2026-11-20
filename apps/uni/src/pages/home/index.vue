@@ -32,7 +32,7 @@
           <button
             v-for="item in moods"
             :key="item.value"
-            class="chip"
+            class="chip ui-reset"
             :class="{ active: myMood === item.value }"
             :aria-label="`${item.label}，${myMood === item.value ? '已选中' : '未选中'}`"
             :aria-pressed="myMood === item.value"
@@ -62,23 +62,24 @@
       </view>
       <view class="section-head">
         <view class="section-title">今天去哪里</view>
-        <view class="text-action" @click="go('/pages/more/index')">看看全部 →</view>
+        <button class="text-action ui-reset" @click="go('/pages/more/index')">看看全部 →</button>
       </view>
       <view class="feature-grid">
-        <view
+        <button
           v-for="feature in features"
           :key="feature.path"
-          class="feature"
+          class="feature ui-reset"
+          :aria-label="`${feature.name}：${feature.desc}`"
           @click="go(feature.path)"
         >
           <view class="feature-icon">{{ feature.icon }}</view>
           <view class="feature-name">{{ feature.name }}</view>
           <view class="feature-desc">{{ feature.desc }}</view>
-        </view>
+        </button>
       </view>
       <view class="section-head">
         <view class="section-title">我们的待办愿望</view>
-        <view class="text-action" @click="go('/pages/wishes/index')">查看全部 →</view>
+        <button class="text-action ui-reset" @click="go('/pages/wishes/index')">查看全部 →</button>
       </view>
       <view v-if="dashboard?.pendingWishes?.length" class="card home-wishes">
         <wd-cell-group border>
@@ -102,7 +103,7 @@
       />
       <view class="section-head">
         <view class="section-title">最近的回忆</view>
-        <view class="text-action" @click="go('/pages/memories/index')">查看全部 →</view>
+        <button class="text-action ui-reset" @click="go('/pages/memories/index')">查看全部 →</button>
       </view>
       <view v-if="dashboard?.recentMemories?.length" class="card">
         <view
@@ -127,7 +128,7 @@
       />
       <view class="section-head">
         <view class="section-title">这个月的账本</view>
-        <view class="text-action" @click="go('/pages/ledger/index')">去记一笔 →</view>
+        <button class="text-action ui-reset" @click="go('/pages/ledger/index')">去记一笔 →</button>
       </view>
       <view class="stat-grid">
         <view class="stat">

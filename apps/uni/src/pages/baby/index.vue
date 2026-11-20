@@ -33,7 +33,7 @@
               : '一起等待新生命'
           }}</view>
         </view>
-        <view class="text-action" @click="editBaby">编辑</view>
+        <button class="text-action ui-reset" aria-label="编辑宝宝档案" @click="editBaby">编辑</button>
       </view>
       <view v-if="baby.notes" class="card-text">{{ baby.notes }}</view>
     </view>
@@ -50,14 +50,22 @@
       <wd-button size="small" @click="openNew">＋ 记录</wd-button>
     </view>
     <view class="chips">
-      <view class="chip" :class="{ active: filter === 'all' }" @click="filter = 'all'">全部</view>
-      <view
+      <button
+        class="chip ui-reset"
+        :class="{ active: filter === 'all' }"
+        aria-label="全部记录"
+        :aria-pressed="filter === 'all'"
+        @click="filter = 'all'"
+        >全部</button
+      ><button
         v-for="option in types"
         :key="option.value"
-        class="chip"
+        class="chip ui-reset"
         :class="{ active: filter === option.value }"
+        :aria-label="`${option.label}记录`"
+        :aria-pressed="filter === option.value"
         @click="filter = option.value"
-        >{{ option.label }}</view
+        >{{ option.label }}</button
       >
     </view>
     <view class="note">这里只记录家庭日常；身高、体重、喂养和健康备注都可以按需要选填。</view>
@@ -80,18 +88,19 @@
           >
         </view>
         <view v-if="item.assets?.length" class="photo-grid">
-          <image
+          <button
             v-for="(asset, index) in item.assets"
             :key="asset.id"
-            class="photo"
-            :src="assetUrl(asset)"
-            mode="aspectFill"
+            class="photo-preview ui-reset"
+            :aria-label="`预览${item.title}照片 ${index + 1}`"
             @click="previewPhotos(item.assets, index)"
-          />
+        >
+            <image class="photo" :src="assetUrl(asset)" mode="aspectFill" />
+          </button>
         </view>
         <view class="actions">
-          <view class="text-action" @click="edit(item)">编辑</view>
-          <view class="text-action delete" @click="remove(item)">删除</view>
+          <button class="text-action ui-reset" @click="edit(item)">编辑</button>
+          <button class="text-action delete ui-reset" @click="remove(item)">删除</button>
         </view>
       </view>
     </view>

@@ -55,16 +55,21 @@
       </view>
     </view>
     <view class="chips">
-      <view
+      <button
         v-for="option in filters"
         :key="option.value"
-        class="chip"
+        class="chip ui-reset"
         :class="{ active: filter === option.value }"
+        :aria-label="`${option.label}，${filter === option.value ? '已选中' : '切换筛选'}`"
+        :aria-pressed="filter === option.value"
         @click="filter = option.value"
-        >{{ option.label }}</view
+        >{{ option.label }}</button
       >
     </view>
-    <view v-if="error" class="error-box">{{ error }}</view>
+    <view v-if="error" class="error-box">
+      <view>{{ error }}</view>
+      <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
+    </view>
     <view v-if="loading" class="loading">账本打开中…</view>
     <view v-for="item in filtered" :key="item.id" class="card">
       <view class="between">
@@ -80,8 +85,8 @@
       </view>
       <view v-if="item.note" class="card-text">{{ item.note }}</view>
       <view class="actions">
-        <view class="text-action" @click="edit(item)">编辑</view>
-        <view class="text-action delete" @click="remove(item)">删除</view>
+        <button class="text-action ui-reset" @click="edit(item)">编辑</button>
+        <button class="text-action delete ui-reset" @click="remove(item)">删除</button>
       </view>
     </view>
     <EmptyState
@@ -126,7 +131,7 @@ import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
 import { useResource } from '../../lib/useResource';
 import { today, money, centsFromInput } from '../../lib/domain';
-const { session, items, loading, error, saving, editor, formError, save, remove } =
+const { session, items, loading, error, saving, editor, formError, load, save, remove } =
     useResource('ledger'),
   month = ref(today().slice(0, 7)),
   filter = ref('all'),

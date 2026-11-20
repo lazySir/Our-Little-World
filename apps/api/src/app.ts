@@ -152,6 +152,9 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
     dashboard(req: AuthenticatedRequest) {
       return resources.dashboard(req.user);
     }
+    calendar(req: AuthenticatedRequest, query: { month?: string }) {
+      return resources.calendar(req.user, query?.month);
+    }
     health() {
       return { ok: true, version: '1.0.0', database: 'sqlite' };
     }
@@ -159,6 +162,7 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   Controller()(SpaceController);
   route(SpaceController, Patch, 'space', 'space', [Req(), Body()]);
   route(SpaceController, Get, 'dashboard', 'dashboard', [Req()]);
+  route(SpaceController, Get, 'calendar', 'calendar', [Req(), Query()]);
   route(SpaceController, Get, 'health', 'health', [], false);
   const controllers: Type<any>[] = [AuthController, SpaceController];
   for (const kind of Object.keys(schemas).filter((k) => k !== 'baby')) {

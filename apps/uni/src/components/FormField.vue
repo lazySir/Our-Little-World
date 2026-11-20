@@ -15,22 +15,26 @@
           <text class="muted">▾</text>
         </view>
       </picker>
-      <view
+      <button
         v-if="modelValue && !required"
-        class="text-action"
+        class="text-action ui-reset"
+        aria-label="清除日期"
         style="padding: 0 24rpx 14rpx"
         @click="update('')"
-        >清除日期</view
       >
+        清除日期
+      </button>
     </view>
     <view v-else-if="kind === 'select'" class="chips">
-      <view
+      <button
         v-for="option in options"
         :key="option.value"
-        class="chip"
+        class="chip ui-reset"
         :class="{ active: modelValue === option.value }"
+        :aria-label="`${option.label}，${modelValue === option.value ? '已选中' : '未选中'}`"
+        :aria-pressed="modelValue === option.value"
         @click="update(option.value)"
-        >{{ option.label }}</view
+        >{{ option.label }}</button
       >
     </view>
     <view v-else-if="kind === 'switch'" class="switch-row">

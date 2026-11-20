@@ -235,6 +235,88 @@ test('baby profile is optional and updates a singleton', async () => {
   const b = await api.put('/api/baby').set(auth()).send({ name: '小芽', birthday: '2026-01-01' });
   assert.equal(a.body.id, b.body.id);
 });
+
+test('calendar aggregates dated records and expands recurring birthdays', async () => {
+  const recurring = await api
+    .post('/api/anniversaries')
+    .set(auth())
+    .send({ title: '相识日', date: '2024-02-29', recurring: true });
+  const oneTime = await api
+    .post('/api/anniversaries')
+    .set(auth())
+    .send({ title: '搬家日', date: '2099-11-07', recurring: false });
+  const wish = await api
+    .post('/api/wishes')
+    .set(auth())
+    .send({ title: '一起看海', targetDate: '2099-11-04' });
+  const letter = await api
+    .post('/api/letters')
+    .set(auth())
+    .send({ title: '未来的信', content: '只给未来看的内容', unlockDate: '2099-11-05' });
+  const memory = await api
+    .post('/api/memories')
+    .set(auth())
+    .send({ title: '那天的照片', date: '2099-11-06' });
+  const growth = await api
+    .post('/api/growth')
+    .set(auth())
+    .send({ title: '第一次长高', date: '2099-11-08', type: 'growth', heightCm: 80 });
+  const baby = await api
+    .put('/api/baby')
+    .set(auth())
+    .send({ name: '小芽', birthday: '2020-11-13' });
+  assert.equal(recurring.status, 201);
+  assert.equal(oneTime.status, 201);
+  assert.equal(wish.status, 201);
+  assert.equal(letter.status, 201);
+  assert.equal(memory.status, 201);
+  assert.equal(growth.status, 201);
+  assert.equal(baby.status, 200);
+
+  const november = await api.get('/api/calendar?month=2099-11').set(auth());
+  assert.equal(november.status, 200, JSON.stringify(november.body));
+  assert.equal(november.body.month, '2099-11');
+  assert.match(november.body.date, /^\d{4}-\d{2}-\d{2}$/);
+  assert.deepEqual(
+    november.body.events.map((event: any) => [event.kind, event.date, event.title]),
+    [
+      ['wish', '2099-11-04', '一起看海'],
+      ['letter', '2099-11-05', '未来的信'],
+      ['memory', '2099-11-06', '那天的照片'],
+      ['anniversary', '2099-11-07', '搬家日'],
+      ['growth', '2099-11-08', '第一次长高'],
+      ['baby', '2099-11-13', '小芽的生日'],
+    ],
+  );
+  const letterEvent = november.body.events.find((event: any) => event.kind === 'letter');
+  assert.equal(letterEvent.sourceId, letter.body.id);
+  assert.equal(letterEvent.locked, true);
+  assert.equal(letterEvent.description, undefined);
+  assert.equal(
+    november.body.events.some((event: any) => event.sourceId === recurring.body.id),
+    false,
+  );
+
+  const february = await api.get('/api/calendar?month=2099-02').set(auth());
+  assert.equal(february.status, 200);
+  assert.deepEqual(february.body.events, [
+    {
+      id: `${recurring.body.id}:2099-02-28`,
+      sourceId: recurring.body.id,
+      kind: 'anniversary',
+      date: '2099-02-28',
+      title: '相识日',
+      description: '',
+      recurring: true,
+      icon: 'heart',
+    },
+  ]);
+
+  const empty = await api.get('/api/calendar?month=2099-12').set(auth());
+  assert.equal(empty.status, 200);
+  assert.deepEqual(empty.body.events, []);
+  assert.equal((await api.get('/api/calendar?month=2099-13').set(auth())).status, 400);
+});
 test('uploads decode image data and require valid signed access', async () => {
   const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#e8a38b' } })
     .png()

@@ -10,7 +10,10 @@
       <view class="grow muted">收藏那些特别的日期</view>
       <wd-button size="small" @click="openNew">＋ 添加</wd-button>
     </view>
-    <view v-if="error" class="error-box">{{ error }}</view>
+    <view v-if="error" class="error-box">
+      <view>{{ error }}</view>
+      <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
+    </view>
     <view v-if="loading" class="loading">在找下一个值得期待的日子…</view>
     <view v-for="item in sorted" :key="item.id" class="card">
       <view class="between">
@@ -27,8 +30,8 @@
         </view>
       </view>
       <view class="actions">
-        <view class="text-action" @click="edit(item)">编辑</view>
-        <view class="text-action delete" @click="remove(item)">删除</view>
+        <button class="text-action ui-reset" @click="edit(item)">编辑</button>
+        <button class="text-action delete ui-reset" @click="remove(item)">删除</button>
       </view>
     </view>
     <EmptyState
@@ -76,7 +79,7 @@ import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
 import { useResource } from '../../lib/useResource';
 import { today, nextOccurrence, daysBetween } from '../../lib/domain';
-const { session, items, loading, error, saving, editor, formError, save, remove } =
+const { session, items, loading, error, saving, editor, formError, load, save, remove } =
     useResource('anniversaries'),
   editing = ref(null),
   form = reactive({ title: '', date: today(), recurring: true, description: '', icon: 'heart' });

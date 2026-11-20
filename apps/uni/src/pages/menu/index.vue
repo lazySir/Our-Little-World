@@ -11,48 +11,76 @@
       <wd-button size="small" @click="openNew">＋ 添加</wd-button>
     </view>
     <view class="chips">
-      <view
+      <button
         v-for="option in categories"
         :key="option.value"
-        class="chip"
+        class="chip ui-reset"
         :class="{ active: category === option.value }"
+        :aria-label="`${option.label}，${category === option.value ? '已选中' : '切换分类'}`"
+        :aria-pressed="category === option.value"
         @click="category = option.value"
-        >{{ option.label }}</view
+        >{{ option.label }}</button
       >
-      <view class="chip" :class="{ active: favoriteOnly }" @click="favoriteOnly = !favoriteOnly"
-        >♡ 只看收藏</view
+      <button
+        class="chip ui-reset"
+        :class="{ active: favoriteOnly }"
+        aria-label="只看收藏"
+        :aria-pressed="favoriteOnly"
+        @click="favoriteOnly = !favoriteOnly"
+        >♡ 只看收藏</button
       >
     </view>
-    <view v-if="error" class="error-box">{{ error }}</view>
+    <view v-if="error" class="error-box">
+      <view>{{ error }}</view>
+      <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
+    </view>
     <view v-if="loading" class="loading">正在翻开菜单…</view>
     <template v-else>
       <view v-for="item in filtered" :key="item.id" class="card">
         <view class="row">
-          <image
+          <button
             v-if="item.asset"
+            class="photo-preview ui-reset"
+            aria-label="预览菜单照片"
+            @click="previewPhotos([item.asset])"
+          ><image
             :src="assetUrl(item.asset)"
             mode="aspectFill"
             style="width: 130rpx; height: 130rpx; border-radius: 20rpx"
-            @click="previewPhotos([item.asset])"
-          />
+          /></button>
           <view class="grow">
             <view class="card-title">{{ item.name }}</view>
             <view v-if="item.description" class="card-text">{{ item.description }}</view>
             <view class="meta"
               >{{ money(item.priceCents) }}
-              <text class="accent" @click="favorite(item)">
-                · {{ item.favorite ? '♥ 已收藏' : '♡ 收藏' }}</text
+              <button
+                class="accent ui-reset"
+                :aria-label="item.favorite ? '取消收藏' : '收藏菜单'"
+                :aria-pressed="item.favorite"
+                @click="favorite(item)"
               >
+                · {{ item.favorite ? '♥ 已收藏' : '♡ 收藏' }}
+              </button>
             </view>
           </view>
-          <view class="text-action" @click="edit(item)">编辑</view>
+          <button class="text-action ui-reset" @click="edit(item)">编辑</button>
         </view>
         <view class="between" style="margin-top: 22rpx">
           <view class="muted">放入本次点单</view>
           <view class="quantity">
-            <view class="quantity-btn" @click="change(item.id, -1)">−</view>
+            <button
+              class="quantity-btn ui-reset"
+              :aria-label="`减少 ${item.name} 数量`"
+              @click="change(item.id, -1)"
+              >−</button
+            >
             <view>{{ cart[item.id] || 0 }}</view>
-            <view class="quantity-btn" @click="change(item.id, 1)">＋</view>
+            <button
+              class="quantity-btn ui-reset"
+              :aria-label="`增加 ${item.name} 数量`"
+              @click="change(item.id, 1)"
+              >＋</button
+            >
           </view>
         </view>
       </view>
@@ -90,9 +118,12 @@
         >{{ item.name }} × {{ item.quantity }}</view
       ><view v-if="order.note" class="card-text">{{ order.note }}</view
       ><view class="actions"
-        ><view v-if="order.status === 'pending'" class="text-action" @click="completeOrder(order)"
-          >✓ 完成这单</view
-        ><view class="text-action delete" @click="deleteOrder(order)">删除</view></view
+        ><button
+          v-if="order.status === 'pending'"
+          class="text-action ui-reset"
+          @click="completeOrder(order)"
+          >✓ 完成这单</button
+        ><button class="text-action delete ui-reset" @click="deleteOrder(order)">删除</button></view
       ></view
     ><view v-if="!orders.length" class="no-data">想吃的选好后，在这里一起开饭。</view
     ><EditorSheet
@@ -127,8 +158,11 @@
         :max="1"
         :disabled="saving"
         @busy="uploading = $event"
-      /><view v-if="editing" class="text-action delete" @click="remove(editing)"
-        >删除这项菜单</view
+      /><button
+        v-if="editing"
+        class="text-action delete ui-reset"
+        @click="remove(editing)"
+        >删除这项菜单</button
       ></EditorSheet
     ></view
   >

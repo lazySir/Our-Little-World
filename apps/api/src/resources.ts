@@ -3,7 +3,7 @@ import { fail } from './auth';
 import type { Entry, PrismaClient } from './db/client';
 import type { AssetsService } from './assets';
 import type { ResourceData, SpaceUser } from './types';
-const { daysTogether, anniversaryInfo } = require('@our-little-world/shared/date');
+const { daysTogether, anniversaryInfo, isValidDate } = require('@our-little-world/shared/date');
 export function today() {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: process.env.TZ || 'Asia/Shanghai' }).format(
     new Date(),
@@ -183,5 +183,129 @@ export class ResourcesService {
       pendingWishes: wishes.filter((w) => w.status === 'todo').slice(0, 4),
       moods: moods.filter((m) => m.date === date),
     };
+  }
+  async calendar(user: SpaceUser, requestedMonth?: string) {
+    const date = today();
+    const month = requestedMonth || date.slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month) || !isValidDate(`${month}-01`))
+      fail(400, '月份格式应为有效的 YYYY-MM');
+
+    const [year, monthNumber] = month.split('-').map(Number);
+    const kinds = ['anniversaries', 'wishes', 'letters', 'memories', 'growth'];
+    const rows = await this.db.entry.findMany({
+      where: { spaceId: user.spaceId, kind: { in: kinds } },
+      orderBy: { createdAt: 'asc' },
+    });
+    const events: Array<Record<string, any>> = [];
+    const append = (event: Record<string, any>) => events.push(event);
+
+    for (const row of rows) {
+      const data = JSON.parse(row.data) as ResourceData;
+      if (row.kind === 'anniversaries') {
+        const sourceDate = data.date as string;
+        if (data.recurring) {
+          const [, sourceMonth] = sourceDate.split('-').map(Number);
+          if (sourceMonth !== monthNumber || year < Number(sourceDate.slice(0, 4))) continue;
+          const occurrence = anniversaryInfo(sourceDate, `${month}-01`, {
+            recurring: true,
+          }).nextDate;
+          append({
+            id: `${row.id}:${occurrence}`,
+            sourceId: row.id,
+            kind: 'anniversary',
+            date: occurrence,
+            title: data.title,
+            description: data.description,
+            recurring: true,
+            icon: data.icon,
+          });
+        } else if (sourceDate.startsWith(`${month}-`)) {
+          append({
+            id: row.id,
+            sourceId: row.id,
+            kind: 'anniversary',
+            date: sourceDate,
+            title: data.title,
+            description: data.description,
+            recurring: false,
+            icon: data.icon,
+          });
+        }
+      } else if (row.kind === 'wishes' && data.targetDate?.startsWith(`${month}-`)) {
+        append({
+          id: row.id,
+          sourceId: row.id,
+          kind: 'wish',
+          date: data.targetDate,
+          title: data.title,
+          description: data.description,
+        });
+      } else if (row.kind === 'letters' && data.unlockDate?.startsWith(`${month}-`)) {
+        append({
+          id: row.id,
+          sourceId: row.id,
+          kind: 'letter',
+          date: data.unlockDate,
+          title: data.title,
+          locked: data.unlockDate > date,
+        });
+      } else if (row.kind === 'memories' && data.date?.startsWith(`${month}-`)) {
+        append({
+          id: row.id,
+          sourceId: row.id,
+          kind: 'memory',
+          date: data.date,
+          title: data.title,
+          description: data.content,
+        });
+      } else if (row.kind === 'growth' && data.date?.startsWith(`${month}-`)) {
+        append({
+          id: row.id,
+          sourceId: row.id,
+          kind: 'growth',
+          date: data.date,
+          title: data.title,
+          description: data.content,
+        });
+      }
+    }
+
+    const baby = await this.db.entry.findFirst({ where: { spaceId: user.spaceId, kind: 'baby' } });
+    if (baby) {
+      const data = JSON.parse(baby.data) as ResourceData;
+      const birthday = data.birthday as string | null | undefined;
+      if (
+        birthday &&
+        year >= Number(birthday.slice(0, 4)) &&
+        birthday.slice(5, 7) === String(monthNumber).padStart(2, '0')
+      ) {
+        const occurrence = anniversaryInfo(birthday, `${month}-01`, { recurring: true }).nextDate;
+        append({
+          id: `${baby.id}:${occurrence}`,
+          sourceId: baby.id,
+          kind: 'baby',
+          date: occurrence,
+          title: `${data.name}的生日`,
+          recurring: true,
+        });
+      }
+    }
+
+    const kindOrder: Record<string, number> = {
+      anniversary: 0,
+      wish: 1,
+      letter: 2,
+      memory: 3,
+      growth: 4,
+      baby: 5,
+    };
+    events.sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) ||
+        (kindOrder[a.kind] ?? 99) - (kindOrder[b.kind] ?? 99) ||
+        a.title.localeCompare(b.title) ||
+        a.sourceId.localeCompare(b.sourceId),
+    );
+    return { month, date, events };
   }
 }

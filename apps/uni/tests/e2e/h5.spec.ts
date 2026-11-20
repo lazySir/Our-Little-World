@@ -295,7 +295,7 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   await page.reload();
   const memory = page.locator('.card').filter({ hasText: names.memory });
   await expect(memory.locator('.photo')).toHaveCount(2);
-  await memory.locator('.photo').first().click();
+  await memory.locator('uni-button.photo-preview').first().click();
   await expect(page.locator('#u-a-p uni-swiper')).toBeVisible();
   await page.reload();
   await page.goto('/#/pages/home/index');

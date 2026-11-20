@@ -7,13 +7,15 @@
       <view class="subtitle">把平凡的日子，过成喜欢的模样。</view>
     </view>
     <view class="chips" style="justify-content: center; margin-top: 32rpx">
-      <view
+      <button
         v-for="tab in tabs"
         :key="tab.value"
-        class="chip"
+        class="chip ui-reset"
         :class="{ active: mode === tab.value }"
+        :aria-label="`${tab.label}，${mode === tab.value ? '当前选中' : '切换到此模式'}`"
+        :aria-pressed="mode === tab.value"
         @click="selectMode(tab.value)"
-        >{{ tab.label }}</view
+        >{{ tab.label }}</button
       >
     </view>
     <view class="card auth-form">
@@ -74,10 +76,15 @@
       ><wd-button block :loading="saving" :disabled="connecting" @click="submit">{{
         mode === 'setup' ? '创建我们的小世界' : mode === 'join' ? '加入对方的世界' : '回家啦'
       }}</wd-button></view
-    ><view class="auth-bottom" @click="showServer = !showServer"
-      >连接设置 · {{ getBase()
-      }}<view class="accent">{{ showServer ? '收起' : '修改服务地址' }}</view></view
-    ><view v-if="showServer" class="card"
+    ><button
+      class="auth-bottom ui-reset"
+      :aria-expanded="showServer"
+      aria-controls="server-settings"
+      @click="showServer = !showServer"
+      >连接设置 · {{ getBase() }}<view class="accent">{{
+        showServer ? '收起' : '修改服务地址'
+      }}</view></button
+    ><view v-if="showServer" id="server-settings" class="card"
       ><FormField
         v-model="apiBase"
         label="小世界服务地址"

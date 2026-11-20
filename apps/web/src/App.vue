@@ -19,6 +19,7 @@ const nav = [
   { to: '/ledger', name: '共同账本', icon: 'wallet' },
   { to: '/memories', name: '回忆相册', icon: 'photo' },
   { to: '/anniversaries', name: '纪念日', icon: 'calendar' },
+  { to: '/calendar', name: '共享日历', icon: 'calendar' },
   { to: '/baby', name: '宝宝成长', icon: 'baby' },
   { to: '/work', name: '工作手记', icon: 'work' },
   { to: '/letters', name: '时光信箱', icon: 'letter' },

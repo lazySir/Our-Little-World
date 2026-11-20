@@ -96,6 +96,23 @@ export interface Dashboard {
   pendingWishes: LivingRecord[];
   moods: LivingRecord[];
 }
+export type CalendarEventKind = 'anniversary' | 'wish' | 'letter' | 'memory' | 'growth' | 'baby';
+export interface CalendarEvent {
+  id: string;
+  sourceId: string;
+  kind: CalendarEventKind;
+  date: string;
+  title: string;
+  description?: string;
+  recurring?: boolean;
+  locked?: boolean;
+  icon?: string;
+}
+export interface CalendarData {
+  month: string;
+  date: string;
+  events: CalendarEvent[];
+}
 export interface ApiError extends Error {
   status?: number;
 }

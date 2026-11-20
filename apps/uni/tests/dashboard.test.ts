@@ -169,7 +169,9 @@ test('home previews up to four pending wishes between its feature grid and recen
 test('home mood choices render as named buttons with an exposed pressed state', async (t) => {
   const s = setup(t);
   await s.view.load();
-  const choices = nodes(s.render()).filter((node) => node.type === 'button');
+  const choices = nodes(s.render()).filter(
+    (node) => node.type === 'button' && node.props?.['aria-pressed'] !== undefined,
+  );
 
   assert.equal(choices.length, 5);
   assert.ok(choices.every((choice) => choice.type === 'button'));
@@ -258,7 +260,9 @@ test('home locks mood controls while a delayed save is pending and unlocks after
     const note = controls.find((node) => node.type === 'wd-textarea');
     assert.ok(note, 'The actual home template must render the mood note');
     assert.equal(note.props.disabled, true, 'The pending save must disable the note field');
-    const otherMood = controls.find((node) => node.props?.onClick && node.props.class === 'chip');
+    const otherMood = controls.find(
+      (node) => node.props?.onClick && node.props.class?.split(' ').includes('chip'),
+    );
     assert.ok(otherMood);
     otherMood.props.onClick();
     note.props['onUpdate:modelValue']('保存期间又写了一句');

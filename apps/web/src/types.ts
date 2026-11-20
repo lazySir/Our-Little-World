@@ -130,6 +130,23 @@ export interface Dashboard {
   pendingWishes: Wish[];
   moods: Mood[];
 }
+export type CalendarEventKind = 'anniversary' | 'wish' | 'letter' | 'memory' | 'growth' | 'baby';
+export interface CalendarEvent {
+  id: string;
+  sourceId: string;
+  kind: CalendarEventKind;
+  date: string;
+  title: string;
+  description?: string;
+  recurring?: boolean;
+  locked?: boolean;
+  icon?: string;
+}
+export interface CalendarData {
+  month: string;
+  date: string;
+  events: CalendarEvent[];
+}
 export interface ApiOptions extends Omit<RequestInit, 'body'> {
   body?: object | FormData;
   binary?: boolean;

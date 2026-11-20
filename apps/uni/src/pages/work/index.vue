@@ -10,7 +10,10 @@
       <input class="search" v-model="query" placeholder="搜索标题、内容或标签" />
       <wd-button size="small" @click="openNew">＋ 写一篇</wd-button>
     </view>
-    <view v-if="error" class="error-box">{{ error }}</view>
+    <view v-if="error" class="error-box">
+      <view>{{ error }}</view>
+      <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
+    </view>
     <view v-if="loading" class="loading">工作手记打开中…</view>
     <view v-for="item in filtered" :key="item.id" class="card">
       <view class="between">
@@ -32,8 +35,8 @@
         />
       </view>
       <view class="actions">
-        <view class="text-action" @click="edit(item)">编辑</view>
-        <view class="text-action delete" @click="remove(item)">删除</view>
+        <button class="text-action ui-reset" @click="edit(item)">编辑</button>
+        <button class="text-action delete ui-reset" @click="remove(item)">删除</button>
       </view>
     </view>
     <EmptyState
@@ -81,7 +84,7 @@ import PhotoPicker from '../../components/PhotoPicker.vue';
 import { useResource } from '../../lib/useResource';
 import { assetUrl, previewPhotos } from '../../lib/api';
 import { today, splitTags } from '../../lib/domain';
-const { session, items, loading, error, saving, editor, formError, save, remove } =
+const { session, items, loading, error, saving, editor, formError, load, save, remove } =
     useResource('work'),
   query = ref(''),
   tagsText = ref(''),
