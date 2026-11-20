@@ -38,6 +38,9 @@ function setup() {
     },
     '../../lib/domain': { today: () => '2026-11-20' },
     '../../stores/session': { useSession: () => ({ theme: 'cream' }) },
+    '../../lib/calendar-source': {
+      useCalendarSource: () => ({ calendarSource: { value: undefined }, clearCalendarSource() {} }),
+    },
   };
   new Function('require', 'module', 'exports', 'uni', output)(
     (specifier: string) => dependencies[specifier] || (specifier.endsWith('.vue') ? {} : require(specifier)),

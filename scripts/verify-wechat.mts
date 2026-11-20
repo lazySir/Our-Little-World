@@ -526,6 +526,60 @@ async function main() {
     }, 'wish list from home preview');
     await has('一起看星星');
     pass('home previews a saved wish and opens its list');
+
+    const calendarDate = await step(
+      () =>
+        mini!.evaluate<string>(
+          'function() { var date = new Date(); return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-15"; }',
+        ),
+      'read simulator calendar month',
+    );
+    const json = { 'Content-Type': 'application/json' };
+    assert.equal(
+      (
+        await request('wishes/' + wish.id, {
+          method: 'PATCH',
+          headers: json,
+          body: JSON.stringify({ targetDate: calendarDate }),
+        })
+      ).ok,
+      true,
+    );
+    assert.equal(
+      (
+        await request('wishes', {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ title: '日历以外的愿望' }),
+        })
+      ).ok,
+      true,
+    );
+    page = await step(() => mini!.navigateTo('/pages/calendar/index'), 'open calendar source');
+    await has('一起看星星');
+    const origin = await control('.calendar-source-action', '查看来源');
+    const originPosition = await step(() => origin.offset(), 'read calendar source position');
+    await step(
+      () =>
+        mini!.callWxMethod('pageScrollTo', {
+          scrollTop: Math.max(0, Number(originPosition.top) - 80),
+          duration: 0,
+        }),
+      'show calendar source action',
+    );
+    await step(() => origin.tap(), 'open calendar wish source');
+    page = await until(async () => {
+      const current = await mini!.currentPage();
+      return current?.path === 'pages/wishes/index' && current;
+    }, 'wish tab from calendar');
+    await has('来自共享日历');
+    await has('一起看星星');
+    assert.ok(!(await textOfPage()).includes('日历以外的愿望'));
+    await tap('查看全部', '.calendar-source-clear');
+    await has('日历以外的愿望');
+    assert.ok(!(await textOfPage()).includes('来自共享日历'));
+    pass('calendar opens the dated wish in its native tab');
+
     page = await step(() => mini!.navigateTo('/pages/ledger/index'), 'open ledger');
     await tap('＋ 记一笔');
     await input('0.00', '12.34');
@@ -539,6 +593,7 @@ async function main() {
       ['more', '我们的日常'],
       ['menu', '今天吃什么'],
       ['anniversaries', '纪念日'],
+      ['calendar', '共享日历'],
       ['baby', '宝宝成长'],
       ['work', '工作手记'],
       ['letters', '时光信箱'],
@@ -555,7 +610,7 @@ async function main() {
         `${route} displayed an error`,
       );
     }
-    pass('all 12 routes render without an error box');
+    pass('all 13 routes render without an error box');
 
     if (media) {
       log('Verify native upload, signed photo download and ZIP restore');

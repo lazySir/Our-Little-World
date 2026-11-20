@@ -6,9 +6,11 @@ import { api, assetUrl } from '../api';
 import { today, tomorrow, splitTags, wishCategories, nextAnniversary } from '../domain';
 import { useSession } from '../stores/session';
 import { useResource } from '../composables/resource';
+import { useRecordFocus } from '../composables/record-focus';
 import PhotoUpload from '../components/PhotoUpload.vue';
+import CalendarSourceStatus from '../components/CalendarSourceStatus.vue';
 
-const props = defineProps({ kind: { type: String, required: true } });
+const props = defineProps<{ kind: string; recordId?: string }>();
 const session = useSession();
 const configs: Record<string, any> = {
   wishes: {
@@ -84,6 +86,11 @@ const configs: Record<string, any> = {
 };
 const config = computed(() => configs[props.kind]);
 const { items, loading, error, saving, load, save, remove } = useResource(config.value.path);
+const sourceReady = computed(() => !!props.recordId && !loading.value && !error.value);
+const sourceRecord = computed(() =>
+  sourceReady.value ? items.value.find((item) => item.id === props.recordId) : undefined,
+);
+const focusRecord = useRecordFocus();
 const query = ref('');
 const tab = ref('all');
 const dialog = ref(false);
@@ -194,6 +201,7 @@ function matchesTab(i, key) {
   return true;
 }
 const filtered = computed(() => {
+  if (sourceRecord.value) return [sourceRecord.value];
   let list = items.value || [];
   const q = query.value.trim().toLowerCase();
   if (q)
@@ -266,7 +274,8 @@ async function convertToMemory(item) {
     ></PageHeader
   >
   <LoadState :loading="loading" :error="error" @retry="load">
-    <div class="toolbar">
+    <CalendarSourceStatus v-if="sourceReady" :path="config.path" :missing="!sourceRecord" />
+    <div v-if="!sourceRecord && (!recordId || sourceReady)" class="toolbar">
       <div class="filter-tabs">
         <button
           v-for="item in config.tabs"
@@ -284,11 +293,19 @@ async function convertToMemory(item) {
       ></el-input>
     </div>
     <div
-      v-if="filtered.length"
+      v-if="filtered.length && (!recordId || sourceReady)"
       class="card-grid"
-      :class="{ two: kind === 'memories' || kind === 'work' }"
+      :class="{ two: !sourceRecord && (kind === 'memories' || kind === 'work') }"
     >
-      <article v-for="item in filtered" :key="item.id" class="panel record-card">
+      <article
+        v-for="item in filtered"
+        :key="item.id"
+        :ref="item === sourceRecord ? focusRecord : undefined"
+        :data-record-id="item.id"
+        :tabindex="item === sourceRecord ? -1 : undefined"
+        class="panel record-card"
+        :class="{ 'record-source-highlight': item === sourceRecord }"
+      >
         <div class="flex items-start justify-between gap-4">
           <div>
             <h3>{{ item.title }}</h3>
@@ -394,7 +411,7 @@ async function convertToMemory(item) {
         </div>
       </article>
     </div>
-    <div v-else class="panel">
+    <div v-else-if="!recordId || sourceReady" class="panel">
       <EmptyState
         :title="query ? '没有找到匹配的记录' : config.empty"
         :description="query ? '换一个关键词试试看' : config.emptyDesc"

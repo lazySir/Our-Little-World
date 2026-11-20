@@ -4,11 +4,14 @@ import { ElMessage } from 'element-plus';
 import { api, assetUrl } from '../api';
 import { today, growthTypes } from '../domain';
 import { useResource } from '../composables/resource';
+import { useRecordFocus } from '../composables/record-focus';
+import CalendarSourceStatus from '../components/CalendarSourceStatus.vue';
 import type { Baby, Growth, Asset } from '../types';
 import PhotoUpload from '../components/PhotoUpload.vue';
 import GrowthChart from '../components/GrowthChart.vue';
 import { projectGrowthMeasurements } from '@our-little-world/shared/growth';
 import { collectBabyAlbumPhotos } from '@our-little-world/shared/baby-album';
+const props = defineProps<{ recordId?: string; profileSource?: boolean }>();
 const baby = ref<Baby | null>(null),
   babyLoading = ref(true),
   babyLoaded = ref(false),
@@ -41,13 +44,35 @@ const form = reactive<any>({
   assetIds: [],
 });
 const filtered = computed(() =>
-  [...items.value]
-    .filter((i) => tab.value === 'all' || i.type === tab.value)
-    .sort((a, b) => b.date.localeCompare(a.date)),
+  sourceIsGrowth.value
+    ? sourceGrowth.value
+      ? [sourceGrowth.value]
+      : []
+    : [...items.value]
+        .filter((i) => tab.value === 'all' || i.type === tab.value)
+        .sort((a, b) => b.date.localeCompare(a.date)),
 );
 const editorBusy = computed(() => uploading.value || saving.value);
 const profileBusy = computed(() => profileUploading.value || profileSaving.value);
 const profileReady = computed(() => babyLoaded.value && !babyLoading.value);
+const sourceIsBirthday = computed(() => !!props.recordId && props.profileSource);
+const sourceIsGrowth = computed(() => !!props.recordId && !sourceIsBirthday.value);
+const sourceReady = computed(() =>
+  sourceIsBirthday.value
+    ? profileReady.value
+    : sourceIsGrowth.value && !loading.value && !error.value,
+);
+const sourceBaby = computed(() =>
+  sourceReady.value && sourceIsBirthday.value && baby.value?.id === props.recordId
+    ? baby.value
+    : null,
+);
+const sourceGrowth = computed(() =>
+  sourceReady.value && sourceIsGrowth.value
+    ? items.value.find((item) => item.id === props.recordId) || null
+    : null,
+);
+const focusRecord = useRecordFocus();
 let babyLoadVersion = 0;
 const measurements = computed(() => projectGrowthMeasurements(items.value));
 const albumPhotos = computed(() => collectBabyAlbumPhotos(items.value));
@@ -166,12 +191,24 @@ onMounted(loadBaby);
 </script>
 <template>
   <PageHeader title="宝宝成长" description="小小的你，每一天都在长大；小小的事，我们都想记住。"
-    ><el-button type="primary" :disabled="!profileReady" @click="baby ? edit() : editProfile()"
+    ><el-button
+      v-if="!recordId"
+      type="primary"
+      :disabled="!profileReady"
+      @click="baby ? edit() : editProfile()"
       ><AppIcon name="plus" :size="16" />{{ baby ? '记下成长' : '创建宝宝档案' }}</el-button
     ></PageHeader
   >
-  <LoadState :loading="babyLoading" :error="babyError" @retry="loadBaby" />
-  <section v-if="baby && profileReady" class="baby-profile panel">
+  <LoadState v-if="!sourceIsGrowth" :loading="babyLoading" :error="babyError" @retry="loadBaby" />
+  <CalendarSourceStatus v-if="sourceReady" path="/baby" :missing="!sourceBaby && !sourceGrowth" />
+  <section
+    v-if="baby && profileReady && (!recordId || sourceBaby)"
+    :ref="sourceBaby ? focusRecord : undefined"
+    :data-record-id="baby.id"
+    :tabindex="sourceBaby ? -1 : undefined"
+    :class="{ 'record-source-highlight': !!sourceBaby }"
+    class="baby-profile panel"
+  >
     <div class="baby-avatar">
       <el-image v-if="baby.asset" :src="assetUrl(baby.asset)" fit="cover" /><AppIcon
         v-else
@@ -187,7 +224,7 @@ onMounted(loadBaby);
       </p>
       <small v-if="baby.notes">{{ baby.notes }}</small>
     </div>
-    <div class="baby-measurements">
+    <div v-if="!sourceBaby" class="baby-measurements">
       <div>
         <small>最近身高</small><strong>{{ latestHeight?.value ?? '—' }}<span>cm</span></strong>
       </div>
@@ -195,11 +232,11 @@ onMounted(loadBaby);
         <small>最近体重</small><strong>{{ latestWeight?.value ?? '—' }}<span>kg</span></strong>
       </div>
     </div>
-    <button class="icon-button" title="编辑宝宝档案" @click="editProfile">
+    <button v-if="!recordId" class="icon-button" title="编辑宝宝档案" @click="editProfile">
       <AppIcon name="edit" :size="18" />
     </button>
   </section>
-  <div v-else-if="profileReady" class="panel baby-onboarding">
+  <div v-else-if="!recordId && profileReady" class="panel baby-onboarding">
     <EmptyState
       title="给小小的家人，留一片温柔的地方"
       description="创建宝宝档案后，就可以记录身高体重、喂养睡眠与每一个第一次。"
@@ -208,15 +245,15 @@ onMounted(loadBaby);
       @action="editProfile"
     />
   </div>
-  <div class="baby-note">
+  <div v-if="!recordId" class="baby-note">
     <AppIcon
       name="heart"
       :size="14"
     />这里是家庭成长记录。每个宝宝都有自己的节奏，让爱和陪伴慢慢发生。
   </div>
-  <LoadState :loading="loading" :error="error" @retry="load"
+  <LoadState v-if="!sourceIsBirthday" :loading="loading" :error="error" @retry="load"
     ><section
-      v-if="albumPhotos.length || (baby && profileReady)"
+      v-if="!recordId && (albumPhotos.length || (baby && profileReady))"
       class="baby-album"
       aria-labelledby="baby-album-title"
     >
@@ -250,8 +287,8 @@ onMounted(loadBaby);
         icon="baby"
       />
     </section>
-    <GrowthChart :records="items" />
-    <div class="toolbar">
+    <GrowthChart v-if="!recordId" :records="items" />
+    <div v-if="!recordId" class="toolbar">
       <div class="filter-tabs">
         <button class="filter-tab" :class="{ active: tab === 'all' }" @click="tab = 'all'">
           全部记录</button
@@ -267,7 +304,15 @@ onMounted(loadBaby);
       </div>
     </div>
     <div v-if="filtered.length" class="growth-timeline">
-      <article v-for="item in filtered" :key="item.id" class="panel record-card">
+      <article
+        v-for="item in filtered"
+        :key="item.id"
+        :ref="item === sourceGrowth ? focusRecord : undefined"
+        :data-record-id="item.id"
+        :tabindex="item === sourceGrowth ? -1 : undefined"
+        :class="{ 'record-source-highlight': item === sourceGrowth }"
+        class="panel record-card"
+      >
         <div class="flex items-start justify-between gap-4">
           <div>
             <span class="tag green">{{ growthTypes[item.type] }}</span>
@@ -305,7 +350,7 @@ onMounted(loadBaby);
         </div>
       </article>
     </div>
-    <div v-else class="panel">
+    <div v-else-if="!recordId" class="panel">
       <EmptyState
         title="每一次小进步，都值得被记住"
         description="第一次微笑、第一次翻身，或者今天的身高体重，都是珍贵的成长。"

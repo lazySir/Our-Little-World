@@ -6,7 +6,12 @@
       description="每一个重要的日子，都值得提前期待。"
       symbol="♡"
     />
-    <view class="toolbar">
+    <CalendarSourceNotice
+      v-if="calendarSource"
+      :missing="sourceMissing"
+      @clear="clearCalendarSource"
+    />
+    <view v-if="!calendarSource" class="toolbar">
       <view class="grow muted">收藏那些特别的日期</view>
       <wd-button size="small" @click="openNew">＋ 添加</wd-button>
     </view>
@@ -16,7 +21,7 @@
     </view>
     <view v-if="loading && !hasLoaded" class="loading">在找下一个值得期待的日子…</view>
     <view v-else-if="loading" class="meta" role="status">正在更新纪念日…</view>
-    <view v-for="item in sorted" :key="item.id" class="card">
+    <view v-for="item in visibleRecords" :key="item.id" class="card">
       <view class="between">
         <view class="grow">
           <view class="card-title">♡ {{ item.title }}</view>
@@ -36,7 +41,7 @@
       </view>
     </view>
     <EmptyState
-      v-if="hasLoaded && !loading && !items.length"
+      v-if="!calendarSource && hasLoaded && !loading && !items.length"
       symbol="♡"
       title="把第一个日子放在这里"
       description="在一起的那天、生日、第一次旅行……"
@@ -78,6 +83,8 @@ import PageHeading from '../../components/PageHeading.vue';
 import EmptyState from '../../components/EmptyState.vue';
 import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
+import CalendarSourceNotice from '../../components/CalendarSourceNotice.vue';
+import { useCalendarSource } from '../../lib/calendar-source';
 import { useResource } from '../../lib/useResource';
 import { today, nextOccurrence, daysBetween } from '../../lib/domain';
 const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
@@ -89,6 +96,23 @@ const sorted = computed(() =>
     .map((item) => ({ ...item, remaining: daysBetween(nextOccurrence(item.date, item.recurring)) }))
     .sort((a, b) => a.remaining - b.remaining),
 );
+const { calendarSource, clearCalendarSource } = useCalendarSource('anniversary');
+const sourceMissing = computed(() => {
+  const source = calendarSource.value;
+  return Boolean(
+    source &&
+    hasLoaded.value &&
+    !loading.value &&
+    !error.value &&
+    !items.value.some((item) => item.id === source.sourceId),
+  );
+});
+const visibleRecords = computed(() => {
+  const selection = calendarSource.value;
+  return selection && !sourceMissing.value
+    ? sorted.value.filter((item) => item.id === selection.sourceId)
+    : sorted.value;
+});
 function openNew() {
   editing.value = null;
   Object.assign(form, {

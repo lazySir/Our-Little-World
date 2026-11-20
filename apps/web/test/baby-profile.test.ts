@@ -86,9 +86,11 @@ function component(
   }).render;
   return { view, render: () => render(context, [], props, context) };
 }
-function setup() {
+function setup(options: { recordId?: string; profileSource?: boolean; growth?: any[] } = {}) {
   const writes: any[] = [];
   const errors: string[] = [];
+  const growthLoading = ref(false);
+  const growthError = ref('');
   let mounted!: () => Promise<void>;
   let reads = 0;
   const api = {
@@ -102,36 +104,41 @@ function setup() {
       return { id: existing.id, ...structuredClone(body) };
     },
   };
-  const page = component('../src/pages/BabyPage.vue', {
-    vue: {
-      ...require('vue'),
-      onMounted(callback: typeof mounted) {
-        mounted = callback;
+  const page = component(
+    '../src/pages/BabyPage.vue',
+    {
+      vue: {
+        ...require('vue'),
+        onMounted(callback: typeof mounted) {
+          mounted = callback;
+        },
       },
-    },
-    '../api': { api, assetUrl: () => '' },
-    '../domain': domain,
-    '../composables/resource': {
-      useResource: () => ({
-        items: ref([]),
-        loading: ref(false),
-        error: ref(''),
-        saving: ref(false),
-        load() {},
-        save() {},
-        remove() {},
-      }),
-    },
-    'element-plus': {
-      ElMessage: {
-        success() {},
-        warning() {},
-        error(message: string) {
-          errors.push(message);
+      '../api': { api, assetUrl: () => '' },
+      '../domain': domain,
+      '../composables/record-focus': { useRecordFocus: () => () => {} },
+      '../composables/resource': {
+        useResource: () => ({
+          items: ref(options.growth || []),
+          loading: growthLoading,
+          error: growthError,
+          saving: ref(false),
+          load() {},
+          save() {},
+          remove() {},
+        }),
+      },
+      'element-plus': {
+        ElMessage: {
+          success() {},
+          warning() {},
+          error(message: string) {
+            errors.push(message);
+          },
         },
       },
     },
-  });
+    { recordId: options.recordId, profileSource: options.profileSource },
+  );
   const rendered = () => nodes(page.render());
   const action = () =>
     rendered().find((node) => node.type === 'el-button' && node.props?.type === 'primary');
@@ -147,6 +154,8 @@ function setup() {
     writes,
     errors,
     rendered,
+    growthLoading,
+    growthError,
     action,
     status,
     saveButton,
@@ -154,6 +163,111 @@ function setup() {
     mount: () => mounted(),
   };
 }
+
+test('the source of a birthday opens the existing profile rather than a growth card or editor', async () => {
+  const s = setup({
+    recordId: existing.id,
+    profileSource: true,
+    growth: [{ id: 'growth-record', type: 'growth', date: '2026-11-20', title: '第一次坐稳' }],
+  });
+  await s.mount();
+  assert.equal(
+    s.rendered().find((node) => node.props?.['data-record-id'] === existing.id)?.type,
+    'section',
+  );
+  assert.equal(
+    s.rendered().some((node) => node.type === 'article'),
+    false,
+  );
+  assert.equal(s.view.profileOpen.value, false);
+});
+
+test('the source of a growth event remains visible through an unrelated growth filter', async () => {
+  const s = setup({
+    recordId: 'growth-record',
+    growth: [{ id: 'growth-record', type: 'growth', date: '2026-11-20', title: '第一次坐稳' }],
+  });
+  await s.mount();
+  s.view.tab.value = 'feeding';
+  assert.equal(
+    s.rendered().find((node) => node.props?.['data-record-id'] === 'growth-record')?.type,
+    'article',
+  );
+  assert.equal(
+    s.rendered().some((node) => node.props?.['data-record-id'] === existing.id),
+    false,
+  );
+  assert.equal(s.view.dialog.value, false);
+});
+
+test('a birthday source offers retry before treating a successfully read missing profile as deleted', async () => {
+  const s = setup({ recordId: existing.id, profileSource: true });
+  const sourceStatus = () => s.rendered().find((node) => node.type === 'CalendarSourceStatus');
+  s.api.get = async () => {
+    throw new Error('档案暂时无法读取');
+  };
+  await s.mount();
+  assert.equal(s.status()?.props.error, '档案暂时无法读取');
+  assert.equal(sourceStatus(), undefined);
+  s.api.get = async () => null;
+  await s.status()?.props.onRetry();
+  assert.equal(sourceStatus()?.props.missing, true);
+  assert.equal(sourceStatus()?.props.path, '/baby');
+  assert.equal(
+    s.rendered().some((node) => node.props?.class === 'panel baby-onboarding'),
+    false,
+  );
+});
+
+test('a different baby profile is hidden when the requested birthday source is absent', async () => {
+  const s = setup({ recordId: 'old-profile', profileSource: true });
+  await s.mount();
+  assert.equal(
+    s.rendered().find((node) => node.type === 'CalendarSourceStatus')?.props.missing,
+    true,
+  );
+  assert.equal(
+    s.rendered().some((node) => node.props?.['data-record-id'] === existing.id),
+    false,
+  );
+});
+
+test('a source marker without a record ID opens the regular growth page', async () => {
+  const s = setup({ profileSource: true });
+  await s.mount();
+  assert.ok(s.rendered().some((node) => node.type === 'GrowthChart'));
+  assert.equal(
+    s.rendered().some((node) => node.type === 'CalendarSourceStatus'),
+    false,
+  );
+});
+
+test('a failed growth source keeps its retry without showing unrelated baby panels', async () => {
+  const s = setup({ recordId: 'growth-record' });
+  await s.mount();
+  s.growthError.value = '成长记录暂时无法读取';
+  const rendered = s.rendered();
+  assert.equal(
+    rendered.find((node) => node.type === 'LoadState')?.props.error,
+    s.growthError.value,
+  );
+  assert.equal(
+    typeof rendered.find((node) => node.type === 'LoadState')?.props.onRetry,
+    'function',
+  );
+  assert.equal(
+    rendered.some((node) => node.props?.['data-record-id'] === existing.id),
+    false,
+  );
+  assert.equal(
+    rendered.some((node) => node.type === 'GrowthChart'),
+    false,
+  );
+  assert.equal(
+    rendered.some((node) => node.type === 'CalendarSourceStatus'),
+    false,
+  );
+});
 
 test('unknown baby profile disables creation and refuses saves while the first read is pending', async () => {
   const s = setup();

@@ -17,7 +17,7 @@
     "build": "uni build",
     "build:h5": "uni build",
     "build:mp-weixin": "uni build -p mp-weixin",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {

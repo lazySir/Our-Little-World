@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parse, compileScript, compileTemplate } from '@vue/compiler-sfc';
-import { createRenderer, h, proxyRefs } from 'vue';
+import { createRenderer, h, proxyRefs, ref } from 'vue';
 import ts from 'typescript';
 import * as domain from '../src/lib/domain';
 import type { Baby } from '../src/types';
@@ -59,7 +59,11 @@ const renderer = createRenderer<any, any>({
 });
 
 // Compile the real page and resource composable. Only platform hooks and network I/O are replaced.
-function setup(initial: Baby | null = existing) {
+function setup(
+  initial: Baby | null = existing,
+  calendarSource: { kind: 'baby' | 'growth'; sourceId: string } | undefined = undefined,
+  growthRecords: any[] = [],
+) {
   let stored = structuredClone(initial);
   const requests: { path: string; method: string; data?: any }[] = [];
   const notices: string[] = [];
@@ -74,7 +78,7 @@ function setup(initial: Baby | null = existing) {
     async request(path: string, method = 'GET', data?: any) {
       requests.push({ path, method, data: data === undefined ? undefined : structuredClone(data) });
       if (path === '/baby') return method === 'GET' ? api.readBaby() : api.putBaby(data);
-      return method === 'GET' ? [] : { id: 'growth-saved', ...data };
+      return method === 'GET' ? structuredClone(growthRecords) : { id: 'growth-saved', ...data };
     },
     notify(message: string) {
       notices.push(message);
@@ -120,6 +124,9 @@ function setup(initial: Baby | null = existing) {
     '../../lib/useResource': resource,
     '../../lib/api': api,
     '../../lib/domain': domain,
+    '../../lib/calendar-source': {
+      useCalendarSource: () => ({ calendarSource: ref(calendarSource), clearCalendarSource() {} }),
+    },
   });
   const view = page.default.setup({}, { expose() {} });
   const template = compileTemplate({
@@ -281,6 +288,28 @@ test('retrying a confirmed null profile permits normal creation', async () => {
       },
     ],
   );
+});
+
+test('a deleted baby birthday source does not reopen profile creation or the growth list', async () => {
+  const s = setup(null, { kind: 'baby', sourceId: 'deleted-baby' }, [
+    {
+      id: 'growth-existing',
+      title: '普通成长记录',
+      date: '2025-01-02',
+      type: 'milestone',
+      content: '不应出现在生日来源页',
+      assets: [],
+    },
+  ]);
+  await s.show();
+  const rendered = textOf(s.render());
+  assert.equal(s.view.missingCalendarSource.value, true);
+  assert.equal(s.view.sourceUnavailable.value, true);
+  assert.equal(creationIsVisible(s), false);
+  assert.equal(rendered.includes('成长手账打开中…'), false);
+  assert.equal(rendered.includes('普通成长记录'), false);
+  assert.equal(rendered.includes('宝宝相册'), false);
+  assert.equal(rendered.includes('记下一点点长大'), false);
 });
 
 test('a late earlier onShow read cannot replace a newer existing profile with an empty state', async () => {

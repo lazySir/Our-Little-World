@@ -6,11 +6,16 @@
       description="把想去的地方、想吃的东西和想完成的小事，放在同一个小清单里。"
       symbol="✦"
     />
-    <view class="toolbar">
+    <CalendarSourceNotice
+      v-if="calendarSource"
+      :missing="sourceMissing"
+      @clear="clearCalendarSource"
+    />
+    <view v-if="!calendarSource" class="toolbar">
       <input class="search" v-model="query" placeholder="搜索你们想做的事" />
       <wd-button size="small" @click="openNew">＋ 添加</wd-button>
     </view>
-    <view class="chips">
+    <view v-if="!calendarSource" class="chips">
       <button
         v-for="tab in tabs"
         :key="tab.value"
@@ -31,7 +36,7 @@
     <view v-else-if="loading" class="meta" role="status">正在更新清单…</view>
     <template v-if="hasLoaded">
       <view
-        v-for="item in filtered"
+        v-for="item in visibleRecords"
         :key="item.id"
         class="card"
         :class="{ done: item.status === 'done' }"
@@ -71,7 +76,7 @@
         </view>
       </view>
       <EmptyState
-        v-if="!filtered.length"
+        v-if="!calendarSource && !filtered.length"
         symbol="✦"
         title="清单还空着"
         description="先写下一件你们都想做的小事，完成时再把它变成一段回忆。"
@@ -115,6 +120,8 @@ import PageHeading from '../../components/PageHeading.vue';
 import EmptyState from '../../components/EmptyState.vue';
 import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
+import CalendarSourceNotice from '../../components/CalendarSourceNotice.vue';
+import { useCalendarSource } from '../../lib/calendar-source';
 import { useResource } from '../../lib/useResource';
 import { request, notify, navigate } from '../../lib/api';
 import { today } from '../../lib/domain';
@@ -147,6 +154,23 @@ const filtered = computed(() =>
   ),
 );
 const count = (value) => items.value.filter((item) => item.status === value).length;
+const { calendarSource, clearCalendarSource } = useCalendarSource('wish');
+const sourceMissing = computed(() => {
+  const source = calendarSource.value;
+  return Boolean(
+    source &&
+    hasLoaded.value &&
+    !loading.value &&
+    !error.value &&
+    !items.value.some((item) => item.id === source.sourceId),
+  );
+});
+const visibleRecords = computed(() => {
+  const selection = calendarSource.value;
+  if (selection && !sourceMissing.value)
+    return items.value.filter((item) => item.id === selection.sourceId);
+  return sourceMissing.value ? items.value : filtered.value;
+});
 function openNew() {
   editing.value = null;
   Object.assign(form, {

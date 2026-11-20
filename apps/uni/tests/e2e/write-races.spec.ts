@@ -196,8 +196,8 @@ test('uni H5 menu deletion keeps surviving basket quantities and total until the
   await expect(page.locator('uni-modal:visible')).toHaveCount(0);
   await expect(sheet(page)).toBeVisible();
   await expect(firstCard).toHaveCount(1);
-  await expect(firstCard.locator('.quantity')).toHaveText('−2＋');
-  await expect(secondCard.locator('.quantity')).toHaveText('−3＋');
+  await expect(firstCard.locator('.quantity')).toHaveText(/−\s*2\s*＋/);
+  await expect(secondCard.locator('.quantity')).toHaveText(/−\s*3\s*＋/);
   await expect(cart).toContainText('这一顿 · 5 份');
   await expect(cart).toContainText('¥49.75');
   const afterCancel = await request.get(`${api}/menu`, { headers: world.headers });
@@ -210,7 +210,7 @@ test('uni H5 menu deletion keeps surviving basket quantities and total until the
   await removeMenu(page, firstName, first.id);
   await expect(cart).toContainText('这一顿 · 3 份');
   await expect(cart).toContainText('¥24.75');
-  await expect(secondCard.locator('.quantity')).toHaveText('−3＋');
+  await expect(secondCard.locator('.quantity')).toHaveText(/−\s*3\s*＋/);
   await expect(field(cart, '给这一单留个备注').locator('input')).toHaveValue(
     `保留这一单 ${world.marker}`,
   );

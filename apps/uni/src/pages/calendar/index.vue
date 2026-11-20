@@ -39,7 +39,12 @@
             v-for="(date, index) in cells"
             :key="date || `blank-${index}`"
             class="calendar-day"
-            :class="{ blank: !date, today: date && isToday(date), selected: date === selectedDate, 'has-events': date && eventCount(date) }"
+            :class="{
+              blank: !date,
+              today: date && isToday(date),
+              selected: date === selectedDate,
+              'has-events': date && eventCount(date),
+            }"
             :disabled="!date"
             :aria-label="date ? `${date}，${eventCount(date)} 件事件` : undefined"
             :aria-pressed="date ? date === selectedDate : undefined"
@@ -64,11 +69,25 @@
       </view>
       <view v-if="selectedEvents.length">
         <view v-for="event in selectedEvents" :key="event.id" class="card calendar-event">
-          <view class="calendar-event-icon" :class="`event-${event.kind}`">{{ kindSymbols[event.kind] }}</view>
+          <view class="calendar-event-icon" :class="`event-${event.kind}`">{{
+            kindSymbols[event.kind]
+          }}</view>
           <view class="grow">
             <view class="meta">{{ kindLabels[event.kind] }}</view>
-            <view class="card-title">{{ event.title }}<text v-if="event.locked"> · 已封存</text></view>
+            <view class="card-title"
+              >{{ event.title }}<text v-if="event.locked"> · 已封存</text></view
+            >
             <view v-if="event.description" class="card-text">{{ event.description }}</view>
+            <view v-if="hasCalendarSource(event)" class="actions">
+              <wd-button
+                class="calendar-source-action"
+                size="small"
+                plain
+                @click="viewSource(event)"
+              >
+                查看来源
+              </wd-button>
+            </view>
           </view>
         </view>
       </view>
@@ -85,7 +104,8 @@
 import { computed, ref } from 'vue';
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app';
 import PageHeading from '../../components/PageHeading.vue';
-import { request } from '../../lib/api';
+import { notify, request } from '../../lib/api';
+import { hasCalendarSource, openCalendarSource } from '../../lib/calendar-source';
 import { today } from '../../lib/domain';
 import { useSession } from '../../stores/session';
 import type { CalendarData, CalendarEvent, CalendarEventKind } from '../../types';
@@ -134,9 +154,11 @@ const eventsByDate = computed(() => {
 });
 const monthTitle = computed(() => {
   const [year, value] = month.value.split('-').map(Number);
-  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', timeZone: 'UTC' }).format(
-    new Date(Date.UTC(year, value - 1, 1)),
-  );
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, value - 1, 1)));
 });
 const cells = computed(() => {
   const [year, value] = month.value.split('-').map(Number);
@@ -144,7 +166,10 @@ const cells = computed(() => {
   const days = new Date(Date.UTC(year, value, 0)).getUTCDate();
   return [
     ...Array.from({ length: offset }, () => null as string | null),
-    ...Array.from({ length: days }, (_, index) => `${month.value}-${String(index + 1).padStart(2, '0')}`),
+    ...Array.from(
+      { length: days },
+      (_, index) => `${month.value}-${String(index + 1).padStart(2, '0')}`,
+    ),
   ];
 });
 const selectedEvents = computed(() => eventsByDate.value[selectedDate.value] || []);
@@ -186,6 +211,9 @@ function eventCount(date: string) {
 }
 function isToday(date: string) {
   return date === data.value.date;
+}
+function viewSource(event: CalendarEvent) {
+  openCalendarSource(event, () => notify('暂时打不开来源，请重试'));
 }
 onShow(load);
 onPullDownRefresh(load);

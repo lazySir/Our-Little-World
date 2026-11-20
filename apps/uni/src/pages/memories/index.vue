@@ -5,11 +5,15 @@
       title="回忆相册"
       description="照片、文字和日期，慢慢装满你们的时间线。"
       symbol="♡" />
-    <view class="toolbar">
+    <CalendarSourceNotice
+      v-if="calendarSource"
+      :missing="sourceMissing"
+      @clear="clearCalendarSource" />
+    <view v-if="!calendarSource" class="toolbar">
       <input class="search" v-model="query" placeholder="搜索标题或标签" />
       <wd-button size="small" @click="openNew">＋ 写一篇</wd-button>
     </view>
-    <view class="chips">
+    <view v-if="!calendarSource" class="chips">
       <button
         v-for="tab in tabs"
         :key="tab.value"
@@ -29,7 +33,7 @@
     <view v-if="loading && !hasLoaded" class="loading">正在翻开相册…</view>
     <view v-else-if="loading" class="meta" role="status">正在更新相册…</view>
     <template v-if="hasLoaded">
-      <view v-for="item in filtered" :key="item.id" class="card">
+      <view v-for="item in visibleRecords" :key="item.id" class="card">
         <view class="between">
           <view class="card-title">{{ item.title }}</view>
           <view class="meta">{{ item.date }}</view>
@@ -55,7 +59,7 @@
         </view>
       </view>
       <EmptyState
-        v-if="!filtered.length"
+        v-if="!calendarSource && !filtered.length"
         symbol="♡"
         title="还没有被收藏的日子"
         description="一张照片、一句话，就可以开始你们的回忆时间线。"
@@ -97,6 +101,8 @@ import PageHeading from '../../components/PageHeading.vue';
 import EmptyState from '../../components/EmptyState.vue';
 import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
+import CalendarSourceNotice from '../../components/CalendarSourceNotice.vue';
+import { useCalendarSource } from '../../lib/calendar-source';
 import PhotoPicker from '../../components/PhotoPicker.vue';
 import { useResource } from '../../lib/useResource';
 import { assetUrl, previewPhotos } from '../../lib/api';
@@ -131,6 +137,23 @@ const filtered = computed(() =>
         .includes(query.value.toLowerCase()),
   ),
 );
+const { calendarSource, clearCalendarSource } = useCalendarSource('memory');
+const sourceMissing = computed(() => {
+  const source = calendarSource.value;
+  return Boolean(
+    source &&
+    hasLoaded.value &&
+    !loading.value &&
+    !error.value &&
+    !items.value.some((item) => item.id === source.sourceId),
+  );
+});
+const visibleRecords = computed(() => {
+  const selection = calendarSource.value;
+  if (selection && !sourceMissing.value)
+    return items.value.filter((item) => item.id === selection.sourceId);
+  return sourceMissing.value ? items.value : filtered.value;
+});
 function openNew() {
   editing.value = null;
   tagsText.value = '';

@@ -5,12 +5,20 @@
       title="宝宝成长"
       description="可选的小家庭档案，收藏每一个慢慢长大的瞬间。"
       symbol="⌂" />
-    <view v-if="babyLoading" class="loading">宝宝档案打开中…</view>
-    <view v-else-if="babyError" class="error-box">
+    <CalendarSourceNotice
+      v-if="calendarSource"
+      :missing="missingCalendarSource"
+      @clear="clearCalendarSource" />
+    <view v-if="!sourceUnavailable && !focusedGrowth && babyLoading" class="loading">宝宝档案打开中…</view>
+    <view v-else-if="!sourceUnavailable && !focusedGrowth && babyError" class="error-box">
       <view>{{ babyError }}</view>
       <wd-button size="small" plain @click="loadBaby">重试宝宝档案</wd-button>
     </view>
-    <view v-else-if="babyReady && baby" class="hero" style="min-height: 220rpx">
+    <view
+      v-else-if="!sourceUnavailable && !focusedGrowth && babyReady && visibleBaby"
+      class="hero"
+      style="min-height: 220rpx"
+    >
       <view class="row">
         <image
           v-if="baby.asset || baby.avatar"
@@ -40,14 +48,14 @@
       <view v-if="baby.notes" class="card-text">{{ baby.notes }}</view>
     </view>
     <EmptyState
-      v-else-if="babyReady"
+      v-else-if="!sourceUnavailable && babyReady && !sourceActive"
       symbol="☻"
       title="还没有宝宝档案"
       description="现在或未来有需要时，再为宝宝建一个温柔的小档案。"
       action="建立宝宝档案"
       @action="editBaby" />
     <view
-      v-if="hasLoaded && (albumPhotos.length || (babyReady && baby))"
+      v-if="!sourceUnavailable && !sourceActive && hasLoaded && (albumPhotos.length || (babyReady && baby))"
       class="baby-album"
       aria-labelledby="baby-album-title"
     >
@@ -85,12 +93,12 @@
         description="在成长记录中添加照片，它们会自动收进这里。"
       />
     </view>
-    <GrowthChart v-if="hasLoaded" ref="growthChart" :records="items" />
-    <view class="toolbar">
+    <GrowthChart v-if="!sourceUnavailable && !sourceActive && hasLoaded" ref="growthChart" :records="items" />
+    <view v-if="!sourceUnavailable && !sourceActive" class="toolbar">
       <input class="search" v-model="query" placeholder="搜索成长记录" />
       <wd-button size="small" @click="openNew">＋ 记录</wd-button>
     </view>
-    <view class="chips">
+    <view v-if="!sourceUnavailable && !sourceActive" class="chips">
       <button
         class="chip ui-reset"
         :class="{ active: filter === 'all' }"
@@ -111,15 +119,22 @@
         {{ option.label }}
       </button>
     </view>
-    <view class="note">这里只记录家庭日常；身高、体重、喂养和健康备注都可以按需要选填。</view>
-    <view v-if="error" class="error-box">
+    <view v-if="!sourceUnavailable && !sourceActive" class="note"
+      >这里只记录家庭日常；身高、体重、喂养和健康备注都可以按需要选填。</view
+    >
+    <view v-if="!sourceUnavailable && !focusedBaby && error" class="error-box">
       <view>{{ error }}</view>
       <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
     </view>
-    <view v-if="loading && !hasLoaded" class="loading">成长手账打开中…</view>
-    <view v-else-if="loading" class="meta" role="status">正在更新成长记录…</view>
-    <template v-if="hasLoaded">
-      <view v-for="item in filtered" :key="item.id" class="timeline-item" style="margin-top: 28rpx">
+    <view v-if="!sourceUnavailable && !focusedBaby && loading && !hasLoaded" class="loading">成长手账打开中…</view>
+    <view v-else-if="!sourceUnavailable && !focusedBaby && loading" class="meta" role="status">正在更新成长记录…</view>
+    <template v-if="!sourceUnavailable && !focusedBaby && hasLoaded">
+      <view
+        v-for="item in visibleRecords"
+        :key="item.id"
+        class="timeline-item"
+        style="margin-top: 28rpx"
+      >
         <view class="timeline-dot" />
         <view class="meta" style="margin: 0 0 14rpx"
           >{{ item.date }} · {{ typeLabel(item.type) }}</view
@@ -153,7 +168,7 @@
         </view>
       </view>
       <EmptyState
-        v-if="!loading && !filtered.length"
+        v-if="!sourceUnavailable && !sourceActive && !loading && !filtered.length"
         symbol="✿"
         title="每一次长大，都值得收藏"
         description="记一记身高、第一次翻身，或者今天安睡的小模样。"
@@ -232,6 +247,8 @@ import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
 import PhotoPicker from '../../components/PhotoPicker.vue';
 import GrowthChart from '../../components/GrowthChart.vue';
+import CalendarSourceNotice from '../../components/CalendarSourceNotice.vue';
+import { useCalendarSource } from '../../lib/calendar-source';
 import { useResource } from '../../lib/useResource';
 import { request, notify, assetUrl, previewPhotos } from '../../lib/api';
 import { today, daysBetween } from '../../lib/domain';
@@ -285,6 +302,42 @@ const filtered = computed(() =>
         `${x.title} ${x.content || ''}`.includes(query.value),
     )
     .sort((a, b) => b.date.localeCompare(a.date)),
+);
+const { calendarSource, clearCalendarSource } = useCalendarSource('baby', 'growth');
+const missingCalendarSource = computed(() => {
+  const source = calendarSource.value;
+  if (!source) return false;
+  if (source.kind === 'baby') {
+    return (
+      babyReady.value &&
+      !babyLoading.value &&
+      !babyError.value &&
+      baby.value?.id !== source.sourceId
+    );
+  }
+  return (
+    source.kind === 'growth' &&
+    hasLoaded.value &&
+    !loading.value &&
+    !error.value &&
+    !items.value.some((item) => item.id === source.sourceId)
+  );
+});
+const sourceActive = computed(() => Boolean(calendarSource.value && !missingCalendarSource.value));
+const sourceUnavailable = computed(
+  () => missingCalendarSource.value && calendarSource.value?.kind === 'baby',
+);
+const focusedBaby = computed(() => sourceActive.value && calendarSource.value?.kind === 'baby');
+const focusedGrowth = computed(() => sourceActive.value && calendarSource.value?.kind === 'growth');
+const visibleBaby = computed(() =>
+  focusedBaby.value && baby.value?.id !== calendarSource.value?.sourceId ? null : baby.value,
+);
+const visibleRecords = computed(() =>
+  focusedGrowth.value
+    ? items.value.filter((item) => item.id === calendarSource.value?.sourceId)
+    : missingCalendarSource.value && calendarSource.value?.kind === 'growth'
+      ? items.value
+      : filtered.value,
 );
 const albumPhotos = computed(() => collectBabyAlbumPhotos(items.value));
 const typeLabel = (value) => types.find((x) => x.value === value)?.label || value;

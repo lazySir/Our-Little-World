@@ -259,6 +259,9 @@ function setupPage(previewPhotos = () => {}) {
         previewPhotos,
       },
       '../../lib/domain': domain,
+      '../../lib/calendar-source': {
+        useCalendarSource: () => ({ calendarSource: ref(undefined), clearCalendarSource() {} }),
+      },
     },
   );
   return { ...page, resource, shows, resizes };

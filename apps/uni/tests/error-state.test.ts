@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { compileScript, compileTemplate, parse } from '@vue/compiler-sfc';
-import { proxyRefs } from 'vue';
+import { proxyRefs, ref } from 'vue';
 import ts from 'typescript';
 import * as domain from '../src/lib/domain';
 
@@ -69,6 +69,9 @@ function setup(page: string, endpoint: string) {
     '../../lib/useResource': resource,
     '@dcloudio/uni-app': platform,
     '@our-little-world/shared/baby-album': require('@our-little-world/shared/baby-album'),
+    '../../lib/calendar-source': {
+      useCalendarSource: () => ({ calendarSource: ref(undefined), clearCalendarSource() {} }),
+    },
   }).default;
   const template = compileTemplate({
     source: descriptor.template!.content,

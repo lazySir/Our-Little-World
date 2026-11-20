@@ -27,6 +27,7 @@ function component(file: string, props: any = {}, dependencies: Record<string, a
   const descriptor = parse(readFileSync(filename, 'utf8'), { filename }).descriptor;
   const script = compileScript(descriptor, { id: 'growth-chart-test' });
   const deps = {
+    '../composables/record-focus': { useRecordFocus: () => () => {} },
     'vue-echarts': {},
     'echarts/core': { use() {} },
     'echarts/charts': { LineChart: {} },
@@ -183,14 +184,20 @@ test('Web baby album shows each attached photo once in newest record order', () 
       date: '2026-11-01',
       title: '第一次抬头',
       type: 'milestone',
-      assets: [{ id: 'shared', url: '/shared' }, { id: 'older-photo', url: '/older' }],
+      assets: [
+        { id: 'shared', url: '/shared' },
+        { id: 'older-photo', url: '/older' },
+      ],
     },
     {
       id: 'newer',
       date: '2026-11-03',
       title: '今天会笑了',
       type: 'milestone',
-      assets: [{ id: 'shared', url: '/shared' }, { id: 'new-photo', url: '/new' }],
+      assets: [
+        { id: 'shared', url: '/shared' },
+        { id: 'new-photo', url: '/new' },
+      ],
     },
   ]);
   const s = component(

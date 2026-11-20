@@ -238,6 +238,60 @@ test('uni H5 edits, completes and reopens a categorized wish without losing its 
   await page.screenshot({ path: 'test-results/daily-details-h5-wish.png', fullPage: true });
 });
 
+test('uni H5 opens a calendar wish in its tab despite the current search filter', async ({
+  page,
+  request,
+  world,
+}) => {
+  const title = '一起去山顶看日出 ' + world.marker;
+  const now = new Date();
+  const targetDate = [now.getFullYear(), now.getMonth() + 1, 12]
+    .map((part) => String(part).padStart(2, '0'))
+    .join('-');
+  const created = await request.post(api + '/wishes', {
+    headers: world.headers,
+    data: { title, category: 'travel', targetDate },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+
+  const current = () => page.locator('.page:visible').last();
+  const wish = () => current().locator('.card').filter({ hasText: title });
+  const search = current().locator('.toolbar .search input');
+  await page.locator('uni-tabbar').getByText('一起做', { exact: true }).click();
+  await expect(current().locator('.title')).toHaveText('一起做');
+  await expect(wish()).toBeVisible();
+  const filter = '排除这条愿望的查询';
+  await search.fill(filter);
+  await expect(wish()).toHaveCount(0);
+
+  await page.locator('uni-tabbar').getByText('我们', { exact: true }).click();
+  await expect(current().locator('.title')).toHaveText('我们的日常');
+  await current().locator('.feature').filter({ hasText: '共享日历' }).click();
+  await expect(current().locator('.title')).toHaveText('共享日历');
+  await current()
+    .locator('.calendar-day[aria-label^="' + targetDate + '，"]')
+    .click();
+  const event = current().locator('.calendar-event').filter({ hasText: title });
+  await expect(event.getByText('查看来源', { exact: true })).toBeVisible();
+  await press(event, '查看来源');
+
+  await expect(page).toHaveURL((url) => url.hash === '#/pages/wishes/index');
+  await expect(current().getByText('来自共享日历', { exact: true })).toBeVisible();
+  await expect(wish()).toBeVisible();
+  await expect(wish()).toContainText(targetDate);
+  await expect(sheet(page)).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(390);
+  await press(current(), '查看全部');
+  await expect(current().getByText('来自共享日历', { exact: true })).toHaveCount(0);
+  await expect(search).toHaveValue(filter);
+  await expect(wish()).toHaveCount(0);
+  await search.fill('');
+  await expect(wish()).toBeVisible();
+  expect(world.errors).toEqual([]);
+});
+
 test('uni H5 searches an edited memory by its new tags and stops matching the removed tag', async ({
   page,
   request,

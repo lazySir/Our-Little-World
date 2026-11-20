@@ -6,7 +6,12 @@
       description="有些话，留到未来的某一天，再一起打开。"
       symbol="✉"
     />
-    <view class="toolbar">
+    <CalendarSourceNotice
+      v-if="calendarSource"
+      :missing="sourceMissing"
+      @clear="clearCalendarSource"
+    />
+    <view v-if="!calendarSource" class="toolbar">
       <view class="muted grow">锁住的信件，到期后才能读</view>
       <wd-button size="small" @click="openNew">＋ 写封信</wd-button>
     </view>
@@ -16,7 +21,7 @@
     </view>
     <view v-if="loading && !hasLoaded" class="loading">未来的信箱打开中…</view>
     <view v-else-if="loading" class="meta" role="status">正在更新信箱…</view>
-    <view v-for="item in items" :key="item.id" class="card letter">
+    <view v-for="item in visibleRecords" :key="item.id" class="card letter">
       <view class="row">
         <view class="lock-symbol">{{ item.isLocked ? '▣' : '✉' }}</view>
         <view class="grow">
@@ -45,7 +50,7 @@
       </view>
     </view>
     <EmptyState
-      v-if="hasLoaded && !loading && !items.length"
+      v-if="!calendarSource && hasLoaded && !loading && !items.length"
       symbol="✉"
       title="寄一封信给未来吧"
       description="今天的期待、想说的情话，或者下一周年想实现的约定。"
@@ -88,11 +93,13 @@
   </view>
 </template>
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import PageHeading from '../../components/PageHeading.vue';
 import EmptyState from '../../components/EmptyState.vue';
 import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
+import CalendarSourceNotice from '../../components/CalendarSourceNotice.vue';
+import { useCalendarSource } from '../../lib/calendar-source';
 import { useResource } from '../../lib/useResource';
 import { today, daysBetween } from '../../lib/domain';
 const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
@@ -108,6 +115,23 @@ function tomorrow() {
   d.setDate(d.getDate() + 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+const { calendarSource, clearCalendarSource } = useCalendarSource('letter');
+const sourceMissing = computed(() => {
+  const source = calendarSource.value;
+  return Boolean(
+    source &&
+    hasLoaded.value &&
+    !loading.value &&
+    !error.value &&
+    !items.value.some((item) => item.id === source.sourceId),
+  );
+});
+const visibleRecords = computed(() => {
+  const selection = calendarSource.value;
+  return selection && !sourceMissing.value
+    ? items.value.filter((item) => item.id === selection.sourceId)
+    : items.value;
+});
 function openNew() {
   editing.value = null;
   Object.assign(form, { title: '', content: '', unlockDate: tomorrow(), recipient: 'both' });

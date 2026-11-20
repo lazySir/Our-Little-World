@@ -39,6 +39,22 @@ const kindIcons: Record<CalendarEventKind, string> = {
   growth: 'work',
   baby: 'baby',
 };
+const sourcePaths: Record<CalendarEventKind, string> = {
+  anniversary: '/anniversaries',
+  wish: '/wishes',
+  letter: '/letters',
+  memory: '/memories',
+  growth: '/baby',
+  baby: '/baby',
+};
+function sourceLink(event: CalendarEvent) {
+  const path = sourcePaths[event.kind];
+  if (!event.sourceId || !path) return;
+  return {
+    path,
+    query: { record: event.sourceId, ...(event.kind === 'baby' ? { source: 'baby' } : {}) },
+  };
+}
 const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
 
 const monthTitle = computed(() => {
@@ -163,6 +179,14 @@ onMounted(load);
               <span class="calendar-event-kind">{{ kindLabels[event.kind] }}</span>
               <h4>{{ event.title }} <AppIcon v-if="event.locked" name="lock" :size="13" /></h4>
               <p v-if="event.description">{{ event.description }}</p>
+              <router-link
+                v-if="sourceLink(event)"
+                :to="sourceLink(event)!"
+                :aria-label="'查看来源：' + event.title"
+                class="text-link mt-2 inline-flex min-h-6"
+              >
+                查看来源 <AppIcon name="arrow" :size="13" />
+              </router-link>
             </div>
           </article>
         </div>

@@ -29,7 +29,7 @@ const textOf = (node: any): string =>
         ? node
         : '';
 
-function setup() {
+function setup(options: { kind?: string; records?: any[]; record?: string } = {}) {
   const wish = {
     id: 'wish-sunset',
     title: '一起看日落',
@@ -46,6 +46,9 @@ function setup() {
   }[] = [];
   const successes: string[] = [];
   const errors: string[] = [];
+  const props = { kind: options.kind ?? 'wishes', recordId: options.record };
+  const loading = ref(false);
+  const error = ref('');
   const filename = fileURLToPath(new URL('../src/pages/ResourcePage.vue', import.meta.url));
   const descriptor = parse(readFileSync(filename, 'utf8'), { filename }).descriptor;
   const script = compileScript(descriptor, { id: 'wish-memory-test' });
@@ -59,7 +62,7 @@ function setup() {
         compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
       }).outputText,
     )(
-      (name: string) => dependencies[name] || (name.endsWith('.vue') ? {} : require(name)),
+      (name: string) => dependencies[name] || (name.endsWith('.vue') ? name : require(name)),
       module,
       module.exports,
     );
@@ -75,11 +78,13 @@ function setup() {
     },
     '../domain': domain,
     '../stores/session': { useSession: () => ({ user: { id: 'owner' } }) },
+    '../composables/record-focus': { useRecordFocus: () => () => {} },
+    '../components/CalendarSourceStatus.vue': 'CalendarSourceStatus',
     '../composables/resource': {
       useResource: () => ({
-        items: ref([wish]),
-        loading: ref(false),
-        error: ref(''),
+        items: ref(options.records ?? [wish]),
+        loading,
+        error,
         saving: ref(false),
         load() {},
         save() {},
@@ -92,7 +97,7 @@ function setup() {
         error: (message: string) => errors.push(message),
       },
     },
-  }).default.setup({ kind: 'wishes' }, { expose() {} });
+  }).default.setup(props, { expose() {} });
   const template = compileTemplate({
     source: descriptor.template!.content,
     filename,
@@ -111,17 +116,58 @@ function setup() {
       withDirectives: (node: any) => node,
     },
   }).render;
-  const props = { kind: 'wishes' };
   const context = proxyRefs({ ...view, ...props });
+  const rendered = () => nodes(render(context, [], props, context));
   function action() {
-    const button = nodes(render(context, [], props, context)).find(
+    const button = rendered().find(
       (node) => node.type === 'el-button' && textOf(node).includes('收藏为回忆'),
     );
     assert.ok(button, 'The real wish template must render the conversion action');
     return button;
   }
-  return { wish, writes, successes, errors, action };
+  return { wish, writes, successes, errors, action, rendered, loading, error, view };
 }
+
+test('a calendar link shows the chosen locked letter outside filters without opening its editor', () => {
+  const s = setup({
+    kind: 'letters',
+    record: 'locked',
+    records: [
+      { id: 'open', title: '已经打开', isLocked: false, authorId: 'owner' },
+      {
+        id: 'locked',
+        title: '给未来的我们',
+        isLocked: true,
+        authorId: 'partner',
+        unlockDate: '2099-11-20',
+        content: '受保护的正文',
+      },
+    ],
+  });
+  s.view.tab.value = 'open';
+  s.view.query.value = '已经打开';
+  const cards = s.rendered().filter((node) => node.type === 'article');
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].props['data-record-id'], 'locked');
+  assert.match(textOf(cards[0]), /给未来的我们/);
+  assert.match(textOf(cards[0]), /未到解锁日/);
+  assert.doesNotMatch(textOf(cards[0]), /受保护的正文/);
+  assert.equal(s.view.dialog.value, false);
+});
+
+test('a missing source warning waits for a successful list read', () => {
+  const s = setup({ record: 'removed' });
+  s.loading.value = true;
+  const hasWarning = () =>
+    s.rendered().some((node) => node.type === 'CalendarSourceStatus' && node.props.missing);
+  assert.equal(hasWarning(), false);
+  s.loading.value = false;
+  s.error.value = '网络错误';
+  assert.equal(hasWarning(), false);
+  s.error.value = '';
+  assert.equal(hasWarning(), true);
+  assert.match(textOf(s.rendered().find((node) => node.type === 'article')), /一起看日落/);
+});
 
 test('a delayed Web wish conversion shows progress and a double click writes and notifies once', async () => {
   const s = setup();

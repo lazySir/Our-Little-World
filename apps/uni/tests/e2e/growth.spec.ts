@@ -348,11 +348,7 @@ test('uni H5 keeps real independent growth measurements through touch, CRUD, fil
     await expectPoints(page, heights);
     await expectSummary(page, '身高', 'cm', heights);
     await currentPage(page).locator('.search input').fill('');
-    await currentPage(page)
-      .locator('.chips > .chip')
-      .filter({ hasText: /^全部$/ })
-      .first()
-      .click();
+    await currentPage(page).locator('.chips > .chip[aria-label="全部记录"]').click();
 
     // Edit through the existing UI and verify the actual persisted result before reloading.
     const uiCard = currentPage(page)

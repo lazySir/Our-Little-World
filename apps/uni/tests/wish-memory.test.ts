@@ -102,6 +102,9 @@ function setup(
         remove() {},
       }),
     },
+    '../../lib/calendar-source': {
+      useCalendarSource: () => ({ calendarSource: ref(undefined), clearCalendarSource() {} }),
+    },
   }).default.setup({}, { expose() {} });
   const template = compileTemplate({
     source: descriptor.template!.content,

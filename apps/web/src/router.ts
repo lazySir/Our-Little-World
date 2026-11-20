@@ -1,5 +1,8 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router';
 import { useSession } from './stores/session';
+const recordProps = (route: RouteLocationNormalized) => ({
+  recordId: typeof route.query.record === 'string' ? route.query.record : undefined,
+});
 const router = createRouter({
   history: createWebHistory(),
   scrollBehavior: () => ({ top: 0 }),
@@ -9,6 +12,7 @@ const router = createRouter({
     {
       path: '/wishes',
       component: () => import('./pages/WishesPage.vue'),
+      props: recordProps,
       meta: { title: '一起做' },
     },
     {
@@ -24,11 +28,13 @@ const router = createRouter({
     {
       path: '/memories',
       component: () => import('./pages/MemoriesPage.vue'),
+      props: recordProps,
       meta: { title: '回忆相册' },
     },
     {
       path: '/anniversaries',
       component: () => import('./pages/AnniversariesPage.vue'),
+      props: recordProps,
       meta: { title: '纪念日' },
     },
     {
@@ -36,11 +42,17 @@ const router = createRouter({
       component: () => import('./pages/CalendarPage.vue'),
       meta: { title: '共享日历' },
     },
-    { path: '/baby', component: () => import('./pages/BabyPage.vue'), meta: { title: '宝宝成长' } },
+    {
+      path: '/baby',
+      component: () => import('./pages/BabyPage.vue'),
+      props: (route) => ({ ...recordProps(route), profileSource: route.query.source === 'baby' }),
+      meta: { title: '宝宝成长' },
+    },
     { path: '/work', component: () => import('./pages/WorkPage.vue'), meta: { title: '工作手记' } },
     {
       path: '/letters',
       component: () => import('./pages/LettersPage.vue'),
+      props: recordProps,
       meta: { title: '时光信箱' },
     },
     {

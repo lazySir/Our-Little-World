@@ -42,6 +42,9 @@ function setup(t: any) {
   const dependencies = {
     '../../lib/useResource': { useResource: () => resource },
     '../../lib/domain': domain,
+    '../../lib/calendar-source': {
+      useCalendarSource: () => ({ calendarSource: ref(undefined), clearCalendarSource() {} }),
+    },
   };
   const module = { exports: {} as any };
   new Function('require', 'module', 'exports', output)(

@@ -1,4 +1,5 @@
 <script setup lang="ts">
 import ResourcePage from './ResourcePage.vue';
+defineProps<{ recordId?: string }>();
 </script>
-<template><ResourcePage kind="wishes" /></template>
+<template><ResourcePage kind="wishes" :record-id="recordId" /></template>
