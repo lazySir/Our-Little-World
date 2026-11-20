@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import AdmZip from 'adm-zip';
+import { createPrismaClient } from './db/client';
 import type { PrismaClient } from './db/client';
 import { Controller, Get, Post, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -102,61 +103,68 @@ export function makeBackupController({ db, assets, route, mutex }: BackupContext
         zipEntries: assetStats._count._all + 3,
         expandedBytes: Number(entryStats[0].bytes) + (assetStats._sum.size || 0),
       });
-      const data = await dataset(db, user, true);
-      const dataBytes = Buffer.from(JSON.stringify(data));
-      const missingAssets: { id: string; filename: string }[] = [];
-      const damagedAssets: {
-        id: string;
-        filename: string;
-        expectedSize: number;
-        actualSize: number;
-      }[] = [];
-      const files: { filename: string; source: string; size: number }[] = [];
-      let expandedBytes = dataBytes.length;
-      assertBackupBudget({ expandedBytes });
-      // Inspect every attachment before reading any attachment into memory.
-      for (const asset of data.assets) {
-        if (!safeFilename.test(asset.filename)) fail(500, '附件文件名无效');
-        const source = path.join(assets.directory, asset.filename);
-        try {
-          const stat = await fs.stat(source);
-          assertBackupBudget({ assetBytes: stat.size });
-          if (stat.size !== asset.size) {
-            if (!allowMissingAssets) fail(409, '照片文件大小与记录不一致，请先恢复完整备份');
-            damagedAssets.push({
-              id: asset.id,
-              filename: asset.filename,
-              expectedSize: asset.size,
-              actualSize: stat.size,
-            });
-          }
-          expandedBytes += stat.size;
-          assertBackupBudget({ expandedBytes });
-          files.push({ filename: asset.filename, source, size: stat.size });
-        } catch (error: any) {
-          if (!allowMissingAssets && error.code === 'ENOENT')
-            fail(409, '有照片文件缺失，请先使用以前保存的完整备份恢复，再重新备份');
-          if (!allowMissingAssets || error.code !== 'ENOENT') throw error;
-          missingAssets.push({ id: asset.id, filename: asset.filename });
-        }
-      }
-      const manifestBytes = Buffer.from(
-        JSON.stringify({
-          product: 'our-little-world',
-          version: VERSION,
-          createdAt: data.exportedAt,
-          format: 'logical-sqlite',
-          complete: missingAssets.length === 0 && damagedAssets.length === 0,
-          missingAssets,
-          damagedAssets,
-        }),
-      );
-      expandedBytes += manifestBytes.length;
-      assertBackupBudget({ expandedBytes });
       // SQLite snapshot plus logical data supports direct offline recovery.
       const snapshot = path.join(config.storage, `snapshot-${crypto.randomUUID()}.db`);
       try {
         await db.$executeRawUnsafe(`VACUUM INTO '${snapshot.replace(/'/g, "''")}'`);
+        const snapshotDb = createPrismaClient(`file:${snapshot.replace(/\\/g, '/')}`);
+        let data: any;
+        try {
+          await snapshotDb.$connect();
+          data = await dataset(snapshotDb, user, true);
+        } finally {
+          await snapshotDb.$disconnect();
+        }
+        const dataBytes = Buffer.from(JSON.stringify(data));
+        const missingAssets: { id: string; filename: string }[] = [];
+        const damagedAssets: {
+          id: string;
+          filename: string;
+          expectedSize: number;
+          actualSize: number;
+        }[] = [];
+        const files: { filename: string; source: string; size: number }[] = [];
+        let expandedBytes = dataBytes.length;
+        assertBackupBudget({ expandedBytes });
+        // Inspect every attachment before reading any attachment into memory.
+        for (const asset of data.assets) {
+          if (!safeFilename.test(asset.filename)) fail(500, '附件文件名无效');
+          const source = path.join(assets.directory, asset.filename);
+          try {
+            const stat = await fs.stat(source);
+            assertBackupBudget({ assetBytes: stat.size });
+            if (stat.size !== asset.size) {
+              if (!allowMissingAssets) fail(409, '照片文件大小与记录不一致，请先恢复完整备份');
+              damagedAssets.push({
+                id: asset.id,
+                filename: asset.filename,
+                expectedSize: asset.size,
+                actualSize: stat.size,
+              });
+            }
+            expandedBytes += stat.size;
+            assertBackupBudget({ expandedBytes });
+            files.push({ filename: asset.filename, source, size: stat.size });
+          } catch (error: any) {
+            if (!allowMissingAssets && error.code === 'ENOENT')
+              fail(409, '有照片文件缺失，请先使用以前保存的完整备份恢复，再重新备份');
+            if (!allowMissingAssets || error.code !== 'ENOENT') throw error;
+            missingAssets.push({ id: asset.id, filename: asset.filename });
+          }
+        }
+        const manifestBytes = Buffer.from(
+          JSON.stringify({
+            product: 'our-little-world',
+            version: VERSION,
+            createdAt: data.exportedAt,
+            format: 'logical-sqlite',
+            complete: missingAssets.length === 0 && damagedAssets.length === 0,
+            missingAssets,
+            damagedAssets,
+          }),
+        );
+        expandedBytes += manifestBytes.length;
+        assertBackupBudget({ expandedBytes });
         expandedBytes += (await fs.stat(snapshot)).size;
         assertBackupBudget({ expandedBytes });
         const zip = new AdmZip();

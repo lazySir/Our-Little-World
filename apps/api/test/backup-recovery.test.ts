@@ -190,6 +190,55 @@ test('the SQLite adapter writes and reads DateTime values as epoch milliseconds'
   }
 });
 
+test('backup logical data and SQLite snapshot cannot diverge during concurrent writes', async () => {
+  const { createPrismaClient } = await import('../src/db/client');
+  await upload('#bcdaee');
+  const writes: Promise<any>[] = [];
+  const backups: Promise<any>[] = [];
+  const requests = Array.from({ length: 11 }, (_, index) => {
+    if (index % 2 === 0) {
+      const write = api
+        .post('/api/wishes')
+        .set(auth())
+        .send({ title: `备份并发记录 ${index}` });
+      writes.push(write);
+      return write;
+    }
+    const backup = api.get('/api/backup/download').set(auth()).buffer(true).parse(binary);
+    backups.push(backup);
+    return backup;
+  });
+  const [writeResponses, backupResponses] = await Promise.all([
+    Promise.all(writes),
+    Promise.all(backups),
+  ]);
+  assert.equal(requests.length, 11);
+  assert.ok(writeResponses.every((response: any) => response.status === 201));
+  for (const backup of backupResponses) {
+    assert.equal(backup.status, 200, JSON.stringify(backup.body));
+    const archive = new AdmZip(backup.body);
+    const data = JSON.parse(archive.readAsText('data.json'));
+    const snapshotPath = path.join(directory, `concurrent-${Math.random()}.sqlite`);
+    await writeFile(snapshotPath, archive.readFile('database.sqlite')!);
+    const snapshotDb = createPrismaClient(`file:${snapshotPath.replace(/\\/g, '/')}`);
+    try {
+      const normalize = (value: any) => JSON.parse(JSON.stringify(value));
+      const logicalEntries = data.entries
+        .map(normalize)
+        .sort((a: any, b: any) => a.id.localeCompare(b.id));
+      const snapshotEntries = (await snapshotDb.entry.findMany({
+        where: { spaceId: data.space.id },
+      }))
+        .map(normalize)
+        .sort((a: any, b: any) => a.id.localeCompare(b.id));
+      assert.deepEqual(snapshotEntries, logicalEntries);
+    } finally {
+      await snapshotDb.$disconnect();
+      await unlink(snapshotPath).catch(() => {});
+    }
+  }
+});
+
 test('backup restore preserves legacy SQLite DateTime values at millisecond precision', async () => {
   const { createPrismaClient } = await import('../src/db/client');
   const db = createPrismaClient();
