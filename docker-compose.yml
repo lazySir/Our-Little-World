@@ -17,6 +17,7 @@ services:
       RUST_LOG: info
       AUTO_BACKUP_HOURS: '${AUTO_BACKUP_HOURS:-24}'
       CORS_ORIGINS: '${CORS_ORIGINS:-}'
+      TRUSTED_PROXY_CIDRS: '${TRUSTED_PROXY_CIDRS:-}'
     volumes:
       - world-data:/app/data
       - world-storage:/app/storage

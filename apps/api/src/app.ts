@@ -46,6 +46,7 @@ import { Mutex } from 'async-mutex';
 import { makeBackupController } from './backup';
 import { from, lastValueFrom } from 'rxjs';
 import { prepareSetupToken } from './setup-token';
+import { configureTrustedProxies, createRateLimitMiddleware } from './rate-limit';
 
 class ErrorFilter implements ExceptionFilter {
   catch(error: any, host: ArgumentsHost) {
@@ -82,6 +83,7 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   await db.$queryRawUnsafe('PRAGMA busy_timeout = 5000');
   const setupToken = await prepareSetupToken(db, config.storage, process.env.SETUP_TOKEN);
   const auth = new AuthService(db, setupToken);
+  const rateLimit = createRateLimitMiddleware();
   class AuthGuard implements CanActivate {
     async canActivate(context: ExecutionContext) {
       await auth.authenticate(context.switchToHttp().getRequest());
@@ -249,7 +251,7 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
         provide: 'WORLD_LIFECYCLE',
         useValue: {
           onModuleDestroy: async () => {
-            clearInterval(cleanup);
+            rateLimit.close();
             if (backupTimer) clearInterval(backupTimer);
             await db.$disconnect();
           },
@@ -261,6 +263,7 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
     logger: options.logger === false ? false : ['log', 'error', 'warn'],
     bodyParser: false,
   });
+  configureTrustedProxies(app.getHttpAdapter().getInstance(), process.env.TRUSTED_PROXY_CIDRS);
   app.use(
     helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }),
   );
@@ -298,24 +301,7 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'X-HTTP-Method-Override'],
   });
-  // Short-lived in-memory buckets bound login/setup/join brute force and uploads.
-  const buckets = new Map<string, { count: number; reset: number }>();
-  const cleanup = setInterval(() => {
-    for (const [key, b] of buckets) if (b.reset < Date.now()) buckets.delete(key);
-  }, 60000);
-  cleanup.unref();
-  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const sensitive = /^\/api\/auth\/(login|setup|join)$/.test(req.path);
-    const key = `${req.socket.remoteAddress}:${sensitive ? 'auth' : 'general'}`;
-    let bucket = buckets.get(key);
-    if (!bucket || bucket.reset < Date.now()) {
-      bucket = { count: 0, reset: Date.now() + 60000 };
-      buckets.set(key, bucket);
-    }
-    if (++bucket.count > (sensitive ? 20 : 600))
-      return res.status(429).json({ message: '请求过于频繁，请稍后再试' });
-    next();
-  });
+  app.use(rateLimit);
   app.setGlobalPrefix('api');
   app.useGlobalFilters(new ErrorFilter());
   const webDist = path.resolve(config.root, process.env.WEB_DIST_DIR || 'apps/web/dist');
