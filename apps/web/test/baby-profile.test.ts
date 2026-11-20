@@ -86,10 +86,12 @@ function component(
   }).render;
   return { view, render: () => render(context, [], props, context) };
 }
-function setup(options: { recordId?: string; profileSource?: boolean; growth?: any[] } = {}) {
+function setup(
+  options: { recordId?: string; profileSource?: boolean; growth?: any[]; loading?: boolean } = {},
+) {
   const writes: any[] = [];
   const errors: string[] = [];
-  const growthLoading = ref(false);
+  const growthLoading = ref(options.loading || false);
   const growthError = ref('');
   let mounted!: () => Promise<void>;
   let reads = 0;
@@ -200,6 +202,32 @@ test('the source of a growth event remains visible through an unrelated growth f
   assert.equal(s.view.dialog.value, false);
 });
 
+test('a deleted growth source stays hidden until its read succeeds, then restores the regular growth list', async () => {
+  const s = setup({
+    recordId: 'deleted-growth-record',
+    growth: [{ id: 'remaining-growth-record', type: 'growth', date: '2026-11-19', title: '第一次挥手' }],
+    loading: true,
+  });
+  await s.mount();
+  assert.equal(
+    s.rendered().some((node) => node.props?.['data-record-id'] === 'remaining-growth-record'),
+    false,
+  );
+  assert.equal(s.rendered().some((node) => node.type === 'CalendarSourceStatus'), false);
+
+  s.growthLoading.value = false;
+  const rendered = s.rendered();
+
+  assert.equal(
+    rendered.find((node) => node.type === 'CalendarSourceStatus')?.props.missing,
+    true,
+  );
+  assert.equal(
+    rendered.find((node) => node.props?.['data-record-id'] === 'remaining-growth-record')?.type,
+    'article',
+  );
+});
+
 test('a birthday source offers retry before treating a successfully read missing profile as deleted', async () => {
   const s = setup({ recordId: existing.id, profileSource: true });
   const sourceStatus = () => s.rendered().find((node) => node.type === 'CalendarSourceStatus');
@@ -242,8 +270,11 @@ test('a source marker without a record ID opens the regular growth page', async 
   );
 });
 
-test('a failed growth source keeps its retry without showing unrelated baby panels', async () => {
-  const s = setup({ recordId: 'growth-record' });
+test('a failed growth source keeps its retry without showing unrelated records or baby panels', async () => {
+  const s = setup({
+    recordId: 'growth-record',
+    growth: [{ id: 'unrelated-growth-record', type: 'growth', date: '2026-11-20', title: '无关记录' }],
+  });
   await s.mount();
   s.growthError.value = '成长记录暂时无法读取';
   const rendered = s.rendered();
@@ -257,6 +288,10 @@ test('a failed growth source keeps its retry without showing unrelated baby pane
   );
   assert.equal(
     rendered.some((node) => node.props?.['data-record-id'] === existing.id),
+    false,
+  );
+  assert.equal(
+    rendered.some((node) => node.props?.['data-record-id'] === 'unrelated-growth-record'),
     false,
   );
   assert.equal(

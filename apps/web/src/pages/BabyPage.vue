@@ -43,14 +43,19 @@ const form = reactive<any>({
   durationMinutes: null,
   assetIds: [],
 });
+const regularFiltered = computed(() =>
+  [...items.value]
+    .filter((i) => tab.value === 'all' || i.type === tab.value)
+    .sort((a, b) => b.date.localeCompare(a.date)),
+);
 const filtered = computed(() =>
   sourceIsGrowth.value
     ? sourceGrowth.value
       ? [sourceGrowth.value]
-      : []
-    : [...items.value]
-        .filter((i) => tab.value === 'all' || i.type === tab.value)
-        .sort((a, b) => b.date.localeCompare(a.date)),
+      : sourceReady.value
+        ? regularFiltered.value
+        : []
+    : regularFiltered.value,
 );
 const editorBusy = computed(() => uploading.value || saving.value);
 const profileBusy = computed(() => profileUploading.value || profileSaving.value);
