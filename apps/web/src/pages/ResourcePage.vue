@@ -276,12 +276,13 @@ async function convertToMemory(item) {
   <LoadState :loading="loading" :error="error" @retry="load">
     <CalendarSourceStatus v-if="sourceReady" :path="config.path" :missing="!sourceRecord" />
     <div v-if="!sourceRecord && (!recordId || sourceReady)" class="toolbar">
-      <div class="filter-tabs">
+      <div class="filter-tabs" role="group" aria-label="记录筛选">
         <button
           v-for="item in config.tabs"
           :key="item.key"
           class="filter-tab"
           :class="{ active: tab === item.key }"
+          :aria-pressed="tab === item.key"
           @click="tab = item.key"
         >
           {{ item.label

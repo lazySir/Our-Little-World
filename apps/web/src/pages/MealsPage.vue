@@ -209,12 +209,13 @@ onMounted(fetchOrders);
     </div></PageHeader
   ><LoadState :loading="loading" :error="error" @retry="load"
     ><div class="toolbar">
-      <div class="filter-tabs">
+      <div class="filter-tabs" role="group" aria-label="菜单筛选">
         <button
           v-for="[key, label] in tabs"
           :key="key"
           class="filter-tab"
           :class="{ active: tab === key }"
+          :aria-pressed="tab === key"
           @click="tab = key"
         >
           {{ label

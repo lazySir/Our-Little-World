@@ -78,6 +78,7 @@ async function choose(event: Event) {
         ><AppIcon name="plus" :size="24" /><span>{{ busy ? '上传中…' : '添加照片' }}</span
         ><input
           type="file"
+          :aria-label="busy ? '照片上传中' : '添加照片'"
           accept="image/jpeg,image/png,image/webp,image/gif"
           :multiple="limit > 1"
           :disabled="busy || disabled"

@@ -122,7 +122,7 @@ async function submit() {
     <LedgerCharts v-if="stats.rows.length" :stats="stats" />
     <section class="ledger-records">
       <div class="toolbar">
-        <div class="filter-tabs">
+        <div class="filter-tabs" role="group" aria-label="账本类型筛选">
           <button
             v-for="[key, label] in [
               ['all', '全部记录'],
@@ -132,6 +132,7 @@ async function submit() {
             :key="key"
             class="filter-tab"
             :class="{ active: type === key }"
+            :aria-pressed="type === key"
             @click="type = key"
           >
             {{ label }}
