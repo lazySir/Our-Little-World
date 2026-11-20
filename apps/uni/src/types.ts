@@ -96,7 +96,7 @@ export interface Dashboard {
   pendingWishes: LivingRecord[];
   moods: LivingRecord[];
 }
-export type CalendarEventKind = 'anniversary' | 'wish' | 'letter' | 'memory' | 'growth' | 'baby';
+export type CalendarEventKind = 'anniversary' | 'wish' | 'letter' | 'memory' | 'growth' | 'mood' | 'baby';
 export interface CalendarEvent {
   id: string;
   sourceId: string;
@@ -107,6 +107,8 @@ export interface CalendarEvent {
   recurring?: boolean;
   locked?: boolean;
   icon?: string;
+  mood?: string;
+  author?: { id?: string; nickname: string };
 }
 export interface CalendarData {
   month: string;

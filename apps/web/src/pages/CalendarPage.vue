@@ -21,6 +21,7 @@ const filters: { value: 'all' | CalendarEventKind; label: string }[] = [
   { value: 'letter', label: '信件' },
   { value: 'memory', label: '回忆' },
   { value: 'growth', label: '成长' },
+  { value: 'mood', label: '心情' },
   { value: 'baby', label: '宝宝' },
 ];
 const kindLabels: Record<CalendarEventKind, string> = {
@@ -29,6 +30,7 @@ const kindLabels: Record<CalendarEventKind, string> = {
   letter: '时光信箱',
   memory: '回忆',
   growth: '成长记录',
+  mood: '心情记录',
   baby: '宝宝生日',
 };
 const kindIcons: Record<CalendarEventKind, string> = {
@@ -37,15 +39,23 @@ const kindIcons: Record<CalendarEventKind, string> = {
   letter: 'letter',
   memory: 'photo',
   growth: 'work',
+  mood: 'heart',
   baby: 'baby',
 };
-const sourcePaths: Record<CalendarEventKind, string> = {
+const sourcePaths: Partial<Record<CalendarEventKind, string>> = {
   anniversary: '/anniversaries',
   wish: '/wishes',
   letter: '/letters',
   memory: '/memories',
   growth: '/baby',
   baby: '/baby',
+};
+const moodLabels: Record<string, string> = {
+  great: '特别好',
+  good: '不错',
+  okay: '还可以',
+  low: '有点低落',
+  tired: '有点累',
 };
 function sourceLink(event: CalendarEvent) {
   const path = sourcePaths[event.kind];
@@ -177,7 +187,13 @@ onMounted(load);
             </span>
             <div>
               <span class="calendar-event-kind">{{ kindLabels[event.kind] }}</span>
-              <h4>{{ event.title }} <AppIcon v-if="event.locked" name="lock" :size="13" /></h4>
+              <h4>
+                {{ event.title }}<span v-if="event.kind === 'mood' && event.mood">：{{ moodLabels[event.mood] || event.mood }}</span>
+                <AppIcon v-if="event.locked" name="lock" :size="13" />
+              </h4>
+              <p v-if="event.kind === 'mood' && event.author" class="calendar-event-author">
+                {{ event.author.nickname }}记录
+              </p>
               <p v-if="event.description">{{ event.description }}</p>
               <router-link
                 v-if="sourceLink(event)"

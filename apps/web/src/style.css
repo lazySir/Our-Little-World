@@ -2806,6 +2806,11 @@ textarea {
   background: #e2ebed;
   color: #6d8d96;
 }
+.calendar-day-dots .dot-mood,
+.event-mood {
+  background: #e8eee4;
+  color: #72896b;
+}
 .calendar-day-dots .dot-baby,
 .event-baby {
   background: #f3e4e2;
@@ -2851,6 +2856,10 @@ textarea {
   margin-bottom: 4px;
   color: #aaa18d;
   font-size: 9px;
+}
+.calendar-event .calendar-event-author {
+  margin-top: 0;
+  color: #8c816e;
 }
 .calendar-event h4 {
   display: flex;

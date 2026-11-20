@@ -11,7 +11,7 @@ const destinations = {
   memory: { url: '/pages/memories/index', tab: true },
   growth: { url: '/pages/baby/index', tab: false },
   baby: { url: '/pages/baby/index', tab: false },
-} satisfies Record<CalendarEventKind, { url: string; tab: boolean }>;
+} satisfies Partial<Record<CalendarEventKind, { url: string; tab: boolean }>>;
 
 let pendingSource: Source | undefined;
 
@@ -26,7 +26,9 @@ export function hasCalendarSource(event: Source) {
 export function openCalendarSource(event: Source, onFailure: () => void) {
   if (!hasCalendarSource(event)) return;
   const { kind, sourceId } = event;
-  const { url, tab } = destinations[kind];
+  const destination = destinations[kind];
+  if (!destination) return;
+  const { url, tab } = destination;
   const selection = { kind, sourceId };
   // switchTab does not accept query parameters. Both page types consume this selection on show.
   pendingSource = selection;

@@ -195,13 +195,22 @@ export class ResourcesService {
       fail(400, '月份格式应为有效的 YYYY-MM');
 
     const [year, monthNumber] = month.split('-').map(Number);
-    const kinds = ['anniversaries', 'wishes', 'letters', 'memories', 'growth'];
+    const kinds = ['anniversaries', 'wishes', 'letters', 'memories', 'growth', 'moods'];
     const rows = await this.db.entry.findMany({
       where: { spaceId: user.spaceId, kind: { in: kinds } },
       orderBy: { createdAt: 'asc' },
     });
     const events: Array<Record<string, any>> = [];
     const append = (event: Record<string, any>) => events.push(event);
+    const moodRows = rows.filter((row) => row.kind === 'moods');
+    const moodAuthors = new Map(
+      (
+        await this.db.user.findMany({
+          where: { id: { in: moodRows.map((row) => row.authorId) } },
+          select: { id: true, nickname: true },
+        })
+      ).map((user) => [user.id, user]),
+    );
 
     for (const row of rows) {
       const data = JSON.parse(row.data) as ResourceData;
@@ -271,6 +280,17 @@ export class ResourcesService {
           title: data.title,
           description: data.content,
         });
+      } else if (row.kind === 'moods' && data.date?.startsWith(`${month}-`)) {
+        append({
+          id: row.id,
+          sourceId: row.id,
+          kind: 'mood',
+          date: data.date,
+          title: '今天的心情',
+          description: data.note || undefined,
+          mood: data.mood,
+          author: moodAuthors.get(row.authorId),
+        });
       }
     }
 
@@ -301,7 +321,8 @@ export class ResourcesService {
       letter: 2,
       memory: 3,
       growth: 4,
-      baby: 5,
+      mood: 5,
+      baby: 6,
     };
     events.sort(
       (a, b) =>

@@ -58,6 +58,12 @@ test('mobile Web opens a recurring calendar occurrence at its original record', 
   });
   expect(created.ok(), await created.text()).toBeTruthy();
   const { id } = await created.json();
+  const moodResponse = await request.post(api + '/moods', {
+    headers,
+    data: { mood: 'good', note: '一起散步了', date: todayOccurrence },
+  });
+  expect(moodResponse.ok(), await moodResponse.text()).toBeTruthy();
+  const { id: moodId } = await moodResponse.json();
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
@@ -74,9 +80,18 @@ test('mobile Web opens a recurring calendar occurrence at its original record', 
       }),
     );
 
-    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/calendar');
     await dayButton(page, todayOccurrence).click();
+    const moodEvent = page.locator('.calendar-event').filter({ hasText: '今天的心情' });
+    await expect(moodEvent).toContainText('小林记录');
+    await expect(moodEvent).toContainText('不错');
+    await expect(moodEvent).toContainText('一起散步了');
+    await page.screenshot({
+      path: 'test-results/calendar-mood-web-desktop.jpg',
+      fullPage: false,
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
     const link = sourceLink(page, title);
     await expect(link).toHaveAttribute('href', '/anniversaries?record=' + id);
     await expect
@@ -105,6 +120,8 @@ test('mobile Web opens a recurring calendar occurrence at its original record', 
     await expect(original).toBeVisible();
     expect(errors).toEqual([]);
   } finally {
+    const removedMood = await request.delete(api + '/moods/' + moodId, { headers });
+    expect(removedMood.ok(), await removedMood.text()).toBeTruthy();
     const removed = await request.delete(api + '/anniversaries/' + id, { headers });
     expect(removed.ok(), await removed.text()).toBeTruthy();
   }

@@ -75,8 +75,9 @@
           <view class="grow">
             <view class="meta">{{ kindLabels[event.kind] }}</view>
             <view class="card-title"
-              >{{ event.title }}<text v-if="event.locked"> · 已封存</text></view
+              >{{ event.title }}<text v-if="event.kind === 'mood' && event.mood">：{{ moodLabels[event.mood] || event.mood }}</text><text v-if="event.locked"> · 已封存</text></view
             >
+            <view v-if="event.kind === 'mood' && event.author" class="meta">{{ event.author.nickname }}记录</view>
             <view v-if="event.description" class="card-text">{{ event.description }}</view>
             <view v-if="hasCalendarSource(event)" class="actions">
               <wd-button
@@ -128,6 +129,7 @@ const filters: { value: 'all' | CalendarEventKind; label: string }[] = [
   { value: 'letter', label: '信件' },
   { value: 'memory', label: '回忆' },
   { value: 'growth', label: '成长' },
+  { value: 'mood', label: '心情' },
   { value: 'baby', label: '宝宝' },
 ];
 const kindLabels: Record<CalendarEventKind, string> = {
@@ -136,6 +138,7 @@ const kindLabels: Record<CalendarEventKind, string> = {
   letter: '时光信箱',
   memory: '回忆',
   growth: '成长记录',
+  mood: '心情记录',
   baby: '宝宝生日',
 };
 const kindSymbols: Record<CalendarEventKind, string> = {
@@ -144,7 +147,15 @@ const kindSymbols: Record<CalendarEventKind, string> = {
   letter: '✉',
   memory: '▧',
   growth: '⌁',
+  mood: '♡',
   baby: '⌂',
+};
+const moodLabels: Record<string, string> = {
+  great: '特别好',
+  good: '不错',
+  okay: '还可以',
+  low: '有点低落',
+  tired: '有点累',
 };
 const events = computed(() =>
   data.value.events.filter((event) => filter.value === 'all' || event.kind === filter.value),

@@ -281,6 +281,10 @@ test('calendar aggregates dated records and expands recurring birthdays', async 
     .post('/api/growth')
     .set(auth())
     .send({ title: '第一次长高', date: '2099-11-08', type: 'growth', heightCm: 80 });
+  const mood = await api
+    .post('/api/moods')
+    .set(auth())
+    .send({ mood: 'great', note: '今天一起散步了', date: '2099-11-09' });
   const baby = await api
     .put('/api/baby')
     .set(auth())
@@ -291,6 +295,7 @@ test('calendar aggregates dated records and expands recurring birthdays', async 
   assert.equal(letter.status, 201);
   assert.equal(memory.status, 201);
   assert.equal(growth.status, 201);
+  assert.equal(mood.status, 201);
   assert.equal(baby.status, 200);
 
   const november = await api.get('/api/calendar?month=2099-11').set(auth());
@@ -305,9 +310,15 @@ test('calendar aggregates dated records and expands recurring birthdays', async 
       ['memory', '2099-11-06', '那天的照片'],
       ['anniversary', '2099-11-07', '搬家日'],
       ['growth', '2099-11-08', '第一次长高'],
+      ['mood', '2099-11-09', '今天的心情'],
       ['baby', '2099-11-13', '小芽的生日'],
     ],
   );
+  const moodEvent = november.body.events.find((event: any) => event.kind === 'mood');
+  assert.equal(moodEvent.sourceId, mood.body.id);
+  assert.equal(moodEvent.author.nickname, '小林');
+  assert.equal(moodEvent.mood, 'great');
+  assert.equal(moodEvent.description, '今天一起散步了');
   const letterEvent = november.body.events.find((event: any) => event.kind === 'letter');
   assert.equal(letterEvent.sourceId, letter.body.id);
   assert.equal(letterEvent.locked, true);

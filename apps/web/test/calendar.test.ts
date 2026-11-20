@@ -110,6 +110,34 @@ test('calendar renders links to the source IDs rather than occurrence IDs', asyn
   );
 });
 
+test('calendar shows shared mood history with its author, label, and note', async () => {
+  const s = setup();
+  const loading = s.view.load();
+  s.reads[0].resolve({
+    month: '2026-11',
+    date: '2026-11-20',
+    events: [
+      {
+        id: 'mood-1',
+        sourceId: 'mood-1',
+        kind: 'mood',
+        date: '2026-11-20',
+        title: '今天的心情',
+        mood: 'good',
+        author: { nickname: '小禾' },
+        description: '今天一起散步了',
+      },
+    ],
+  });
+  await loading;
+  const rendered = nodes(s.render());
+  assert.ok(rendered.some((node) => node.type === 'el-radio-button' && node.props.value === 'mood'));
+  assert.ok(rendered.some((node) => JSON.stringify(node).includes('小禾记录')));
+  assert.ok(rendered.some((node) => JSON.stringify(node).includes('不错')));
+  assert.ok(rendered.some((node) => JSON.stringify(node).includes('今天一起散步了')));
+  assert.equal(rendered.some((node) => node.type === 'router-link'), false);
+});
+
 test('a stale calendar response cannot replace a newer successful load', async () => {
   const s = setup();
   const older = s.view.load();

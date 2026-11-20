@@ -200,6 +200,34 @@ test('mini program calendar template exposes semantic controls for filters and d
   assert.match(dayButton, /:aria-current=/);
 });
 
+test('mini program calendar shows mood history with its author, label, and note', async () => {
+  const s = setup();
+  const loading = s.view.load();
+  s.reads[0].resolve({
+    month: '2026-11',
+    date: '2026-11-20',
+    events: [
+      {
+        id: 'mood-1',
+        sourceId: 'mood-1',
+        kind: 'mood',
+        date: '2026-11-20',
+        title: '今天的心情',
+        mood: 'good',
+        author: { nickname: '小禾' },
+        description: '今天一起散步了',
+      },
+    ],
+  });
+  await loading;
+  const rendered = s.render();
+  assert.ok(rendered.some((node) => JSON.stringify(node).includes('心情')));
+  assert.ok(rendered.some((node) => JSON.stringify(node).includes('小禾记录')));
+  assert.ok(rendered.some((node) => JSON.stringify(node).includes('不错')));
+  assert.ok(rendered.some((node) => JSON.stringify(node).includes('今天一起散步了')));
+  assert.equal(rendered.some((node) => hasClass(node, 'calendar-source-action')), false);
+});
+
 test('calendar uses the business month on first show and keeps a manually selected month on later shows', async () => {
   const s = setup();
 
