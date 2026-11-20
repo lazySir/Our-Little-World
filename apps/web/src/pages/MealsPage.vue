@@ -376,7 +376,7 @@ onMounted(fetchOrders);
       ><el-form-item label="加入收藏"><el-switch v-model="form.favorite" /></el-form-item>
       <div class="dialog-footer">
         <el-button :disabled="editorBusy" @click="dialog = false">取消</el-button
-        ><el-button type="primary" :loading="saving" :disabled="uploading" @click="submit"
+        ><el-button type="primary" native-type="submit" :loading="saving" :disabled="uploading"
           >保存</el-button
         >
       </div></el-form

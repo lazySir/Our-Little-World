@@ -226,7 +226,7 @@ async function submit() {
       /></el-form-item>
       <div class="flex justify-end gap-2.5 pt-4">
         <el-button :disabled="saving" @click="dialog = false">取消</el-button
-        ><el-button type="primary" :loading="saving" @click="submit">记进账本</el-button>
+        ><el-button type="primary" native-type="submit" :loading="saving">记进账本</el-button>
       </div></el-form
     ></el-dialog
   >

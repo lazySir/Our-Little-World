@@ -563,7 +563,7 @@ async function convertToMemory(item) {
       ></template>
       <div class="flex justify-end gap-2.5 pt-4">
         <el-button :disabled="editorBusy" @click="dialog = false">取消</el-button
-        ><el-button type="primary" :loading="saving" :disabled="uploaded === true" @click="submit"
+        ><el-button type="primary" native-type="submit" :loading="saving" :disabled="uploaded === true"
           >保存到小世界</el-button
         >
       </div></el-form

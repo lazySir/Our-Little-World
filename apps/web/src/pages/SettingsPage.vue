@@ -205,10 +205,10 @@ async function logout() {
           ><small>{{ session.partner ? '故事里的另一个主角' : '让故事更完整' }}</small>
         </div>
       </div>
-      <el-form label-position="top"
+      <el-form label-position="top" @submit.prevent="saveProfile"
         ><el-form-item label="我的昵称"
           ><el-input v-model="profile.nickname" maxlength="30" /></el-form-item
-        ><el-button type="primary" :loading="busy === 'profile'" @click="saveProfile"
+        ><el-button type="primary" native-type="submit" :loading="busy === 'profile'"
           >保存昵称</el-button
         ></el-form
       >
@@ -240,7 +240,7 @@ async function logout() {
       <div class="section-head">
         <h3><AppIcon name="home" :size="19" />家的模样</h3>
       </div>
-      <el-form label-position="top"
+      <el-form label-position="top" @submit.prevent="saveSpace"
         ><el-form-item label="小世界的名字"
           ><el-input v-model="space.name" maxlength="60" /></el-form-item
         ><el-form-item label="我们在一起的日子"
@@ -263,7 +263,7 @@ async function logout() {
               ><small>{{ t.name }}</small>
             </button>
           </div></el-form-item
-        ><el-button type="primary" :loading="busy === 'space'" @click="saveSpace"
+        ><el-button type="primary" native-type="submit" :loading="busy === 'space'"
           >保存家的模样</el-button
         ></el-form
       >
@@ -272,7 +272,7 @@ async function logout() {
       <div class="section-head">
         <h3><AppIcon name="lock" :size="19" />保管好我们的故事</h3>
       </div>
-      <el-form label-position="top"
+      <el-form label-position="top" @submit.prevent="savePassword"
         ><el-form-item label="当前密码"
           ><el-input
             v-model="password.currentPassword"
@@ -295,7 +295,7 @@ async function logout() {
             show-password
             autocomplete="new-password"
             :disabled="busy === 'password'" /></el-form-item
-        ><el-button :loading="busy === 'password'" @click="savePassword"
+        ><el-button native-type="submit" :loading="busy === 'password'"
           >修改密码</el-button
         ></el-form
       >

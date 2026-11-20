@@ -150,6 +150,16 @@ function setup(
     );
   const saveButton = () =>
     rendered().find((node) => node.type === 'el-button' && node.children === '保存小档案');
+  const submitProfile = async () => {
+    const tree = rendered();
+    const button = tree.find((node) => node.type === 'el-button' && node.children === '保存小档案');
+    assert.equal(button?.props?.['native-type'], 'submit');
+    const form = tree.find(
+      (node) => node.type === 'el-form' && nodes(node).includes(button),
+    );
+    assert.equal(typeof form?.props?.onSubmit, 'function');
+    await form.props.onSubmit({ preventDefault() {} });
+  };
   return {
     ...page,
     api,
@@ -161,6 +171,7 @@ function setup(
     action,
     status,
     saveButton,
+    submitProfile,
     reads: () => reads,
     mount: () => mounted(),
   };
@@ -396,7 +407,7 @@ test('retrying an existing baby profile retains every saved field when editing a
     },
   );
   s.view.profile.name = '小团子的新名字';
-  await s.saveButton().props.onClick();
+  await s.submitProfile();
   assert.deepEqual(s.writes, [
     {
       path: '/baby',
@@ -429,7 +440,7 @@ test('a successful null retry enables the actual empty state and normal profile 
   empty.props.onAction();
   assert.equal(s.view.profileOpen.value, true);
   s.view.profile.name = '新的小家人';
-  await s.saveButton().props.onClick();
+  await s.submitProfile();
   assert.equal(s.writes.length, 1);
   assert.equal(s.writes[0].body.name, '新的小家人');
   assert.equal(s.view.baby.value.name, '新的小家人');

@@ -412,9 +412,9 @@ onMounted(loadBaby);
         <el-button :disabled="profileBusy" @click="profileOpen = false">取消</el-button
         ><el-button
           type="primary"
+          native-type="submit"
           :loading="profileSaving"
           :disabled="profileUploading || !profileReady"
-          @click="saveProfile"
           >保存小档案</el-button
         >
       </div></el-form
@@ -487,7 +487,7 @@ onMounted(loadBaby);
       /></el-form-item>
       <div class="flex justify-end gap-2.5 pt-4">
         <el-button :disabled="editorBusy" @click="dialog = false">取消</el-button
-        ><el-button type="primary" :loading="saving" :disabled="uploading" @click="submit"
+        ><el-button type="primary" native-type="submit" :loading="saving" :disabled="uploading"
           >收藏这份成长</el-button
         >
       </div></el-form
