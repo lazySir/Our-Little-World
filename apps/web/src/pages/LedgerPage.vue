@@ -9,6 +9,7 @@ import LedgerCharts from '../components/LedgerCharts.vue';
 const session = useSession();
 const { items, loading, error, saving, load, save, remove } = useResource<LedgerRecord>('/ledger');
 const month = ref(monthNow()),
+  monthSelected = ref(false),
   type = ref('all'),
   query = ref(''),
   dialog = ref(false),
@@ -25,15 +26,28 @@ const expenseCategories = ['餐饮', '购物', '居家', '出行', '娱乐', '�
 const incomeCategories = ['工资', '奖金', '礼金', '其他'];
 const categories = computed(() => (form.type === 'income' ? incomeCategories : expenseCategories));
 const stats = computed(() => groupLedger(items.value, month.value || monthNow()));
+const normalizedQuery = computed(() => query.value.trim().toLowerCase());
+const hasFilter = computed(
+  () => monthSelected.value || type.value !== 'all' || !!normalizedQuery.value,
+);
 const filtered = computed(() =>
   stats.value.rows
     .filter(
       (i) =>
         (type.value === 'all' || i.type === type.value) &&
-        (!query.value || `${i.category} ${i.note} ${i.payer}`.includes(query.value)),
+        `${i.category} ${i.note} ${i.payer}`.toLowerCase().includes(normalizedQuery.value),
     )
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
+function clearFilters() {
+  month.value = monthNow();
+  monthSelected.value = false;
+  type.value = 'all';
+  query.value = '';
+}
+function selectMonth() {
+  monthSelected.value = true;
+}
 const members = computed(() =>
   [session.user?.nickname, session.partner?.nickname, '共同账户'].filter(Boolean),
 );
@@ -97,6 +111,7 @@ async function submit() {
         value-format="YYYY-MM"
         format="YYYY 年 MM 月"
         :clearable="false"
+        @change="selectMonth"
       /><span class="muted">每一笔小开支，都是我们认真生活的痕迹。</span>
     </div>
     <div class="ledger-stats">
@@ -171,11 +186,16 @@ async function submit() {
       </div>
       <div v-else class="panel">
         <EmptyState
-          title="这个月的小账本，还是空白的"
-          description="从今天的一顿午饭开始，给共同生活记上第一笔。"
+          :title="hasFilter ? '没有匹配的账本记录' : '这个月的小账本，还是空白的'"
+          :description="
+            hasFilter
+              ? '试试其他月份、收支类型或关键词。'
+              : '从今天的一顿午饭开始，给共同生活记上第一笔。'
+          "
           icon="wallet"
-          action="记下第一笔"
-          @action="edit()"
+          :action="hasFilter ? '清除筛选' : '记下第一笔'"
+          :action-icon="hasFilter ? 'close' : 'plus'"
+          @action="hasFilter ? clearFilters() : edit()"
         />
       </div></section></LoadState
   ><el-dialog

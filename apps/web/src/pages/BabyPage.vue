@@ -48,6 +48,7 @@ const regularFiltered = computed(() =>
     .filter((i) => tab.value === 'all' || i.type === tab.value)
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
+const hasFilter = computed(() => tab.value !== 'all');
 const filtered = computed(() =>
   sourceIsGrowth.value
     ? sourceGrowth.value
@@ -57,6 +58,9 @@ const filtered = computed(() =>
         : []
     : regularFiltered.value,
 );
+function clearFilters() {
+  tab.value = 'all';
+}
 const editorBusy = computed(() => uploading.value || saving.value);
 const profileBusy = computed(() => profileUploading.value || profileSaving.value);
 const profileReady = computed(() => babyLoaded.value && !babyLoading.value);
@@ -219,11 +223,12 @@ onMounted(loadBaby);
     class="baby-profile panel"
   >
     <div class="baby-avatar">
-      <el-image v-if="baby.asset" :src="assetUrl(baby.asset)" @error="refreshAssetOnError(baby.asset)" fit="cover" /><AppIcon
-        v-else
-        name="baby"
-        :size="49"
-      />
+      <el-image
+        v-if="baby.asset"
+        :src="assetUrl(baby.asset)"
+        @error="refreshAssetOnError(baby.asset)"
+        fit="cover"
+      /><AppIcon v-else name="baby" :size="49" />
     </div>
     <div class="baby-intro">
       <p class="eyebrow">OUR LITTLE SUNSHINE</p>
@@ -363,11 +368,16 @@ onMounted(loadBaby);
     </div>
     <div v-else-if="showRegularPage" class="panel">
       <EmptyState
-        title="每一次小进步，都值得被记住"
-        description="第一次微笑、第一次翻身，或者今天的身高体重，都是珍贵的成长。"
+        :title="hasFilter ? '没有匹配的成长记录' : '每一次小进步，都值得被记住'"
+        :description="
+          hasFilter
+            ? '试试其他记录类型。'
+            : '第一次微笑、第一次翻身，或者今天的身高体重，都是珍贵的成长。'
+        "
         icon="baby"
-        action="记下第一条成长"
-        @action="edit()"
+        :action="hasFilter ? '清除筛选' : '记下第一条成长'"
+        :action-icon="hasFilter ? 'close' : 'plus'"
+        @action="hasFilter ? clearFilters() : edit()"
       /></div
   ></LoadState>
   <el-dialog

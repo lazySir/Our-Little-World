@@ -102,3 +102,43 @@ test('a failed ledger save retains the draft and allows a successful retry', asy
   await retry;
   assert.equal(s.view.dialog.value, false);
 });
+
+test('a filtered ledger empty state can clear type and query without changing the month', () => {
+  const s = setup();
+  const month = s.view.month.value;
+  s.view.items.value.push({
+    id: 'coffee',
+    type: 'expense',
+    amountCents: 580,
+    category: '咖啡',
+    date: `${month}-10`,
+    note: '拿铁',
+    payer: '我',
+  });
+  s.view.query.value = '  咖啡  ';
+  assert.deepEqual(
+    s.view.filtered.value.map((item: any) => item.id),
+    ['coffee'],
+  );
+
+  s.view.month.value = '2020-01';
+  s.view.selectMonth();
+  s.view.type.value = 'income';
+  s.view.query.value = '  NO MATCH  ';
+
+  assert.equal(s.view.hasFilter.value, true);
+  s.view.clearFilters();
+  assert.equal(s.view.type.value, 'all');
+  assert.equal(s.view.query.value, '');
+  assert.equal(s.view.month.value, month);
+  assert.equal(s.view.hasFilter.value, false);
+  const filename = fileURLToPath(new URL('../src/pages/LedgerPage.vue', import.meta.url));
+  const template = parse(readFileSync(filename, 'utf8'), { filename }).descriptor.template!.content;
+  const emptyState = template.slice(
+    template.indexOf('<EmptyState'),
+    template.indexOf('/>', template.indexOf('<EmptyState')) + 2,
+  );
+  assert.ok(emptyState.includes("hasFilter ? '没有匹配的账本记录'"));
+  assert.ok(emptyState.includes("hasFilter ? '清除筛选'"));
+  assert.match(emptyState, /action-icon/);
+});

@@ -9,7 +9,9 @@
       v-if="calendarSource"
       :missing="missingCalendarSource"
       @clear="clearCalendarSource" />
-    <view v-if="!sourceUnavailable && !focusedGrowth && babyLoading" class="loading">宝宝档案打开中…</view>
+    <view v-if="!sourceUnavailable && !focusedGrowth && babyLoading" class="loading"
+      >宝宝档案打开中…</view
+    >
     <view v-else-if="!sourceUnavailable && !focusedGrowth && babyError" class="error-box">
       <view>{{ babyError }}</view>
       <wd-button size="small" plain @click="loadBaby">重试宝宝档案</wd-button>
@@ -56,7 +58,12 @@
       action="建立宝宝档案"
       @action="editBaby" />
     <view
-      v-if="!sourceUnavailable && !sourceActive && hasLoaded && (albumPhotos.length || (babyReady && baby))"
+      v-if="
+        !sourceUnavailable &&
+        !sourceActive &&
+        hasLoaded &&
+        (albumPhotos.length || (babyReady && baby))
+      "
       class="baby-album"
       aria-labelledby="baby-album-title"
     >
@@ -80,7 +87,12 @@
             )
           "
         >
-          <image class="baby-album-image" :src="assetUrl(photo.asset)" mode="aspectFill" @error="refreshAssetOnError(photo.asset)" />
+          <image
+            class="baby-album-image"
+            :src="assetUrl(photo.asset)"
+            mode="aspectFill"
+            @error="refreshAssetOnError(photo.asset)"
+          />
           <view class="baby-album-caption">
             <view class="baby-album-title">{{ photo.title }}</view>
             <view class="meta">{{ photo.date }}</view>
@@ -94,7 +106,10 @@
         description="在成长记录中添加照片，它们会自动收进这里。"
       />
     </view>
-    <GrowthChart v-if="!sourceUnavailable && !sourceActive && hasLoaded" ref="growthChart" :records="items" />
+    <GrowthChart
+      v-if="!sourceUnavailable && !sourceActive && hasLoaded"
+      ref="growthChart"
+      :records="items" />
     <view v-if="!sourceUnavailable && !sourceActive" class="toolbar">
       <input class="search" v-model="query" placeholder="搜索成长记录" />
       <wd-button size="small" @click="openNew">＋ 记录</wd-button>
@@ -127,8 +142,12 @@
       <view>{{ error }}</view>
       <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
     </view>
-    <view v-if="!sourceUnavailable && !focusedBaby && loading && !hasLoaded" class="loading">成长手账打开中…</view>
-    <view v-else-if="!sourceUnavailable && !focusedBaby && loading" class="meta" role="status">正在更新成长记录…</view>
+    <view v-if="!sourceUnavailable && !focusedBaby && loading && !hasLoaded" class="loading"
+      >成长手账打开中…</view
+    >
+    <view v-else-if="!sourceUnavailable && !focusedBaby && loading" class="meta" role="status"
+      >正在更新成长记录…</view
+    >
     <template v-if="!sourceUnavailable && !focusedBaby && hasLoaded">
       <view
         v-for="item in visibleRecords"
@@ -159,7 +178,12 @@
               :aria-label="`预览${item.title}照片 ${index + 1}`"
               @click="previewPhotos(item.assets, index)"
             >
-              <image class="photo" :src="assetUrl(asset)" mode="aspectFill" @error="refreshAssetOnError(asset)" />
+              <image
+                class="photo"
+                :src="assetUrl(asset)"
+                mode="aspectFill"
+                @error="refreshAssetOnError(asset)"
+              />
             </button>
           </view>
           <view class="actions">
@@ -171,10 +195,14 @@
       <EmptyState
         v-if="!sourceUnavailable && !sourceActive && !loading && !filtered.length"
         symbol="✿"
-        title="每一次长大，都值得收藏"
-        description="记一记身高、第一次翻身，或者今天安睡的小模样。"
-        action="写下成长记录"
-        @action="openNew"
+        :title="hasFilter ? '没有匹配的成长记录' : '每一次长大，都值得收藏'"
+        :description="
+          hasFilter
+            ? '试试其他关键词或记录类型。'
+            : '记一记身高、第一次翻身，或者今天安睡的小模样。'
+        "
+        :action="hasFilter ? '清除筛选' : '写下成长记录'"
+        @action="hasFilter ? resetFilters() : openNew()"
       />
     </template>
     <EditorSheet
@@ -295,15 +323,17 @@ const types = [
     durationMinutes: '',
     assets: [],
   });
+const normalizedQuery = computed(() => query.value.trim().toLowerCase());
 const filtered = computed(() =>
   items.value
     .filter(
       (x) =>
         (filter.value === 'all' || filter.value === x.type) &&
-        `${x.title} ${x.content || ''}`.includes(query.value),
+        `${x.title} ${x.content || ''}`.toLowerCase().includes(normalizedQuery.value),
     )
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
+const hasFilter = computed(() => !!normalizedQuery.value || filter.value !== 'all');
 const { calendarSource, clearCalendarSource } = useCalendarSource('baby', 'growth');
 const missingCalendarSource = computed(() => {
   const source = calendarSource.value;
@@ -342,6 +372,10 @@ const visibleRecords = computed(() =>
 );
 const albumPhotos = computed(() => collectBabyAlbumPhotos(items.value));
 const typeLabel = (value) => types.find((x) => x.value === value)?.label || value;
+function resetFilters() {
+  query.value = '';
+  filter.value = 'all';
+}
 let babyLoadVersion = 0;
 async function loadBaby() {
   if (profileEditor.value || profileSaving.value) return;

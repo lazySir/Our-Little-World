@@ -13,6 +13,12 @@
       <view class="grow" />
       <wd-button size="small" @click="openNew">＋ 记一笔</wd-button>
     </view>
+    <input
+      class="search"
+      v-model="query"
+      aria-label="搜索分类、备注或付款人"
+      placeholder="搜索分类、备注或付款人"
+    />
     <view v-if="error" class="error-box">
       <view>{{ error }}</view>
       <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
@@ -95,10 +101,12 @@
       <EmptyState
         v-if="hasLoaded && !loading && !filtered.length"
         symbol="¥"
-        title="这一页账本还是空的"
-        description="今天的一杯咖啡，也值得好好记下。"
-        action="记第一笔"
-        @action="openNew"
+        :title="hasFilter ? '没有匹配的账本记录' : '这一页账本还是空的'"
+        :description="
+          hasFilter ? '试试其他关键词、月份或收支类型。' : '今天的一杯咖啡，也值得好好记下。'
+        "
+        :action="hasFilter ? '清除筛选' : '记第一笔'"
+        @action="hasFilter ? clearFilters() : openNew()"
       />
     </template>
     <EditorSheet
@@ -139,6 +147,7 @@ const { session, items, hasLoaded, loading, error, saving, editor, formError, lo
     useResource('ledger', { syncBusinessDate: true }),
   month = ref(today().slice(0, 7)),
   filter = ref('all'),
+  query = ref(''),
   editing = ref(null),
   amount = ref('');
 const filters = [
@@ -147,18 +156,34 @@ const filters = [
     { value: 'income', label: '收入' },
   ],
   form = reactive({ type: 'expense', category: '餐饮', date: today(), payer: '', note: '' });
-let monthSelected = false;
+const monthSelected = ref(false);
 watch(serverBusinessDate, (value) => {
-  if (value && !monthSelected) month.value = value.slice(0, 7);
+  if (value && !monthSelected.value) month.value = value.slice(0, 7);
 });
 function selectMonth(value: string) {
-  monthSelected = true;
+  monthSelected.value = true;
   month.value = value;
 }
-const monthly = computed(() => items.value.filter((x) => x.date?.startsWith(month.value))),
+function clearFilters() {
+  monthSelected.value = false;
+  month.value = today().slice(0, 7);
+  filter.value = 'all';
+  query.value = '';
+}
+const normalizedQuery = computed(() => query.value.trim().toLowerCase()),
+  monthly = computed(() => items.value.filter((x) => x.date?.startsWith(month.value))),
+  hasFilter = computed(
+    () => monthSelected.value || filter.value !== 'all' || !!normalizedQuery.value,
+  ),
   filtered = computed(() =>
     monthly.value
-      .filter((x) => filter.value === 'all' || x.type === filter.value)
+      .filter(
+        (x) =>
+          (filter.value === 'all' || x.type === filter.value) &&
+          `${x.category} ${x.note || ''} ${x.payer || ''}`
+            .toLowerCase()
+            .includes(normalizedQuery.value),
+      )
       .sort((a, b) => b.date.localeCompare(a.date)),
   ),
   summary = computed(() =>

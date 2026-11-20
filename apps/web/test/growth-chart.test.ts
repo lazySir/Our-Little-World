@@ -177,6 +177,47 @@ test('Web baby summary retains each latest metric and passes original records de
   assert.equal(chart.props.records, all.value);
 });
 
+test('Web baby growth filtered empty state clears the selected record type', () => {
+  const all = ref([{ id: 'one', date: '2026-11-20', title: '今天会笑了', type: 'growth' }]);
+  const s = component(
+    '../src/pages/BabyPage.vue',
+    {},
+    {
+      vue: { ...require('vue'), onMounted() {} },
+      '../components/GrowthChart.vue': chartComponent,
+      '../components/CalendarSourceStatus.vue': 'CalendarSourceStatus',
+      '../components/PhotoUpload.vue': 'PhotoUpload',
+      '../components/EmptyState.vue': 'EmptyState',
+      '../api': { api: { get: async () => null }, assetUrl: () => '', refreshAssetOnError() {} },
+      '../domain': domain,
+      '../composables/resource': {
+        useResource: () => ({
+          items: all,
+          loading: ref(false),
+          error: ref(''),
+          saving: ref(false),
+          load() {},
+          save() {},
+          remove() {},
+        }),
+      },
+    },
+  );
+  s.view.baby.value = { name: '小团子' };
+  s.view.tab.value = 'health';
+
+  assert.equal(s.view.hasFilter.value, true);
+  const emptyState = s
+    .nodes()
+    .find((node) => node.type === 'EmptyState' && node.props?.title === '没有匹配的成长记录');
+  assert.ok(emptyState);
+  assert.equal(emptyState?.props.action, '清除筛选');
+  assert.equal(emptyState?.props['action-icon'], 'close');
+  emptyState?.props.onAction();
+  assert.equal(s.view.tab.value, 'all');
+  assert.equal(s.view.filtered.value.length, 1);
+});
+
 test('Web baby album shows each attached photo once in newest record order', () => {
   const all = ref([
     {

@@ -4,6 +4,7 @@ defineProps({
   description: { default: '从一件小事开始，把平凡的日子认真收藏。' },
   icon: { default: 'heart' },
   action: String,
+  actionIcon: { type: String, default: 'plus' },
 });
 defineEmits(['action']);
 </script>
@@ -13,7 +14,7 @@ defineEmits(['action']);
     <h3>{{ title }}</h3>
     <p>{{ description }}</p>
     <el-button v-if="action" type="primary" @click="$emit('action')"
-      ><AppIcon name="plus" :size="17" />{{ action }}</el-button
+      ><AppIcon :name="actionIcon" :size="17" />{{ action }}</el-button
     >
   </div>
 </template>

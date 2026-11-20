@@ -26,15 +26,20 @@
         <view v-for="tag in item.tags || []" :key="tag" class="pill sage"># {{ tag }}</view>
       </view>
       <view v-if="item.assets?.length" class="photo-grid">
-        <image
+        <button
           v-for="(asset, index) in item.assets"
           :key="asset.id"
-          class="photo"
-          :src="assetUrl(asset)"
-          mode="aspectFill"
+          class="photo-preview ui-reset"
+          :aria-label="`预览${item.title}照片 ${index + 1}`"
           @click="previewPhotos(item.assets, index)"
-          @error="refreshAssetOnError(asset)"
-        />
+        >
+          <image
+            class="photo"
+            :src="assetUrl(asset)"
+            mode="aspectFill"
+            @error="refreshAssetOnError(asset)"
+          />
+        </button>
       </view>
       <view class="actions">
         <button class="text-action ui-reset" @click="edit(item)">编辑</button>
@@ -44,10 +49,14 @@
     <EmptyState
       v-if="hasLoaded && !loading && !filtered.length"
       symbol="▤"
-      title="今天，有什么小进展？"
-      description="写下完成的事、遇到的问题，或者一个还在发芽的想法。"
-      action="写下第一篇手记"
-      @action="openNew"
+      :title="hasFilter ? '没有匹配的手记' : '今天，有什么小进展？'"
+      :description="
+        hasFilter
+          ? '试试其他关键词，或清空搜索条件。'
+          : '写下完成的事、遇到的问题，或者一个还在发芽的想法。'
+      "
+      :action="hasFilter ? '清除筛选' : '写下第一篇手记'"
+      @action="hasFilter ? clearFilters() : openNew()"
     />
     <EditorSheet
       v-model="editor"
@@ -93,15 +102,20 @@ const { session, items, hasLoaded, loading, error, saving, editor, formError, lo
   editing = ref(null),
   uploading = ref(false),
   form = reactive({ title: '', date: today(), content: '', assets: [] });
+const normalizedQuery = computed(() => query.value.trim().toLowerCase());
 const filtered = computed(() =>
   items.value
     .filter((x) =>
       `${x.title} ${x.content || ''} ${(x.tags || []).join(' ')}`
         .toLowerCase()
-        .includes(query.value.toLowerCase()),
+        .includes(normalizedQuery.value),
     )
     .sort((a, b) => b.date.localeCompare(a.date)),
 );
+const hasFilter = computed(() => !!normalizedQuery.value);
+function clearFilters() {
+  query.value = '';
+}
 function openNew() {
   editing.value = null;
   tagsText.value = '';
