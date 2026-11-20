@@ -130,8 +130,20 @@ export function choosePhotos(count = 9): Promise<string[]> {
     }),
   );
 }
+// Keep toast titles short enough for the narrowest WeChat client layout.
+const TOAST_MESSAGE_MAX_LENGTH = 7;
 export function notify(message) {
-  uni.showToast({ title: String(message), icon: 'none', duration: 2500 });
+  const text = String(message);
+  if (text.length > TOAST_MESSAGE_MAX_LENGTH) {
+    uni.showModal({
+      title: '详细提示',
+      content: text,
+      showCancel: false,
+      confirmText: '知道了',
+    });
+    return;
+  }
+  uni.showToast({ title: text, icon: 'none', duration: 2500 });
 }
 export function confirm(message: string, title = '再确认一下'): Promise<boolean> {
   return new Promise((resolve) =>

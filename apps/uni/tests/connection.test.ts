@@ -22,6 +22,7 @@ function setup(page: 'auth' | 'settings') {
   const requests: any[] = [],
     navigation: string[] = [],
     notices: string[] = [],
+    modals: any[] = [],
     hooks: Record<string, Function> = {};
   const uni = {
     getStorageSync: (key: string) => storage.get(key),
@@ -29,6 +30,7 @@ function setup(page: 'auth' | 'settings') {
     removeStorageSync: (key: string) => storage.delete(key),
     request: (options: any) => requests.push(options),
     showToast: (options: any) => notices.push(options.title),
+    showModal: (options: any) => modals.push(options),
     reLaunch: (options: any) => navigation.push(options.url),
     switchTab: (options: any) => navigation.push(options.url),
     $emit() {},
@@ -83,7 +85,7 @@ function setup(page: 'auth' | 'settings') {
     '../../stores/session': { useSession: () => store },
   }).default;
   const view = component.setup({}, { expose() {} });
-  return { api, store, view, storage, requests, navigation, notices, hooks };
+  return { api, store, view, storage, requests, navigation, notices, modals, hooks };
 }
 
 for (const page of ['auth', 'settings'] as const) {

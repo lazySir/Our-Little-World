@@ -64,6 +64,7 @@ function setup(knownSession = true) {
   const requests: any[] = [],
     uploads: any[] = [],
     notices: string[] = [],
+    modals: any[] = [],
     navigation: string[] = [],
     events: string[] = [];
   let show!: () => Promise<void>;
@@ -81,6 +82,7 @@ function setup(knownSession = true) {
       uploads.push(options);
     },
     showToast: (options: any) => notices.push(options.title),
+    showModal: (options: any) => modals.push(options),
     reLaunch: (options: any) => navigation.push(options.url),
     switchTab: (options: any) => navigation.push(options.url),
     $emit: (event: string) => events.push(event),
@@ -145,6 +147,7 @@ function setup(knownSession = true) {
     requests,
     uploads,
     notices,
+    modals,
     navigation,
     events,
     show: () => show(),
