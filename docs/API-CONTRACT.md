@@ -15,6 +15,10 @@ Prefix `/api`. JSON responses are direct objects/arrays, no wrapper. Failures: `
 - `PATCH /auth/profile` `{nickname}` → user.
 - `PATCH /space` `{name,startDate,theme}` → space. theme `cream|rose|sage`.
 
+## Service date
+
+- `GET /business-date` public → `{ date: "YYYY-MM-DD", month: "YYYY-MM" }`. The service calculates both values using `TZ` (default `Asia/Shanghai`); clients use this response for current-day defaults and month navigation so devices in other time zones remain aligned with server-side date validation.
+
 ## Resources
 
 Every resource below supports `GET /<path>` array, `POST /<path>` object, `PATCH /<path>/:id` object, `DELETE /<path>/:id` `{ok:true}`. IDs/spaceId/authorId/createdAt/updatedAt assigned server-side. GET returns the complete history for the authenticated space in descending creation order; frontend filters/searches locally. Resource objects contain the fields listed below plus id/createdAt/updatedAt and authorId if relevant. PATCH validates merged data and preserves omitted fields; clients may send full writable objects. For WeChat, the same PATCH routes accept POST with the exact `X-HTTP-Method-Override: PATCH` header and identical authentication.

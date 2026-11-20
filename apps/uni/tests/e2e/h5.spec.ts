@@ -393,6 +393,8 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   expect(invalidResponse.ok()).toBeFalsy();
   const invalidDetails = await invalidResponse.json();
   await expect(page.locator('.error-box')).toHaveText(invalidDetails.message);
+  await page.getByText('知道了', { exact: true }).click();
+  await expect(page.locator('uni-modal:visible')).toHaveCount(0);
   const afterBackupWish = `备份后新增 ${stamp}`;
   await visit(page, 'wishes', '一起做');
   await click(page, '＋ 添加');
@@ -423,6 +425,8 @@ test('uni H5 connects to a chosen server and persists real daily workflows inclu
   expect(rejectedResponse.status()).toBe(409);
   const rejectedDetails = await rejectedResponse.json();
   await expect(page.locator('.error-box')).toHaveText(rejectedDetails.message);
+  await page.getByText('知道了', { exact: true }).click();
+  await expect(page.locator('uni-modal:visible')).toHaveCount(0);
   const warningChooser = page.waitForEvent('filechooser');
   await click(page, '选择 ZIP 并恢复');
   await (await warningChooser).setFiles(backupPath!);
@@ -544,6 +548,8 @@ test('uni H5 locks a pending mood, keeps its failed draft and persists a real re
     release();
     expect((await failed).status()).toBe(503);
     await expect(page.getByText(failure, { exact: true })).toBeVisible();
+    await page.getByText('知道了', { exact: true }).click();
+    await expect(page.locator('uni-modal:visible')).toHaveCount(0);
     await expect(note).toBeEnabled();
     await expect(note).toHaveValue(draft);
     await expect(selected).toHaveClass(/active/);

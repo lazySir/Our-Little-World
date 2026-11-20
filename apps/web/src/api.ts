@@ -1,7 +1,10 @@
 import type { ApiOptions, Asset } from './types';
+import { setBusinessDate } from './domain';
 import { createAssetRefresher } from '@our-little-world/shared/asset-refresh';
 export const TOKEN_KEY = 'little-world-token';
 export const BASE_KEY = 'little-world-api';
+let businessDateRequestSequence = 0;
+let appliedBusinessDateRequestSequence = 0;
 export const getBase = () =>
   localStorage.getItem(BASE_KEY) || import.meta.env?.VITE_API_BASE || '/api';
 function normalizeBase(value: string) {
@@ -33,6 +36,9 @@ export async function request<T = any>(path: string, options: ApiOptions = {}): 
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);
+  const responsePath = path.split('?')[0];
+  const syncsBusinessDate = ['/business-date', '/dashboard', '/calendar'].includes(responsePath);
+  const dateRequestSequence = syncsBusinessDate ? ++businessDateRequestSequence : 0;
   try {
     const response = await fetch(`${base}${path}`, {
       ...fetchOptions,
@@ -58,7 +64,17 @@ export async function request<T = any>(path: string, options: ApiOptions = {}): 
       throw new Error(details?.message || `请求失败（${response.status}）`);
     }
     if (binary) return response.blob() as Promise<T>;
-    return response.status === 204 ? null : response.json();
+    const result = response.status === 204 ? null : await response.json();
+    if (
+      syncsBusinessDate &&
+      result &&
+      typeof result.date === 'string' &&
+      dateRequestSequence > appliedBusinessDateRequestSequence
+    ) {
+      appliedBusinessDateRequestSequence = dateRequestSequence;
+      setBusinessDate(result.date);
+    }
+    return result;
   } catch (error) {
     if (error.name === 'AbortError') throw new Error('连接超时，请检查网络与接口地址');
     if (error instanceof TypeError) throw new Error('暂时连接不到小世界，请检查网络与服务是否启动');

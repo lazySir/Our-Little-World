@@ -256,7 +256,7 @@ import { today, daysBetween } from '../../lib/domain';
 import { collectBabyAlbumPhotos } from '@our-little-world/shared/baby-album';
 import type { Baby } from '../../types';
 const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
-    useResource('growth'),
+    useResource('growth', { syncBusinessDate: true }),
   baby = ref<Baby | null>(null),
   babyLoading = ref(true),
   babyReady = ref(false),
@@ -394,7 +394,7 @@ async function saveBaby() {
       avatarId: profilePhotos.value[0]?.id || null,
     });
     profileEditor.value = false;
-    notify('宝宝档案已保存');
+    notify('宝宝档案已保存', 'success');
   } catch (e) {
     profileError.value = e.message;
   } finally {

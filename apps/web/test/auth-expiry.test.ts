@@ -53,7 +53,9 @@ function setup(t: any, fetch: typeof globalThis.fetch) {
     );
     return module.exports;
   }
-  const api = execute(readFileSync(new URL('../src/api.ts', import.meta.url), 'utf8'), {});
+  const api = execute(readFileSync(new URL('../src/api.ts', import.meta.url), 'utf8'), {
+    './domain': { setBusinessDate() {} },
+  });
   pinia.setActivePinia(pinia.createPinia());
   const store = execute(
     readFileSync(new URL('../src/stores/session.ts', import.meta.url), 'utf8'),
@@ -71,6 +73,7 @@ function setup(t: any, fetch: typeof globalThis.fetch) {
       '../stores/session': { useSession: () => store },
       './stores/session': { useSession: () => store },
       '../domain': { today: () => '2026-11-19' },
+      './domain': { today: () => '2026-11-19' },
       vue: {
         ...require('vue'),
         onMounted(callback: () => void) {

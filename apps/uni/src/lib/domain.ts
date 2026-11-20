@@ -1,5 +1,10 @@
 import type { ApiError, LivingRecord, OrderItem } from '../types';
 import { anniversaryInfo, daysBetween as calendarDaysBetween } from '@our-little-world/shared/date';
+import { ref } from 'vue';
+export const serverBusinessDate = ref('');
+export function setBusinessDate(value: string | null | undefined) {
+  serverBusinessDate.value = /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : '';
+}
 export function normalizeBase(value: string) {
   const base = String(value || '')
     .trim()
@@ -22,6 +27,7 @@ export function centsFromInput(value: string | number) {
   return result;
 }
 export function today() {
+  if (serverBusinessDate.value) return serverBusinessDate.value;
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }

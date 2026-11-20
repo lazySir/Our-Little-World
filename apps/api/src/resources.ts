@@ -14,6 +14,10 @@ export class ResourcesService {
     private readonly db: PrismaClient,
     private readonly assets: AssetsService,
   ) {}
+  businessDate() {
+    const date = today();
+    return { date, month: date.slice(0, 7) };
+  }
   async shape(entry: Entry, user: SpaceUser): Promise<ResourceData> {
     const data: ResourceData = JSON.parse(entry.data);
     const result: ResourceData = {

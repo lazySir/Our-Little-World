@@ -16,6 +16,8 @@ npm start
 
 API 使用 Prisma 7 和 `better-sqlite3` 驱动适配器，客户端由 `apps/api/src/db/client.ts` 统一创建，并以毫秒时间戳格式读写 SQLite `DateTime` 字段，兼容现有数据库文件。数据库连接地址从根 `.env` 的 `DATABASE_URL` 读取，Prisma CLI 配置位于 `apps/api/prisma.config.ts`。
 
+服务端以 `TZ` 计算业务日期，默认 `Asia/Shanghai`。若要让本地空间按其他时区换日，可在根 `.env` 或服务环境变量中设置有效的 IANA 时区名并重启；Web 和小程序通过公开的 `/api/business-date` 读取同一业务日期。
+
 根环境样例：
 
 ```dotenv

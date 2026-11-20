@@ -4,6 +4,8 @@ import {
   normalizeBase,
   resolveAsset,
   centsFromInput,
+  setBusinessDate,
+  today,
   nextOccurrence,
   daysBetween,
   buildOrderItems,
@@ -14,6 +16,12 @@ test('API base allows local LAN and HTTPS endpoints without duplicate api prefix
   assert.equal(normalizeBase(' http://192.168.1.8:3000/ '), 'http://192.168.1.8:3000/api');
   assert.equal(normalizeBase('https://home.example/api/'), 'https://home.example/api');
   assert.throws(() => normalizeBase('file:///secret'));
+});
+
+test('server business date overrides the device-local date used by forms', () => {
+  setBusinessDate('2026-11-21');
+  assert.equal(today(), '2026-11-21');
+  setBusinessDate('');
 });
 test('signed asset URLs resolve on the API host without losing their signature', () => {
   assert.equal(

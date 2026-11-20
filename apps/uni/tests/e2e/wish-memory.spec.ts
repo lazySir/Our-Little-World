@@ -163,6 +163,8 @@ test('uni H5 wish conversion stays busy, rejects duplicate taps and retries one 
     gate.resolve();
     expect((await failed).status()).toBe(503);
     await expect(page.getByText('回忆暂时无法保存，请重试', { exact: true })).toBeVisible();
+    await page.getByText('知道了', { exact: true }).click();
+    await expect(page.locator('uni-modal:visible')).toHaveCount(0);
     await expect(convert).not.toHaveClass(/is-loading|is-disabled/);
     await expect(page.locator('.title')).toHaveText('一起做');
     const beforeRetry = await request.get(`${api}/memories`, { headers: world.headers });

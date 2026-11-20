@@ -303,7 +303,7 @@ async function submitOrder() {
     Object.keys(cart).forEach((key) => delete cart[key]);
     orderNote.value = '';
     await loadOrders();
-    notify('点单成功，等着开饭啦');
+    notify('点单成功，等着开饭啦', 'success');
   } catch (e) {
     notify(e.message);
   } finally {

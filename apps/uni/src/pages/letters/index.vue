@@ -103,7 +103,7 @@ import { useCalendarSource } from '../../lib/calendar-source';
 import { useResource } from '../../lib/useResource';
 import { today, daysBetween } from '../../lib/domain';
 const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
-    useResource('letters'),
+    useResource('letters', { syncBusinessDate: true }),
   editing = ref(null),
   form = reactive({ title: '', content: '', unlockDate: '', recipient: 'both' });
 const recipients = [

@@ -86,6 +86,7 @@ function setup() {
       '../stores/session': { useSession: () => store },
       './stores/session': { useSession: () => store },
       '../domain': { today: () => '2026-11-17' },
+      './domain': { today: () => '2026-11-17' },
       vue: { ...require('vue'), onMounted() {}, onUnmounted() {} },
       'vue-router': {
         useRouter: () => ({ replace: async (path: string) => navigations.push(path) }),

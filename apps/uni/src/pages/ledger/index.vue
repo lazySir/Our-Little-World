@@ -7,7 +7,7 @@
       symbol="¥"
     />
     <view class="toolbar">
-      <picker mode="date" fields="month" :value="month" @change="month = $event.detail.value">
+      <picker mode="date" fields="month" :value="month" @change="selectMonth($event.detail.value)">
         <view class="chip">{{ month || '选择月份' }} ▾</view>
       </picker>
       <view class="grow" />
@@ -128,15 +128,15 @@
   </view>
 </template>
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue';
+import { ref, computed, reactive, watch } from 'vue';
 import PageHeading from '../../components/PageHeading.vue';
 import EmptyState from '../../components/EmptyState.vue';
 import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
 import { useResource } from '../../lib/useResource';
-import { today, money, centsFromInput } from '../../lib/domain';
+import { serverBusinessDate, today, money, centsFromInput } from '../../lib/domain';
 const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
-    useResource('ledger'),
+    useResource('ledger', { syncBusinessDate: true }),
   month = ref(today().slice(0, 7)),
   filter = ref('all'),
   editing = ref(null),
@@ -147,6 +147,14 @@ const filters = [
     { value: 'income', label: '收入' },
   ],
   form = reactive({ type: 'expense', category: '餐饮', date: today(), payer: '', note: '' });
+let monthSelected = false;
+watch(serverBusinessDate, (value) => {
+  if (value && !monthSelected) month.value = value.slice(0, 7);
+});
+function selectMonth(value: string) {
+  monthSelected = true;
+  month.value = value;
+}
 const monthly = computed(() => items.value.filter((x) => x.date?.startsWith(month.value))),
   filtered = computed(() =>
     monthly.value

@@ -156,6 +156,9 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
     dashboard(req: AuthenticatedRequest) {
       return resources.dashboard(req.user);
     }
+    businessDate() {
+      return resources.businessDate();
+    }
     calendar(req: AuthenticatedRequest, query: { month?: string }) {
       return resources.calendar(req.user, query?.month);
     }
@@ -166,6 +169,7 @@ export async function createApp(options: { logger?: boolean } = {}): Promise<Wor
   Controller()(SpaceController);
   route(SpaceController, Patch, 'space', 'space', [Req(), Body()]);
   route(SpaceController, Get, 'dashboard', 'dashboard', [Req()]);
+  route(SpaceController, Get, 'businessDate', 'business-date', [], false);
   route(SpaceController, Get, 'calendar', 'calendar', [Req(), Query()]);
   route(SpaceController, Get, 'health', 'health', [], false);
   const controllers: Type<any>[] = [AuthController, SpaceController];

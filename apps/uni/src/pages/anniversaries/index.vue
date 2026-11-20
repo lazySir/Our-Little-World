@@ -88,7 +88,7 @@ import { useCalendarSource } from '../../lib/calendar-source';
 import { useResource } from '../../lib/useResource';
 import { today, nextOccurrence, daysBetween } from '../../lib/domain';
 const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
-    useResource('anniversaries'),
+    useResource('anniversaries', { syncBusinessDate: true }),
   editing = ref(null),
   form = reactive({ title: '', date: today(), recurring: true, description: '', icon: 'heart' });
 const sorted = computed(() =>

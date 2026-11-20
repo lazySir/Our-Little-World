@@ -1,12 +1,17 @@
 import type { Anniversary, LedgerRecord } from './types';
 import { anniversaryInfo } from '@our-little-world/shared/date';
+let serverBusinessDate = '';
+export function setBusinessDate(value: string | null | undefined) {
+  serverBusinessDate = /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : '';
+}
 export const today = () => {
+  if (serverBusinessDate) return serverBusinessDate;
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 export const monthNow = () => today().slice(0, 7);
 export const tomorrow = () => {
-  const d = new Date();
+  const d = new Date(today() + 'T12:00:00');
   d.setDate(d.getDate() + 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };

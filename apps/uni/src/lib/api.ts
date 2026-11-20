@@ -1,10 +1,12 @@
-import { normalizeBase, resolveAsset, decodeResponse } from './domain';
+import { normalizeBase, resolveAsset, decodeResponse, setBusinessDate } from './domain';
 import { toUniRequest } from './transport';
 import { createAssetRefresher, isAssetUrlExpiring } from '@our-little-world/shared/asset-refresh';
 import type { ApiMethod } from './transport';
 import type { Asset, ApiError } from '../types';
 const BASE_KEY = 'little-world-api';
 const TOKEN_KEY = 'little-world-token';
+let businessDateRequestSequence = 0;
+let appliedBusinessDateRequestSequence = 0;
 export const defaultBase = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:3000/api';
 export function getBase() {
   return uni.getStorageSync(BASE_KEY) || defaultBase;
@@ -32,6 +34,9 @@ export async function request<T = any>(
   canExpireSession: () => boolean = () => true,
 ): Promise<T> {
   const token = getToken();
+  const datePath = path.split('?')[0];
+  const syncsBusinessDate = ['/business-date', '/dashboard', '/calendar'].includes(datePath);
+  const dateRequestSequence = syncsBusinessDate ? ++businessDateRequestSequence : 0;
   return new Promise((resolve, reject) =>
     uni.request(
       toUniRequest({
@@ -45,7 +50,17 @@ export async function request<T = any>(
         },
         success(response) {
           try {
-            resolve(decodeResponse(response.statusCode, response.data));
+            const result = decodeResponse(response.statusCode, response.data);
+            if (
+              syncsBusinessDate &&
+              result &&
+              typeof result.date === 'string' &&
+              dateRequestSequence > appliedBusinessDateRequestSequence
+            ) {
+              appliedBusinessDateRequestSequence = dateRequestSequence;
+              setBusinessDate(result.date);
+            }
+            resolve(result);
           } catch (error) {
             if (
               error.status === 401 &&
@@ -67,6 +82,9 @@ export async function request<T = any>(
       }),
     ),
   );
+}
+export async function loadBusinessDate() {
+  return request<{ date: string; month: string }>('/business-date', 'GET', undefined, true);
 }
 export const refreshAsset = createAssetRefresher<Asset>((id) =>
   request<Asset>(`/assets/${encodeURIComponent(id)}/url`),
@@ -132,8 +150,17 @@ export function choosePhotos(count = 9): Promise<string[]> {
 }
 // Keep toast titles short enough for the narrowest WeChat client layout.
 const TOAST_MESSAGE_MAX_LENGTH = 7;
-export function notify(message) {
+export type NotifyKind = 'success' | 'error';
+export function notify(message: unknown, kind: NotifyKind = 'error') {
   const text = String(message);
+  if (kind === 'success') {
+    uni.showToast({
+      title: text.length > TOAST_MESSAGE_MAX_LENGTH ? '已完成' : text,
+      icon: 'success',
+      duration: 2500,
+    });
+    return;
+  }
   if (text.length > TOAST_MESSAGE_MAX_LENGTH) {
     uni.showModal({
       title: '详细提示',
@@ -168,7 +195,7 @@ export async function previewPhotos(assets: Asset[], current = 0) {
   if (urls.length) uni.previewImage({ urls, current: urls[current] || urls[0] });
 }
 export function copy(text) {
-  uni.setClipboardData({ data: String(text), success: () => notify('已复制') });
+  uni.setClipboardData({ data: String(text), success: () => notify('已复制', 'success') });
 }
 export function navigate(url: string) {
   if (

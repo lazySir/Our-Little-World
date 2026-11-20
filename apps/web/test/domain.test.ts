@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMoney, nextAnniversary, today, splitTags, groupLedger } from '../src/domain.ts';
+import {
+  parseMoney,
+  nextAnniversary,
+  today,
+  setBusinessDate,
+  splitTags,
+  groupLedger,
+} from '../src/domain.ts';
 test('money preserves cents and rejects negative and fractional cents', () => {
   assert.equal(parseMoney('12.30'), 1230);
   assert.equal(parseMoney('0.01'), 1);
@@ -41,4 +48,10 @@ test('tags deduplicate and ledger excludes another month', () => {
   assert.equal(stats.balance, 150);
   assert.deepEqual(stats.categories, [{ name: '餐饮', value: 150 }]);
   assert.match(today(), /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test('server business date overrides a device-local date for forms and month defaults', () => {
+  setBusinessDate('2026-11-21');
+  assert.equal(today(), '2026-11-21');
+  setBusinessDate('');
 });

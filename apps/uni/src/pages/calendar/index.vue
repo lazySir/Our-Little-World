@@ -104,7 +104,7 @@
 import { computed, ref } from 'vue';
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app';
 import PageHeading from '../../components/PageHeading.vue';
-import { notify, request } from '../../lib/api';
+import { loadBusinessDate, notify, request } from '../../lib/api';
 import { hasCalendarSource, openCalendarSource } from '../../lib/calendar-source';
 import { today } from '../../lib/domain';
 import { useSession } from '../../stores/session';
@@ -116,6 +116,7 @@ const data = ref<CalendarData>({ month: month.value, date: '', events: [] });
 const loading = ref(true);
 const error = ref('');
 const selectedDate = ref('');
+let firstShow = true;
 let loadSequence = 0;
 const filter = ref<'all' | CalendarEventKind>('all');
 const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
@@ -215,6 +216,15 @@ function isToday(date: string) {
 function viewSource(event: CalendarEvent) {
   openCalendarSource(event, () => notify('暂时打不开来源，请重试'));
 }
-onShow(load);
+onShow(async () => {
+  if (firstShow) {
+    firstShow = false;
+    try {
+      await loadBusinessDate();
+      month.value = today().slice(0, 7);
+    } catch {}
+  }
+  load();
+});
 onPullDownRefresh(load);
 </script>

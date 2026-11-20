@@ -126,7 +126,7 @@ import { useResource } from '../../lib/useResource';
 import { request, notify, navigate } from '../../lib/api';
 import { today } from '../../lib/domain';
 const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
-  useResource('wishes');
+  useResource('wishes', { syncBusinessDate: true });
 const query = ref(''),
   filter = ref('all'),
   editing = ref(null),
@@ -206,7 +206,7 @@ async function toggle(item) {
       completedAt: item.status === 'done' ? null : new Date().toISOString(),
     });
     await load();
-    notify(item.status === 'done' ? '又打开啦' : '完成得漂亮');
+    notify(item.status === 'done' ? '又打开啦' : '完成得漂亮', 'success');
   } catch (e) {
     notify(e.message);
   }
@@ -223,7 +223,7 @@ async function toMemory(item) {
       assetIds: [],
       kind: 'couple',
     });
-    notify('已经放入回忆相册');
+  notify('已经放入回忆相册', 'success');
     navigate('/pages/memories/index');
   } catch (e) {
     notify(e.message);

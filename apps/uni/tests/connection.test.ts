@@ -131,6 +131,37 @@ for (const page of ['auth', 'settings'] as const) {
   });
 }
 
+test('a late dashboard, calendar, or business-date response cannot roll back a newer service date', async (t) => {
+  const previousDate = domain.serverBusinessDate.value;
+  t.after(() => domain.setBusinessDate(previousDate));
+
+  for (const [olderPath, newerPath] of [
+    ['/dashboard', '/business-date'],
+    ['/business-date', '/calendar?month=2026-11'],
+    ['/calendar?month=2026-10', '/dashboard'],
+  ]) {
+    domain.setBusinessDate('');
+    const s = setup('settings');
+    const older = s.api.request(olderPath);
+    const newer = s.api.request(newerPath);
+    assert.equal(s.requests.length, 2);
+
+    s.requests[1].success({
+      statusCode: 200,
+      data: { date: '2026-11-21', month: '2026-11', events: [] },
+    });
+    await newer;
+    assert.equal(domain.serverBusinessDate.value, '2026-11-21');
+
+    s.requests[0].success({
+      statusCode: 200,
+      data: { date: '2026-11-19', month: '2026-11', events: [] },
+    });
+    await older;
+    assert.equal(domain.serverBusinessDate.value, '2026-11-21', `${olderPath} must not override ${newerPath}`);
+  }
+});
+
 test('settings clears the old session and returns to login after connecting to a new service', async () => {
   const s = setup('settings');
   s.view.apiBase.value = candidate;
@@ -154,6 +185,44 @@ test('auth clears a retained session after connecting to a new service', async (
   assert.equal(s.store.user, null);
   assert.equal(s.store.space, null);
   assert.equal(s.view.mode.value, 'setup');
+});
+
+test('auth refreshes its untouched setup date from the anonymous service date before status', async () => {
+  domain.setBusinessDate('2026-11-19');
+  const s = setup('auth');
+  s.storage.delete('little-world-token');
+  assert.equal(s.view.form.startDate, '2026-11-19');
+
+  const loading = s.hooks.load();
+  assert.match(s.requests[0].url, /\/business-date$/);
+  assert.equal(s.requests[0].header.Authorization, undefined);
+  s.requests[0].success({
+    statusCode: 200,
+    data: { date: '2026-11-20', month: '2026-11' },
+  });
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  assert.equal(s.view.form.startDate, '2026-11-20');
+  assert.match(s.requests[1].url, /\/auth\/status$/);
+  s.requests[1].success({ statusCode: 200, data: { initialized: true } });
+  await loading;
+  domain.setBusinessDate('');
+});
+
+test('auth keeps a setup date the user changed while the service date is loading', async () => {
+  domain.setBusinessDate('2026-11-19');
+  const s = setup('auth');
+  s.storage.delete('little-world-token');
+  const loading = s.hooks.load();
+  s.view.form.startDate = '2026-11-18';
+  s.requests[0].success({
+    statusCode: 200,
+    data: { date: '2026-11-20', month: '2026-11' },
+  });
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  assert.equal(s.view.form.startDate, '2026-11-18');
+  s.requests[1].success({ statusCode: 200, data: { initialized: true } });
+  await loading;
+  domain.setBusinessDate('');
 });
 
 test('checking the current address keeps the existing session', async () => {

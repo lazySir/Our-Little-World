@@ -87,7 +87,7 @@ import { useResource } from '../../lib/useResource';
 import { assetUrl, previewPhotos, refreshAssetOnError } from '../../lib/api';
 import { today, splitTags } from '../../lib/domain';
 const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
-    useResource('work'),
+    useResource('work', { syncBusinessDate: true }),
   query = ref(''),
   tagsText = ref(''),
   editing = ref(null),

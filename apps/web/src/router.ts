@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router';
 import { useSession } from './stores/session';
+import { loadBusinessDate } from './composables/business-date';
 const recordProps = (route: RouteLocationNormalized) => ({
   recordId: typeof route.query.record === 'string' ? route.query.record : undefined,
 });
@@ -66,6 +67,11 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const session = useSession();
   await session.hydrate();
+  try {
+    await loadBusinessDate();
+  } catch {
+    // Device-local date remains a temporary fallback when the service is unavailable.
+  }
   if (!session.authenticated && to.path !== '/auth')
     return { path: '/auth', query: { redirect: to.fullPath } };
   if (session.authenticated && to.path === '/auth') return '/';

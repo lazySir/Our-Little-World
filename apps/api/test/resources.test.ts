@@ -123,6 +123,26 @@ test('validation rejects bad calendar dates, fractions of cents and missing asse
     400,
   );
 });
+
+test('business date is server-authoritative and matches future-letter validation', async (t) => {
+  const previousTZ = process.env.TZ;
+  process.env.TZ = 'Asia/Shanghai';
+  t.mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 10, 20, 16, 30) });
+  try {
+    const businessDate = await api.get('/api/business-date');
+    assert.equal(businessDate.status, 200, JSON.stringify(businessDate.body));
+    assert.deepEqual(businessDate.body, { date: '2026-11-21', month: '2026-11' });
+
+    const letter = await api
+      .post('/api/letters')
+      .set(auth())
+      .send({ title: '跨时区的明天', content: '日期由服务端决定', unlockDate: '2026-11-22' });
+    assert.equal(letter.status, 201, JSON.stringify(letter.body));
+  } finally {
+    if (previousTZ === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTZ;
+  }
+});
 test('orders use server prices and immutable snapshots', async () => {
   const menu = await api.post('/api/menu').set(auth()).send({ name: '面条', priceCents: 1800 });
   const order = await api

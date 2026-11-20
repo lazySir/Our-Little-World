@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { useSession } from './stores/session';
+import { today } from './domain';
 const session = useSession(),
   route = useRoute(),
   router = useRouter();
@@ -93,11 +94,12 @@ onUnmounted(() => {
           <span><span class="status-dot" /> 欢迎回家，{{ session.user?.nickname }}</span
           ><span class="topbar-date"
             >{{
-              new Date().toLocaleDateString('zh-CN', {
+              new Intl.DateTimeFormat('zh-CN', {
                 month: 'long',
                 day: 'numeric',
                 weekday: 'long',
-              })
+                timeZone: 'UTC',
+              }).format(new Date(today() + 'T00:00:00Z'))
             }}<AppIcon name="sun" :size="19"
           /></span>
         </div>

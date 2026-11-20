@@ -103,7 +103,15 @@ import { reactive, ref, computed } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import FormField from '../../components/FormField.vue';
 import { useSession } from '../../stores/session';
-import { getBase, connectBase, validateStatus, getToken, request, notify } from '../../lib/api';
+import {
+  getBase,
+  connectBase,
+  validateStatus,
+  getToken,
+  request,
+  notify,
+  loadBusinessDate,
+} from '../../lib/api';
 import { today } from '../../lib/domain';
 const session = useSession(),
   mode = ref('login'),
@@ -114,12 +122,13 @@ const session = useSession(),
   showServer = ref(false),
   apiBase = ref(getBase());
 let connectionVersion = 0;
+const initialStartDate = today();
 const form = reactive({
   username: '',
   password: '',
   nickname: '',
   spaceName: '我们的小世界',
-  startDate: today(),
+  startDate: initialStartDate,
   setupToken: '',
   code: '',
 });
@@ -158,6 +167,12 @@ async function check() {
 onLoad(async () => {
   const version = ++connectionVersion;
   const base = getBase();
+  try {
+    await loadBusinessDate();
+    if (form.startDate === initialStartDate) form.startDate = today();
+  } catch {}
+  if (version !== connectionVersion || connecting.value || saving.value || base !== getBase())
+    return;
   if (getToken()) {
     try {
       if (await session.load()) {
@@ -181,7 +196,7 @@ async function saveBase() {
     const status = await connectBase(apiBase.value);
     if (previous !== getBase()) session.clear();
     applyStatus(status);
-    notify('服务地址已保存');
+    notify('服务地址已保存', 'success');
   } catch (e) {
     error.value = e.message;
   } finally {

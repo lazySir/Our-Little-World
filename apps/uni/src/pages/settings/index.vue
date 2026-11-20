@@ -266,7 +266,7 @@ async function saveProfile() {
     nickname.value = submitted;
     savedNickname = submitted;
     if (await session.load()) syncDrafts();
-    notify('昵称保存好啦');
+    notify('昵称保存好啦', 'success');
   });
 }
 async function saveSpace() {
@@ -277,7 +277,7 @@ async function saveSpace() {
     await request('/space', 'PATCH', submitted);
     savedSpace = submitted;
     if (await session.load()) syncDrafts();
-    notify('小世界更新好啦');
+    notify('小世界更新好啦', 'success');
   });
 }
 async function invite() {
@@ -294,7 +294,7 @@ async function saveServer() {
       uni.reLaunch({ url: '/pages/auth/index' });
       notify('已连接到新服务，请登录这个空间的账号');
     } else {
-      notify('已经连接到服务');
+      notify('已经连接到服务', 'success');
     }
   });
 }
@@ -307,7 +307,7 @@ async function changePassword() {
       newPassword: password.newPassword,
     });
     Object.assign(password, { currentPassword: '', newPassword: '', confirmPassword: '' });
-    notify('密码已更新，其他设备需要重新登录');
+    notify('密码已更新，其他设备需要重新登录', 'success');
   });
 }
 async function download(kind: string) {
@@ -316,7 +316,7 @@ async function download(kind: string) {
       kind === 'export' ? '/backup/export' : '/backup/download',
       `little-world-${today()}.${kind === 'export' ? 'json' : 'zip'}`,
     );
-    if (result) notify('备份已导出，请在接收位置确认文件');
+    if (result) notify('备份已导出，请在接收位置确认文件', 'success');
   });
 }
 async function restore() {
@@ -347,7 +347,7 @@ async function restore() {
           complete: () => resolve(),
         }),
       );
-    } else notify('恢复完成，记录已经回到小世界');
+    } else notify('恢复完成，记录已经回到小世界', 'success');
     uni.reLaunch({ url: '/pages/home/index' });
   });
 }

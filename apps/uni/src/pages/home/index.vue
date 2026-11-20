@@ -255,7 +255,7 @@ async function saveMood() {
       mood: myMood.value,
       note: moodNote.value,
     });
-    notify('今天的心情收好啦');
+    notify('今天的心情收好啦', 'success');
     await load(true);
   } catch (e) {
     notify(e.message);

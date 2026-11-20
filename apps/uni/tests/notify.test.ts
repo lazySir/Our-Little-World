@@ -39,6 +39,14 @@ test('notify keeps short messages as toasts', () => {
   assert.equal(calls[0].options.title, '保存失败');
 });
 
+test('notify keeps long success messages non-blocking', () => {
+  const { api, calls } = loadApi();
+  api.notify('今天的心情收好啦', 'success');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].kind, 'toast');
+  assert.equal(calls[0].options.title, '已完成');
+});
+
 test('notify presents the complete long message in a modal, not a toast', () => {
   const { api, calls } = loadApi();
   const message = '连接不到小世界，请检查服务是否启动和当前接口地址';

@@ -223,6 +223,8 @@ for (const resource of ['auth/profile', 'space'] as const) {
       await press(currentPage(page), resource === 'auth/profile' ? '保存昵称' : '保存小世界');
       await failure;
       await expect(currentPage(page).locator('.error-box')).toContainText('这次保存暂时失败');
+      await page.getByText('知道了', { exact: true }).click();
+      await expect(page.locator('uni-modal:visible')).toHaveCount(0);
       await assertDrafts(page, nickname, name);
       const stale = page.waitForResponse(
         (response) => response.url() === `${api}/auth/me` && response.request().method() === 'GET',
@@ -336,6 +338,8 @@ test('uni H5 locks password fields while saving, keeps a failed draft, and clear
     gate.resolve();
     await failure;
     await expect(box.locator('.error-box')).toContainText('密码暂时无法更新');
+    await page.getByText('知道了', { exact: true }).click();
+    await expect(page.locator('uni-modal:visible')).toHaveCount(0);
     await expect(inputs[0]).toHaveValue(values.current);
     await expect(inputs[1]).toHaveValue(values.next);
     await expect(inputs[2]).toHaveValue(values.next);
