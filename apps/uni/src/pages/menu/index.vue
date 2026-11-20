@@ -12,7 +12,7 @@
     </view>
     <view class="chips">
       <button
-        v-for="option in categories"
+        v-for="option in filterCategories"
         :key="option.value"
         class="chip ui-reset"
         :class="{ active: category === option.value }"
@@ -95,10 +95,10 @@
       <EmptyState
         v-if="!filtered.length"
         symbol="♨"
-        title="菜单还没有这一类"
-        description="从一碗面、一杯茶或者一家喜欢的小店开始吧。"
-        action="添加想吃的"
-        @action="openNew"
+        :title="hasFilter ? '没有匹配的菜单' : '菜单还没有想吃的'"
+        :description="hasFilter ? '试试其他关键词、分类或收藏条件。' : '从一碗面、一杯茶或者一家喜欢的小店开始吧。'"
+        :action="hasFilter ? '清除筛选' : '添加想吃的'"
+        @action="hasFilter ? clearFilters() : openNew()"
       /> </template
     ><view v-if="cartCount" class="sticky-cart"
       ><view class="between"
@@ -212,15 +212,25 @@ const categories = [
   { value: 'drink', label: '饮品' },
   { value: 'restaurant', label: '下馆子' },
 ];
+const filterCategories = [{ value: 'all', label: '全部' }, ...categories];
 const form = reactive({ name: '', category: 'dish', description: '', favorite: false });
+const normalizedQuery = computed(() => query.value.trim().toLowerCase());
+const hasFilter = computed(
+  () => !!normalizedQuery.value || category.value !== 'all' || favoriteOnly.value,
+);
 const filtered = computed(() =>
   items.value.filter(
     (x) =>
-      x.category === category.value &&
+      (category.value === 'all' || x.category === category.value) &&
       (!favoriteOnly.value || x.favorite) &&
-      `${x.name} ${x.description || ''}`.includes(query.value),
+      `${x.name} ${x.description || ''}`.toLowerCase().includes(normalizedQuery.value),
   ),
 );
+function clearFilters() {
+  query.value = '';
+  category.value = 'all';
+  favoriteOnly.value = false;
+}
 const cartCount = computed(() => items.value.reduce((sum, item) => sum + (cart[item.id] || 0), 0)),
   cartTotal = computed(() =>
     items.value.reduce((sum, item) => sum + (cart[item.id] || 0) * item.priceCents, 0),
@@ -231,7 +241,12 @@ function change(id, amount) {
 }
 function openNew() {
   editing.value = null;
-  Object.assign(form, { name: '', category: category.value, description: '', favorite: false });
+  Object.assign(form, {
+    name: '',
+    category: category.value === 'all' ? 'dish' : category.value,
+    description: '',
+    favorite: false,
+  });
   photos.value = [];
   priceText.value = '0';
   editor.value = true;

@@ -78,10 +78,10 @@
       <EmptyState
         v-if="!calendarSource && !filtered.length"
         symbol="✦"
-        title="清单还空着"
-        description="先写下一件你们都想做的小事，完成时再把它变成一段回忆。"
-        action="写下第一件事"
-        @action="openNew"
+        :title="hasFilter ? '没有匹配的愿望' : '清单还空着'"
+        :description="hasFilter ? '试试其他关键词或筛选条件。' : '先写下一件你们都想做的小事，完成时再把它变成一段回忆。'"
+        :action="hasFilter ? '清除筛选' : '写下第一件事'"
+        @action="hasFilter ? resetFilters() : openNew()"
       /> </template
     ><EditorSheet
       v-model="editor"
@@ -147,13 +147,15 @@ const form = reactive({
   targetDate: null,
   completedAt: null,
 });
+const normalizedQuery = computed(() => query.value.trim().toLowerCase());
 const filtered = computed(() =>
   items.value.filter(
     (item) =>
       (filter.value === 'all' || item.status === filter.value) &&
-      `${item.title} ${item.description || ''}`.toLowerCase().includes(query.value.toLowerCase()),
+      `${item.title} ${item.description || ''}`.toLowerCase().includes(normalizedQuery.value),
   ),
 );
+const hasFilter = computed(() => !!normalizedQuery.value || filter.value !== 'all');
 const count = (value) => items.value.filter((item) => item.status === value).length;
 const { calendarSource, clearCalendarSource } = useCalendarSource('wish');
 const sourceMissing = computed(() => {
@@ -172,6 +174,10 @@ const visibleRecords = computed(() => {
     return items.value.filter((item) => item.id === selection.sourceId);
   return sourceMissing.value ? items.value : filtered.value;
 });
+function resetFilters() {
+  query.value = '';
+  filter.value = 'all';
+}
 function openNew() {
   editing.value = null;
   Object.assign(form, {

@@ -61,10 +61,10 @@
       <EmptyState
         v-if="!calendarSource && !filtered.length"
         symbol="♡"
-        title="还没有被收藏的日子"
-        description="一张照片、一句话，就可以开始你们的回忆时间线。"
-        action="写下第一篇回忆"
-        @action="openNew"
+        :title="hasFilter ? '没有匹配的回忆' : '还没有被收藏的日子'"
+        :description="hasFilter ? '试试其他关键词或分类。' : '一张照片、一句话，就可以开始你们的回忆时间线。'"
+        :action="hasFilter ? '清除筛选' : '写下第一篇回忆'"
+        @action="hasFilter ? resetFilters() : openNew()"
       /> </template
     ><EditorSheet
       v-model="editor"
@@ -128,15 +128,17 @@ const form = reactive({
   tags: [],
   kind: 'couple',
 });
+const normalizedQuery = computed(() => query.value.trim().toLowerCase());
 const filtered = computed(() =>
   items.value.filter(
     (item) =>
       (kind.value === 'all' || item.kind === kind.value) &&
       `${item.title} ${item.content || ''} ${(item.tags || []).join(' ')}`
         .toLowerCase()
-        .includes(query.value.toLowerCase()),
+        .includes(normalizedQuery.value),
   ),
 );
+const hasFilter = computed(() => !!normalizedQuery.value || kind.value !== 'all');
 const { calendarSource, clearCalendarSource } = useCalendarSource('memory');
 const sourceMissing = computed(() => {
   const source = calendarSource.value;
@@ -154,6 +156,10 @@ const visibleRecords = computed(() => {
     return items.value.filter((item) => item.id === selection.sourceId);
   return sourceMissing.value ? items.value : filtered.value;
 });
+function resetFilters() {
+  query.value = '';
+  kind.value = 'all';
+}
 function openNew() {
   editing.value = null;
   tagsText.value = '';
