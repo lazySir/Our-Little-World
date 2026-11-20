@@ -48,11 +48,11 @@ onUnmounted(() => {
 </script>
 <template>
   <div class="app" :data-theme="theme">
-    <div v-if="!online" class="offline-banner">
-      现在没有网络，已保存的内容会留在小世界里。连接恢复后可继续操作。
+    <div v-if="!online" class="offline-banner" role="status" aria-live="polite">
+      网络已断开。记录保存在私人服务中，离线时可能无法查看或编辑；请在连接恢复后重试。
     </div>
     <template v-if="session.authenticated && route.path !== '/auth'"
-      ><aside class="sidebar">
+      ><a class="skip-link" href="#main-content">跳到主要内容</a><aside class="sidebar">
         <router-link to="/" class="brand"
           ><span class="brand-mark"><AppIcon name="home" :size="27" /></span
           ><span>我们的小世界<small>OUR LITTLE WORLD</small></span></router-link
@@ -87,7 +87,7 @@ onUnmounted(() => {
           </button>
         </div>
       </aside>
-      <main class="main-content">
+      <main id="main-content" class="main-content" tabindex="-1">
         <div class="topbar">
           <span><span class="status-dot" /> 欢迎回家，{{ session.user?.nickname }}</span
           ><span class="topbar-date"

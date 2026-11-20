@@ -188,6 +188,20 @@ test('two people can create, share and persist their complete little world', asy
   }
   await expect(page.getByRole('heading', { name: '平凡日子，也闪闪发光' })).toBeVisible();
   await expect(page.locator('.home-hero')).toContainText('小林与小禾的小世界');
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+  await page.keyboard.press('Tab');
+  const skipLink = page.getByRole('link', { name: '跳到主要内容' });
+  await expect(skipLink).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#main-content')).toBeFocused();
+  await page.context().setOffline(true);
+  await expect(page.getByRole('status')).toContainText(
+    '记录保存在私人服务中，离线时可能无法查看或编辑',
+  );
+  await page.context().setOffline(false);
+  await expect(page.getByRole('status')).toHaveCount(0);
   await page.getByRole('button', { name: '超开心', exact: true }).click();
   await page.getByPlaceholder('留一句今天的小心情…').fill('今天也认真过日子');
   await page.getByRole('button', { name: /记下心情|更新心情/ }).click();

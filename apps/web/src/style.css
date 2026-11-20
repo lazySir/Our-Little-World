@@ -806,6 +806,24 @@ textarea {
 .mobile-nav {
   display: none;
 }
+.skip-link {
+  position: fixed;
+  z-index: 3000;
+  top: 12px;
+  left: 12px;
+  transform: translateY(-160%);
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--accent-dark);
+  color: #fff;
+  box-shadow: 0 4px 18px #241c1733;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+.main-content:focus {
+  outline: none;
+}
 .offline-banner {
   position: fixed;
   top: 0;
