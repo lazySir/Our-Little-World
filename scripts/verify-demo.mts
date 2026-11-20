@@ -25,8 +25,8 @@ try {
   const seeded = run();
   assert.equal(seeded.status, 0, seeded.error?.message || `${seeded.stdout}\n${seeded.stderr}`);
   const require = createRequire(import.meta.url);
-  const { PrismaClient } = require('@prisma/client') as typeof import('@prisma/client');
-  const database = new PrismaClient({ datasources: { db: { url: environment.DATABASE_URL } } });
+  const { createPrismaClient } = require('../apps/api/dist/db/client.js') as typeof import('../apps/api/src/db/client.js');
+  const database = createPrismaClient(environment.DATABASE_URL);
   try {
     assert.equal(await database.space.count(), 1);
     assert.equal(await database.user.count(), 2);

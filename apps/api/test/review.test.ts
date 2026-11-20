@@ -17,7 +17,7 @@ before(async () => {
   process.env.ASSET_SECRET = 'independent-review-asset-secret-123456';
   process.env.TZ = 'America/Los_Angeles';
   process.env.AUTO_BACKUP_HOURS = '0';
-  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
+  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy', '--config', 'prisma.config.ts'], {
     cwd: path.join(__dirname, '..'),
     stdio: 'pipe',
     env: { ...process.env, RUST_LOG: 'info' },

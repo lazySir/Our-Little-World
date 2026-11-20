@@ -30,7 +30,7 @@ import type {
   Type,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from './db/client';
 import { ZodError } from 'zod';
 import express from 'express';
 import type { Response } from 'express';
@@ -77,7 +77,7 @@ class ErrorFilter implements ExceptionFilter {
 Catch()(ErrorFilter);
 export interface WorldApplication extends INestApplication {}
 export async function createApp(options: { logger?: boolean } = {}): Promise<WorldApplication> {
-  const db = new PrismaClient();
+  const db = createPrismaClient();
   await db.$connect();
   await db.$queryRawUnsafe('PRAGMA journal_mode = WAL');
   await db.$queryRawUnsafe('PRAGMA busy_timeout = 5000');

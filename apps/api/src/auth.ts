@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { HttpException } from '@nestjs/common';
-import type { PrismaClient, User } from '@prisma/client';
+import type { PrismaClient, User } from './db/client';
 import type { AuthenticatedRequest, SpaceUser } from './types';
 import { z, text, date, credentials, passwordInput } from './validation';
 import { consumeSetupToken, setupTokenMatches } from './setup-token';

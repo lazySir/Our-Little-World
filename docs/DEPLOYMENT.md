@@ -14,6 +14,8 @@ npm start
 
 `npm run init` 只执行生成客户端与 `prisma migrate deploy`，不执行会交互修改表结构的 `migrate dev`，也不重置生产数据。迁移由仓库中的 `apps/api/prisma/migrations` 管理。
 
+API 使用 Prisma 7 和 `better-sqlite3` 驱动适配器，客户端由 `apps/api/src/db/client.ts` 统一创建，并以毫秒时间戳格式读写 SQLite `DateTime` 字段，兼容现有数据库文件。数据库连接地址从根 `.env` 的 `DATABASE_URL` 读取，Prisma CLI 配置位于 `apps/api/prisma.config.ts`。
+
 根环境样例：
 
 ```dotenv

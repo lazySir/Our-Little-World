@@ -18,7 +18,7 @@ before(async () => {
   process.env.ASSET_SECRET = 'resource-tests-long-secret-1234567890';
   process.env.CORS_ORIGINS = 'http://localhost:5175';
   process.env.RUST_LOG ||= 'info';
-  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
+  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy', '--config', 'prisma.config.ts'], {
     cwd: path.join(__dirname, '..'),
     stdio: 'pipe',
     env: { ...process.env, RUST_LOG: 'info' },
@@ -321,9 +321,9 @@ test('backup restores a real roundtrip, preserves login and rejects malformed zi
 });
 
 test('automatic archives contain data and retain only seven scheduled copies', async () => {
-  const { PrismaClient } = await import('@prisma/client');
+  const { createPrismaClient } = await import('../src/db/client');
   const { makeBackupController } = await import('../src/backup');
-  const db = new PrismaClient();
+  const db = createPrismaClient();
   try {
     const backups = path.join(directory, 'storage', 'backups');
     await mkdir(backups, { recursive: true });

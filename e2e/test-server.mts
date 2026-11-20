@@ -89,12 +89,17 @@ export async function startTestServer(kind: 'web' | 'uni') {
   try {
     execFileSync(
       process.execPath,
+      [require.resolve('prisma/build/index.js'), 'generate', '--config', 'apps/api/prisma.config.ts'],
+      { cwd: root, env: environment, stdio: 'pipe', windowsHide: true },
+    );
+    execFileSync(
+      process.execPath,
       [
         require.resolve('prisma/build/index.js'),
         'migrate',
         'deploy',
-        '--schema',
-        'apps/api/prisma/schema.prisma',
+        '--config',
+        'apps/api/prisma.config.ts',
       ],
       {
         cwd: root,

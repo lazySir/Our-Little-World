@@ -32,7 +32,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json",
     "db:generate": "npm run db:generate --workspace=@our-little-world/api",
     "db:migrate": "npm run db:migrate --workspace=@our-little-world/api",
-    "demo": "npm run build:shared && node --experimental-strip-types scripts/demo.mts",
+    "demo": "node --experimental-strip-types scripts/demo.mts",
     "format": "prettier --write apps/**/src packages/shared/src scripts docs *.json *.md",
     "test:e2e": "playwright test --config=e2e/web.config.ts",
     "test:e2e:uni": "npm run build:shared && playwright test --config=apps/uni/playwright.config.ts",

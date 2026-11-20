@@ -1,5 +1,5 @@
 import type { Request } from 'express';
-import type { User } from '@prisma/client';
+import type { User } from './db/client';
 
 export type SpaceUser = Pick<
   User,

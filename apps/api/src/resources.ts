@@ -1,6 +1,6 @@
 import { schemas } from './validation';
 import { fail } from './auth';
-import type { Entry, PrismaClient } from '@prisma/client';
+import type { Entry, PrismaClient } from './db/client';
 import type { AssetsService } from './assets';
 import type { ResourceData, SpaceUser } from './types';
 const { daysTogether, anniversaryInfo } = require('@our-little-world/shared/date');

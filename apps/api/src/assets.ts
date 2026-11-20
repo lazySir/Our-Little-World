@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
-import type { Asset, PrismaClient } from '@prisma/client';
+import type { Asset, PrismaClient } from './db/client';
 import type { SpaceUser, AssetQuery } from './types';
 import { fail } from './auth';
 import config = require('./config');

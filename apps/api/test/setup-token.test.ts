@@ -23,7 +23,7 @@ before(async () => {
   process.env.ASSET_SECRET = 'test-secret-that-is-long-enough-for-tests';
   process.env.SETUP_TOKEN = '';
   process.env.RUST_LOG ||= 'info';
-  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
+  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy', '--config', 'prisma.config.ts'], {
     cwd: path.join(__dirname, '..'),
     stdio: 'pipe',
     env: { ...process.env, RUST_LOG: 'info' },

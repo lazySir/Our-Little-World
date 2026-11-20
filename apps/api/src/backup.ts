@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import AdmZip from 'adm-zip';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from './db/client';
 import { Controller, Get, Post, Req, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Mutex } from 'async-mutex';

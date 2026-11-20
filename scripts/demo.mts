@@ -5,11 +5,12 @@ import { ensureStorage, loadEnvironment, runNpm } from './runtime.mts';
 try {
   const environment = loadEnvironment();
   ensureStorage(environment);
+  await runNpm(['run', 'build:api'], { env: environment });
   const file = environment.DATABASE_URL.slice(5).split('?')[0];
   if (existsSync(file)) {
     const require = createRequire(import.meta.url);
-    const { PrismaClient } = require('@prisma/client') as typeof import('@prisma/client');
-    const database = new PrismaClient({ datasources: { db: { url: environment.DATABASE_URL } } });
+    const { createPrismaClient } = require('../apps/api/dist/db/client.js') as typeof import('../apps/api/src/db/client.js');
+    const database = createPrismaClient(environment.DATABASE_URL);
     try {
       const tables = await database.$queryRawUnsafe<Array<{ name: string }>>(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '_prisma_migrations'",
@@ -22,7 +23,6 @@ try {
       await database.$disconnect();
     }
   }
-  await runNpm(['run', 'build:shared'], { env: environment });
   await runNpm(['run', 'db:migrate', '--workspace=@our-little-world/api'], { env: environment });
   await runNpm(['run', 'demo', '--workspace=@our-little-world/api'], { env: environment });
   console.log('Demo content is ready. Save the generated temporary password, then start the application.');

@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../src/db/client';
 import request from 'supertest';
 import { readSetupToken } from './setup-fixture';
 
@@ -31,20 +31,20 @@ before(async () => {
   process.env.ASSET_SECRET = 'history-isolated-test-secret-1234567890';
   process.env.AUTO_BACKUP_HOURS = '0';
   process.env.TZ = 'Asia/Shanghai';
-  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
+  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy', '--config', 'prisma.config.ts'], {
     cwd: path.join(__dirname, '..'),
     stdio: 'pipe',
     env: { ...process.env, RUST_LOG: 'info' },
   });
   const { createApp } = await import('../src/app');
-  const { PrismaClient } = await import('@prisma/client');
+  const { createPrismaClient } = await import('../src/db/client');
   const { today } = await import('../src/resources');
   currentDate = today();
   historicalDate = `${Number(currentDate.slice(0, 4)) - 1}-01-01`;
   app = await createApp({ logger: false });
   await app.init();
   api = request(app.getHttpServer());
-  db = new PrismaClient();
+  db = createPrismaClient();
   const setup = await api.post('/api/auth/setup').send({
     setupToken: readSetupToken(path.join(directory, 'storage')),
     username: 'history_owner',

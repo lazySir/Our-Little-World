@@ -15,7 +15,7 @@ const names = {
   letter: `未来的信 ${stamp}`,
 };
 const pixel = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+yQwAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWO4E9X0HwAGhgK4M8vXdAAAAABJRU5ErkJggg==',
   'base64',
 );
 const sheet = (page: Page) => page.locator('.sheet:visible');

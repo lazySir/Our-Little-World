@@ -213,6 +213,7 @@ function mountPage(page: string) {
       }),
     );
   app.component('wd-switch', defineComponent({ setup: () => () => h('switch') }));
+  app.component('wd-segmented', defineComponent({ setup: () => () => null }));
   app.mount(root);
   const button = (label: string) => {
     const found = all(root).find((node) => node.type === 'button' && textOf(node).trim() === label);

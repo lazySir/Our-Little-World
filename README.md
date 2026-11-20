@@ -1,6 +1,38 @@
 # 我们的小世界
 
-供两个人使用的私人生活空间，可部署在自己的电脑、NAS 或常开小主机上。Web 与微信小程序共用一套 API 与 SQLite 数据，Web 同时适配电脑和手机浏览器。界面采用奶油色、手账卡片和暖色插画。
+> 把两个人的愿望、回忆和日常，收进一个由自己掌握的小家。
+
+「我们的小世界」是一款面向伴侣的私人生活记录工具。它提供响应式 Web、微信小程序和统一的本地服务端；电脑浏览器、手机浏览器与小程序共用账号、API 和 SQLite 数据。界面以奶油色、手账卡片和暖色插画呈现，服务可以部署在自己的电脑、NAS 或常开小主机上。
+
+## 界面预览
+
+以下截图来自隔离的本地演示数据，不含真实用户资料。小程序图展示的是 uni-app H5 联调页面，用于预览与微信小程序共享的页面代码；正式微信运行仍需在开发者工具或真机中验收。
+
+<p align="center">
+  <img src="./docs/images/readme/web-desktop-dashboard.jpg" alt="桌面 Web 首页：在一起天数、今日心情、愿望、纪念日与账本" width="100%" />
+</p>
+<p align="center"><sub>桌面 Web：一起生活的每日概览与各功能入口</sub></p>
+
+<p align="center">
+  <img src="./docs/images/readme/web-mobile-dashboard.jpg" alt="手机浏览器中的响应式 Web 首页" width="40%" />
+  <img src="./docs/images/readme/wechat-h5-home.jpg" alt="uni-app 微信小程序 H5 联调首页" width="40%" />
+</p>
+<p align="center"><sub>左：手机 Web 首页；右：小程序 H5 联调首页</sub></p>
+
+<p align="center">
+  <img src="./docs/images/readme/web-memories.jpg" alt="Web 回忆相册：按故事分类和标签查看双人回忆" width="100%" />
+</p>
+<p align="center"><sub>Web 回忆相册：浏览故事、分类和标签</sub></p>
+
+## 项目概览
+
+- **一起记录：** 心情、共同愿望、吃饭点单、账本、纪念日、回忆相册、成长记录、工作手记和时光信箱。
+- **双端共用：** Web 与微信小程序使用同一套 NestJS API 和 SQLite 数据；Web 桌面与手机浏览器使用同一套响应式页面。
+- **自己掌握：** 数据库、图片附件和备份放在自己的服务端目录或 Docker 数据卷，不依赖外部 SaaS 数据库。
+- **面向两个人：** 首位成员创建空间，第二位成员通过一次性邀请码加入；空间最多两位成员。
+- **私密优先：** 空间资源按成员关系隔离，未解锁的时光信由服务端隐藏；照片会去除元数据并缩放、转换为 WebP。
+
+当前仅交付 Web、微信小程序和移动端适配网页，不包含 Android 或 iOS 原生应用。项目不提供即时聊天、实时定位、公开社区或第三方 AI 服务。
 
 ## 功能
 
@@ -56,14 +88,34 @@ Web 默认 `http://localhost:5173`，API 默认 `http://localhost:3000/api`。�
 ## 项目目录与技术
 
 ```text
-apps/api          NestJS 11 / TypeScript / Prisma 6 / SQLite
+apps/api          NestJS 11 / TypeScript / Prisma 7 / SQLite
 apps/web          Vue 3 / TypeScript / Vite / Element Plus / Tailwind / Pinia / ECharts
-apps/uni          Vue 3 / TypeScript / Vite / uni-app / Wot Design Uni
+apps/uni          Vue 3 / TypeScript / Vite / uni-app / Wot Design Uni / Tailwind
 packages/shared   日期、金额与共享领域逻辑
 scripts           初始化、并行开发、生产启动与运行检查
 data              本机 SQLite 数据（不提交）
 storage           本机附件与备份（不提交）
 ```
+
+### 架构与数据流
+
+```mermaid
+flowchart LR
+  Browser["响应式 Web<br/>Vue 3 · Element Plus"] --> API[NestJS 11 API]
+  WeChat["微信小程序<br/>uni-app · Wot Design Uni"] --> API
+  Browser -.-> Shared[共享 TypeScript 领域逻辑]
+  WeChat -.-> Shared
+  API -.-> Shared
+  API --> Prisma["Prisma 7<br/>better-sqlite3 驱动"]
+  Prisma --> DB[(SQLite 数据库)]
+  API --> Files["本地图片、ZIP 备份<br/>storage/"]
+```
+
+Web 和微信小程序通过同一套 API 读写双人空间。服务端负责登录会话、空间成员校验、照片处理和备份；SQLite 保存结构化记录，`storage/` 保存处理后的照片与备份。响应式 Web 可直接在手机浏览器访问，不需要安装 Android 或 iOS 应用。
+
+### 文档维护约定
+
+每次新增、调整或移除用户可见功能，以及改变安装、配置、部署、数据保存或备份行为时，都要在同一项改动中更新本 README 的功能、操作或部署说明。界面明显变化时同步更新对应截图；只有内部实现变化时，也要检查技术栈、目录和架构说明是否仍准确。需要更深入的产品、部署和验收记录时，同步维护 `docs/PRODUCT.md`、`docs/DEPLOYMENT.md` 和 `docs/VERIFICATION.md` 中受影响的部分。
 
 根 `.env` 的相对路径统一从仓库根目录解释；使用根脚本启动。只运行 `apps/api` 内部命令时需要自行配置该目录的环境，不能把两个位置的相对路径混用。
 
@@ -121,7 +173,7 @@ docker compose logs -f world
 
 访问 `http://localhost:3000`。第一次创建空间前，读取容器中的一次性验证码：`docker compose exec world cat /app/storage/.setup-token`。创建成功后该文件会自动删除。容器启动时应用数据库迁移，数据库和附件分别保存在 `world-data`、`world-storage` 命名卷。`.env` 中的 `ASSET_SECRET` 由 Compose 传入容器。停机可用 `docker compose down`；**不要加 `-v`，否则会删除数据卷**。
 
-容器与直接 Node 运行默认使用不同数据位置；切换部署方式需保留原账号身份，按部署说明中的离线迁移步骤操作。2026-11-17 已实际验证镜像构建、Compose 启动、健康检查、重启后记录与照片持久化，以及 ZIP 备份恢复，详见 `docs/VERIFICATION.md`。
+容器与直接 Node 运行默认使用不同数据位置；切换部署方式需保留原账号身份，按部署说明中的离线迁移步骤操作。2026-11-17 的镜像构建、Compose 启动、健康检查、重启后记录与照片持久化，以及 ZIP 备份恢复均在本次 Prisma 7 迁移前验证；本轮 Docker 引擎未运行，因此尚未复验迁移后的 Docker 镜像与 Compose，详见 `docs/VERIFICATION.md`。
 
 ## 数据与备份
 
@@ -131,7 +183,7 @@ docker compose logs -f world
 
 网页 ZIP 下载和恢复使用同一容量范围：最多 10000 条生活记录、10000 个 ZIP 内文件（其中 3 个为固定文件）、展开后合计 250MiB、ZIP 文件 100MiB。超出范围会明确拒绝，并提示停止服务后复制 `data`、`storage` 与 `.env` 做离线备份。当前数据超限时恢复也会在覆盖前停止，以免无法留下保护副本。文件大小异常的照片会在保护副本的 `damagedAssets` 中标记并保留现有字节，仍能用以前完整 ZIP 修复。
 
-服务默认每 24 小时在 `storage/backups` 自动保存一次 ZIP，仅保留最新 7 份自动备份；恢复前的保护副本单独保留。根 `.env` 的 `AUTO_BACKUP_HOURS=24` 可调整间隔，正数范围为 1–596 小时，`0` 关闭。首次自动备份需服务连续运行一个完整间隔；请定期将备份复制到另一块磁盘。
+服务默认每 24 小时在 `storage/backups` 自动保存一次 ZIP，保留最新 7 份自动备份；恢复前的保护副本也独立保留最新 7 份。根 `.env` 的 `AUTO_BACKUP_HOURS=24` 可调整间隔，正数范围为 1–596 小时，`0` 关闭。首次自动备份需服务连续运行一个完整间隔；请定期将备份复制到另一块磁盘。
 
 上传图片会去除元数据、限制尺寸并转为 WebP。备份保存的是服务内的图片版本；需要保留相机原片时，请另行保存。ZIP 中包含可用于离线恢复的数据库，因此也包含账号密码哈希，应作为私人文件保管。
 

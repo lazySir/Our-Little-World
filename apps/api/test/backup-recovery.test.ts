@@ -60,7 +60,7 @@ before(async () => {
   process.env.STORAGE_DIR = path.join(directory, 'storage');
   process.env.ASSET_SECRET = 'backup-recovery-isolated-test-secret-123456';
   process.env.AUTO_BACKUP_HOURS = '0';
-  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
+  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy', '--config', 'prisma.config.ts'], {
     cwd: path.join(__dirname, '..'),
     stdio: 'pipe',
     env: { ...process.env, RUST_LOG: 'info' },
@@ -109,8 +109,8 @@ test('a successful restore removes unreferenced uploads without deleting another
   const uploadDirectory = path.join(directory, 'storage', 'uploads');
   const removed = await upload('#aae5bb');
   await writeFile(path.join(uploadDirectory, 'legacy-orphan.webp'), 'orphan');
-  const { PrismaClient } = await import('@prisma/client');
-  const db = new PrismaClient();
+  const { createPrismaClient } = await import('../src/db/client');
+  const db = createPrismaClient();
   const otherSpace = await db.space.create({
     data: { name: '另一个空间', startDate: '2024-01-01', theme: 'cream' },
   });
@@ -157,6 +157,82 @@ test('a successful restore removes unreferenced uploads without deleting another
   );
 });
 
+test('the SQLite adapter writes and reads DateTime values as epoch milliseconds', async () => {
+  const { createPrismaClient } = await import('../src/db/client');
+  const db = createPrismaClient();
+  try {
+    const owner = await db.user.findUniqueOrThrow({ where: { username: 'recovery_owner' } });
+    const timestamp = new Date('2022-02-03T04:05:06.789Z');
+    const entry = await db.entry.create({
+      data: {
+        id: 'adapter-timestamp-entry',
+        kind: 'memories',
+        data: JSON.stringify({ title: '适配器时间戳', date: '2022-02-03' }),
+        spaceId: owner.spaceId,
+        authorId: owner.id,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    });
+    assert.equal(entry.createdAt.getTime(), timestamp.getTime());
+    assert.equal(entry.updatedAt.getTime(), timestamp.getTime());
+    const persisted = await db.$queryRawUnsafe<Array<{ createdAt: bigint; updatedAt: bigint }>>(
+      'SELECT CAST(createdAt AS INTEGER) AS createdAt, CAST(updatedAt AS INTEGER) AS updatedAt FROM Entry WHERE id = ?',
+      'adapter-timestamp-entry',
+    );
+    assert.deepEqual(persisted[0], {
+      createdAt: BigInt(timestamp.getTime()),
+      updatedAt: BigInt(timestamp.getTime()),
+    });
+  } finally {
+    await db.entry.deleteMany({ where: { id: 'adapter-timestamp-entry' } });
+    await db.$disconnect();
+  }
+});
+
+test('backup restore preserves legacy SQLite DateTime values at millisecond precision', async () => {
+  const { createPrismaClient } = await import('../src/db/client');
+  const db = createPrismaClient();
+  try {
+    const owner = await db.user.findUniqueOrThrow({ where: { username: 'recovery_owner' } });
+    const timestamp = new Date('2021-04-05T06:07:08.123Z');
+    await db.$executeRawUnsafe(
+      'INSERT INTO Entry (id, kind, data, spaceId, authorId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'legacy-timestamp-entry',
+      'memories',
+      JSON.stringify({ title: '带毫秒的旧记录', date: '2021-04-05' }),
+      owner.spaceId,
+      owner.id,
+      timestamp.getTime(),
+      timestamp.getTime(),
+    );
+    const original = await db.entry.findUniqueOrThrow({ where: { id: 'legacy-timestamp-entry' } });
+    assert.equal(original.createdAt.getTime(), timestamp.getTime());
+    assert.equal(original.updatedAt.getTime(), timestamp.getTime());
+
+    const backup = await api.get('/api/backup/download').set(auth()).buffer(true).parse(binary);
+    assert.equal(backup.status, 200);
+    const archive = new AdmZip(backup.body);
+    const archivedEntry = JSON.parse(archive.readAsText('data.json')).entries.find(
+      (entry: any) => entry.id === 'legacy-timestamp-entry',
+    );
+    assert.equal(archivedEntry.createdAt, timestamp.toISOString());
+    assert.equal(archivedEntry.updatedAt, timestamp.toISOString());
+
+    await db.entry.delete({ where: { id: 'legacy-timestamp-entry' } });
+    const restored = await api
+      .post('/api/backup/restore')
+      .set(auth())
+      .attach('file', backup.body, { filename: 'legacy-datetime.zip' });
+    assert.equal(restored.status, 201, JSON.stringify(restored.body));
+    const result = await db.entry.findUniqueOrThrow({ where: { id: 'legacy-timestamp-entry' } });
+    assert.equal(result.createdAt.getTime(), timestamp.getTime());
+    assert.equal(result.updatedAt.getTime(), timestamp.getTime());
+  } finally {
+    await db.$disconnect();
+  }
+});
+
 test('a failed database restore keeps files from the pre-restore state', async () => {
   const retained = await upload('#d9bbaa');
   const record = await api.post('/api/wishes').set(auth()).send({ title: '触发数据库回滚' });
@@ -177,8 +253,8 @@ test('a failed database restore keeps files from the pre-restore state', async (
   archive.updateFile(`uploads/${restoredAsset.filename}`, altered);
   const failingBackup = archive.toBuffer();
   const current = await upload('#aabbdd');
-  const { PrismaClient } = await import('@prisma/client');
-  const db = new PrismaClient();
+  const { createPrismaClient } = await import('../src/db/client');
+  const db = createPrismaClient();
   const filesBefore = (await readdir(uploadDirectory)).sort();
   const exportBefore = await api.get('/api/backup/export').set(auth());
 

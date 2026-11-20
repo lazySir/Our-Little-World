@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { open, readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from './db/client';
 
 export type SetupToken = { value: string; filePath?: string };
 

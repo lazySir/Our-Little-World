@@ -17,10 +17,10 @@ FROM base AS api-dependencies
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/api/prisma apps/api/prisma
+COPY apps/api/prisma.config.ts apps/api/prisma.config.ts
 COPY packages/shared/package.json packages/shared/package.json
 # Prisma CLI is intentionally retained: each container startup applies committed migrations.
 RUN npm ci --include=dev --workspace=@our-little-world/api --workspace=@our-little-world/shared --include-workspace-root
-RUN npm run db:generate --workspace=@our-little-world/api
 COPY apps/api/src apps/api/src
 COPY apps/api/tsconfig.json apps/api/tsconfig.json
 COPY packages/shared packages/shared

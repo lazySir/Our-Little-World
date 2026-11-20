@@ -1,9 +1,9 @@
 /** Explicit opt-in sample content; never runs during production initialization. */
 import config from './config';
-import { PrismaClient } from '@prisma/client';
+import { createPrismaClient } from './db/client';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
-const db = new PrismaClient();
+const db = createPrismaClient();
 async function main() {
   if (await db.space.count())
     throw new Error('数据库已有空间，演示数据不会覆盖现有内容。请使用独立数据库路径。');
