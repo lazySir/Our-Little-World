@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import sharp from 'sharp';
 import { projectRoot, stopChild, waitForExit } from './runtime.mts';
 import {
   assertAutomationPortFree,
@@ -558,7 +559,6 @@ async function main() {
 
     if (media) {
       log('Verify native upload, signed photo download and ZIP restore');
-      const sharp = require('sharp') as typeof import('sharp');
       const fixture = await sharp({
         create: { width: 19, height: 11, channels: 3, background: '#bd786b' },
       })
