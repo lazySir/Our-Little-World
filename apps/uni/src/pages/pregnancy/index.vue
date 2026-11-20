@@ -7,7 +7,7 @@
       symbol="♡"
     />
     <view class="toolbar">
-      <input class="search" v-model="query" placeholder="搜索标题或记录内容" />
+      <input class="search" v-model="query" placeholder="搜索标题或记录内容" aria-label="搜索标题或记录内容" />
       <wd-button size="small" @click="openNew">＋ 写一条</wd-button>
     </view>
     <view class="chips pregnancy-filters" role="group" aria-label="手记类型筛选">

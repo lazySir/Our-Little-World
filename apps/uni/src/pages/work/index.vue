@@ -7,7 +7,7 @@
       symbol="▤"
     />
     <view class="toolbar">
-      <input class="search" v-model="query" placeholder="搜索标题、内容或标签" />
+      <input class="search" v-model="query" placeholder="搜索标题、内容或标签" aria-label="搜索标题、内容或标签" />
       <wd-button size="small" @click="openNew">＋ 写一篇</wd-button>
     </view>
     <view v-if="error" class="error-box">

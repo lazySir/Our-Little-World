@@ -298,3 +298,23 @@ test('work journal photo previews are keyboard-operable labeled buttons', () => 
     { assets: [{ id: 'asset-1', url: '/photo.webp' }], index: 0 },
   ]);
 });
+
+test('mini-program search inputs expose readable labels on every searchable page', () => {
+  const cases = [
+    ['baby', '../src/pages/baby/index.vue', '搜索成长记录'],
+    ['menu', '../src/pages/menu/index.vue', '搜索想吃的'],
+    ['memories', '../src/pages/memories/index.vue', '搜索标题或标签'],
+    ['pregnancy', '../src/pages/pregnancy/index.vue', '搜索标题或记录内容'],
+    ['wishes', '../src/pages/wishes/index.vue', '搜索你们想做的事'],
+    ['work', '../src/pages/work/index.vue', '搜索标题、内容或标签'],
+  ] as const;
+
+  for (const [kind, path, label] of cases) {
+    const page = compilePage(path, kind, []);
+    const searchInput = findNode(
+      page.render(),
+      (node) => node.type === 'input' && node.props?.class === 'search',
+    );
+    assert.equal(searchInput?.props?.['aria-label'], label, kind + ' search label');
+  }
+});

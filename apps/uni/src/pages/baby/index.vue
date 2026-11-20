@@ -111,7 +111,7 @@
       ref="growthChart"
       :records="items" />
     <view v-if="!sourceUnavailable && !sourceActive" class="toolbar">
-      <input class="search" v-model="query" placeholder="搜索成长记录" />
+      <input class="search" v-model="query" placeholder="搜索成长记录" aria-label="搜索成长记录" />
       <wd-button size="small" @click="openNew">＋ 记录</wd-button>
     </view>
     <view v-if="!sourceUnavailable && !sourceActive" class="chips">

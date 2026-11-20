@@ -7,7 +7,7 @@
       symbol="♨"
     />
     <view class="toolbar">
-      <input class="search" v-model="query" placeholder="搜索想吃的" />
+      <input class="search" v-model="query" placeholder="搜索想吃的" aria-label="搜索想吃的" />
       <wd-button size="small" @click="openNew">＋ 添加</wd-button>
     </view>
     <view class="chips">

@@ -12,7 +12,7 @@
       @clear="clearCalendarSource"
     />
     <view v-if="!calendarSource" class="toolbar">
-      <input class="search" v-model="query" placeholder="搜索你们想做的事" />
+      <input class="search" v-model="query" placeholder="搜索你们想做的事" aria-label="搜索你们想做的事" />
       <wd-button size="small" @click="openNew">＋ 添加</wd-button>
     </view>
     <view v-if="!calendarSource" class="chips">
@@ -210,7 +210,7 @@ async function toggle(item) {
     await request(`/wishes/${item.id}`, 'PATCH', {
       ...item,
       status: item.status === 'done' ? 'todo' : 'done',
-      completedAt: item.status === 'done' ? null : new Date().toISOString(),
+      completedAt: item.status === 'done' ? null : today(),
     });
     await load();
     notify(item.status === 'done' ? '又打开啦' : '完成得漂亮', 'success');

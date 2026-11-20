@@ -131,17 +131,57 @@ function setup(
     assert.ok(button, 'The real wish template must render the conversion action');
     return button;
   }
+  function completionAction() {
+    const button = nodes(render(context, [], {}, context)).find(
+      (node) =>
+        typeof node.props?.onClick === 'function' &&
+        node.props?.['aria-label'] === '一起看日落，标记为完成',
+    );
+    assert.ok(button, 'The real wish template must render the completion action');
+    return button;
+  }
   return {
     wish,
     writes,
     notices,
     navigations,
     action,
+    completionAction,
     items,
     hasLoaded,
     render: () => render(context, [], {}, context),
   };
 }
+
+test('mini-program wish completion uses the server business date near a UTC day boundary', async () => {
+  const nativeToISOString = Date.prototype.toISOString;
+  Date.prototype.toISOString = () => '2026-11-20T16:30:00.000Z';
+  domain.setBusinessDate('2026-11-21');
+  try {
+    const s = setup([
+      {
+        id: 'wish-sunset',
+        title: '一起看日落',
+        description: '去海边慢慢散步',
+        status: 'todo',
+        category: 'travel',
+        completedAt: null,
+      },
+    ]);
+    const operation = s.completionAction().props.onClick();
+    const write = s.writes[0];
+    assert.ok(write, 'The completion action must issue a PATCH');
+    write.resolve({ ...s.items.value[0], status: 'done', completedAt: '2026-11-21' });
+    await operation;
+
+    assert.equal(write.path, '/wishes/wish-sunset');
+    assert.equal(write.method, 'PATCH');
+    assert.equal(write.body.completedAt, '2026-11-21');
+  } finally {
+    Date.prototype.toISOString = nativeToISOString;
+    domain.setBusinessDate('');
+  }
+});
 
 test('a delayed mini-program wish conversion shows progress and a double tap writes and navigates once', async () => {
   const s = setup();
