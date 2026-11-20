@@ -125,7 +125,8 @@ function setup(
   function action() {
     const button = nodes(render(context, [], {}, context)).find(
       (node) =>
-        typeof node.props?.onClick === 'function' && textOf(node).trim() === '写成一段回忆 →',
+        typeof node.props?.onClick === 'function' &&
+        ['收藏为回忆', '已收藏为回忆'].includes(textOf(node).trim()),
     );
     assert.ok(button, 'The real wish template must render the conversion action');
     return button;
@@ -175,7 +176,8 @@ test('a delayed mini-program wish conversion shows progress and a double tap wri
   assert.deepEqual(s.notices, ['已经放入回忆相册']);
   assert.deepEqual(s.navigations, ['/pages/memories/index']);
   assert.equal(s.action().props.loading, false);
-  assert.equal(s.action().props.disabled, false);
+  assert.equal(s.action().props.disabled, true);
+  assert.equal(textOf(s.action()), '已收藏为回忆');
 });
 
 test('a failed mini-program wish conversion releases its action and a real retry navigates once', async () => {
@@ -200,7 +202,23 @@ test('a failed mini-program wish conversion releases its action and a real retry
   assert.deepEqual(s.notices, ['回忆暂时没有保存', '已经放入回忆相册']);
   assert.deepEqual(s.navigations, ['/pages/memories/index']);
   assert.equal(s.action().props.loading, false);
-  assert.equal(s.action().props.disabled, false);
+  assert.equal(s.action().props.disabled, true);
+  assert.equal(textOf(s.action()), '已收藏为回忆');
+});
+
+test('a successful mini-program wish conversion disables the action and blocks a duplicate record', async () => {
+  const s = setup();
+  const first = s.action().props.onClick();
+  s.writes[0].resolve({ id: 'memory-saved' });
+  await first;
+
+  assert.equal(s.action().props.disabled, true);
+  assert.equal(s.action().props.loading, false);
+  assert.equal(textOf(s.action()), '已收藏为回忆');
+
+  const repeated = s.action().props.onClick();
+  await repeated;
+  assert.equal(s.writes.length, 1, 'A converted wish must not create a duplicate memory');
 });
 
 test('a first wishes read failure does not render an empty-state action', () => {

@@ -96,6 +96,7 @@ const tab = ref('all');
 const dialog = ref(false);
 const editing = ref<any>(null);
 const convertingId = ref('');
+const convertedWishIds = ref<Set<string>>(new Set());
 const assets = ref<Asset[]>([]);
 const uploaded = ref(false);
 const editorBusy = computed(() => uploaded.value || saving.value);
@@ -248,7 +249,7 @@ function canDelete(item) {
   return props.kind !== 'letters' || item.authorId === session.user.id;
 }
 async function convertToMemory(item) {
-  if (convertingId.value) return;
+  if (convertingId.value || convertedWishIds.value.has(item.id)) return;
   convertingId.value = item.id;
   try {
     await api.post('/memories', {
@@ -259,6 +260,7 @@ async function convertToMemory(item) {
       tags: ['愿望实现'],
       kind: 'couple',
     });
+    convertedWishIds.value = new Set([...convertedWishIds.value, item.id]);
     ElMessage.success('已把完成的愿望收藏为回忆');
   } catch (e) {
     ElMessage.error(e.message);
@@ -386,9 +388,9 @@ async function convertToMemory(item) {
             text
             size="small"
             :loading="convertingId === item.id"
-            :disabled="!!convertingId"
+            :disabled="!!convertingId || convertedWishIds.has(item.id)"
             @click="convertToMemory(item)"
-            >收藏为回忆</el-button
+            >{{ convertedWishIds.has(item.id) ? '已收藏为回忆' : '收藏为回忆' }}</el-button
           ><span v-else class="muted">{{
             item.targetDate ? '目标：' + item.targetDate : '还没有设定日期'
           }}</span

@@ -199,7 +199,8 @@ test('a delayed Web wish conversion shows progress and a double click writes and
   assert.deepEqual(s.successes, ['已把完成的愿望收藏为回忆']);
   assert.deepEqual(s.errors, []);
   assert.equal(s.action().props.loading, false);
-  assert.equal(s.action().props.disabled, false);
+  assert.equal(s.action().props.disabled, true);
+  assert.equal(textOf(s.action()), '已收藏为回忆');
 });
 
 test('a failed Web wish conversion releases its action and a real retry succeeds once', async () => {
@@ -223,5 +224,21 @@ test('a failed Web wish conversion releases its action and a real retry succeeds
   assert.deepEqual(s.writes[1].body, s.writes[0].body, 'The retry must keep the wish content');
   assert.deepEqual(s.successes, ['已把完成的愿望收藏为回忆']);
   assert.equal(s.action().props.loading, false);
-  assert.equal(s.action().props.disabled, false);
+  assert.equal(s.action().props.disabled, true);
+  assert.equal(textOf(s.action()), '已收藏为回忆');
+});
+
+test('a successful Web wish conversion disables the action and blocks a duplicate record', async () => {
+  const s = setup();
+  const first = s.action().props.onClick();
+  s.writes[0].resolve({ id: 'memory-saved' });
+  await first;
+
+  assert.equal(s.action().props.disabled, true);
+  assert.equal(s.action().props.loading, false);
+  assert.equal(textOf(s.action()), '已收藏为回忆');
+
+  const repeated = s.action().props.onClick();
+  await repeated;
+  assert.equal(s.writes.length, 1, 'A converted wish must not create a duplicate memory');
 });

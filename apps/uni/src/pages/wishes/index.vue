@@ -69,9 +69,9 @@
             size="small"
             plain
             :loading="convertingId === item.id"
-            :disabled="!!convertingId"
+            :disabled="!!convertingId || convertedWishIds.has(item.id)"
             @click="toMemory(item)"
-            >写成一段回忆 →</wd-button
+            >{{ convertedWishIds.has(item.id) ? '已收藏为回忆' : '收藏为回忆' }}</wd-button
           >
         </view>
       </view>
@@ -130,7 +130,8 @@ const { session, items, hasLoaded, loading, error, saving, editor, formError, lo
 const query = ref(''),
   filter = ref('all'),
   editing = ref(null),
-  convertingId = ref('');
+  convertingId = ref(''),
+  convertedWishIds = ref(new Set<string>());
 const tabs = [
   { value: 'all', label: '全部' },
   { value: 'todo', label: '还没完成' },
@@ -212,7 +213,7 @@ async function toggle(item) {
   }
 }
 async function toMemory(item) {
-  if (convertingId.value) return;
+  if (convertingId.value || convertedWishIds.value.has(item.id)) return;
   convertingId.value = item.id;
   try {
     await request('/memories', 'POST', {
@@ -223,7 +224,8 @@ async function toMemory(item) {
       assetIds: [],
       kind: 'couple',
     });
-  notify('已经放入回忆相册', 'success');
+    convertedWishIds.value = new Set([...convertedWishIds.value, item.id]);
+    notify('已经放入回忆相册', 'success');
     navigate('/pages/memories/index');
   } catch (e) {
     notify(e.message);
