@@ -255,6 +255,7 @@ async function logout() {
               v-for="t in themes"
               :key="t.key"
               :class="{ selected: space.theme === t.key }"
+              :aria-pressed="space.theme === t.key"
               @click="space.theme = t.key as typeof space.theme"
             >
               <span :style="{ background: t.color }"
