@@ -8,6 +8,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import {
+  assertMiniProgramRouteCoverage,
   assertAutomationPortFree,
   assertProjectIdentity,
   connectAfterLaunch,
@@ -16,6 +17,8 @@ import {
   verificationOptions,
   verificationResult,
   waitForAppReady,
+  miniProgramCoreRoutes,
+  miniProgramSmokeRoutes,
 } from '../wechat-verification.mts';
 
 test('WeChat acceptance validates ports and a bounded run before opening the IDE', () => {
@@ -33,6 +36,26 @@ test('WeChat acceptance validates ports and a bounded run before opening the IDE
   }
   assert.throws(() => verificationOptions({ WECHAT_AUTO_PORT: '9432' }), /different/);
   assert.throws(() => verificationOptions({ WECHAT_TIMEOUT_MS: 'Infinity' }), /WECHAT_TIMEOUT_MS/);
+});
+
+test('native WeChat route sweep covers every page outside the authenticated core flow', async () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  const appPages = JSON.parse(
+    await readFile(path.join(root, 'apps/uni/src/pages.json'), 'utf8'),
+  ).pages.map((page: { path: string }) => page.path) as string[];
+  const covered = [
+    ...Object.values(miniProgramCoreRoutes),
+    ...miniProgramSmokeRoutes.map((route) => route.path),
+  ];
+  assertMiniProgramRouteCoverage(appPages, covered);
+  assert.throws(
+    () =>
+      assertMiniProgramRouteCoverage(
+        appPages,
+        covered.filter((route) => route !== 'pages/pregnancy/index'),
+      ),
+    /missing: pages\/pregnancy\/index/,
+  );
 });
 
 test('occupied automation ports are refused without connecting to their owner', async () => {

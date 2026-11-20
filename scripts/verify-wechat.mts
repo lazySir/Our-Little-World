@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { projectRoot, stopChild, waitForExit } from './runtime.mts';
 import {
+  assertMiniProgramRouteCoverage,
   assertAutomationPortFree,
   assertProjectIdentity,
   connectAfterLaunch,
@@ -21,6 +22,8 @@ import {
   verificationOptions,
   verificationResult,
   waitForAppReady,
+  miniProgramCoreRoutes,
+  miniProgramSmokeRoutes,
 } from './wechat-verification.mts';
 
 interface Element {
@@ -154,6 +157,12 @@ async function main() {
   const api = path.join(projectRoot, 'apps/api/dist/app.js');
   if (!existsSync(path.join(build, 'app.json')) || !existsSync(api))
     throw new Error('Build the API and mp-weixin first; see --help');
+  const registeredRoutes = JSON.parse(await readFile(path.join(build, 'app.json'), 'utf8'))
+    .pages as string[];
+  assertMiniProgramRouteCoverage(registeredRoutes, [
+    ...Object.values(miniProgramCoreRoutes),
+    ...miniProgramSmokeRoutes.map((route) => route.path),
+  ]);
   const cli = officialCli();
   const modulePath = path.resolve(
     projectRoot,
@@ -427,7 +436,7 @@ async function main() {
       () => mini!.callWxMethod('setStorageSync', 'little-world-api', base),
       'set isolated API',
     );
-    page = await step(() => mini!.reLaunch('/pages/auth/index'), 'open auth');
+    page = await step(() => mini!.reLaunch(`/${miniProgramCoreRoutes.auth}`), 'open auth');
     await has('创建我们的小世界');
     log('Create space through WeChat inputs');
     await input('给自己起一个账号', 'sim_owner');
@@ -437,7 +446,7 @@ async function main() {
     await tap('创建我们的小世界');
     page = await until(async () => {
       const current = await mini!.currentPage();
-      return current?.path === 'pages/home/index' && current;
+      return current?.path === miniProgramCoreRoutes.home && current;
     }, 'home');
     await has('保存今天的心情');
     const token = await step(
@@ -479,7 +488,7 @@ async function main() {
     await tap('写下第一个愿望');
     page = await until(async () => {
       const current = await mini!.currentPage();
-      return current?.path === 'pages/wishes/index' && current;
+      return current?.path === miniProgramCoreRoutes.wishes && current;
     }, 'wish list from empty home');
     await tap('＋ 添加');
     await input('例如：去看一场海边日落', '一起看日落');
@@ -495,7 +504,10 @@ async function main() {
     assert.equal(edited.id, wish.id);
     assert.equal(edited.title, '一起看星星');
     pass('wish creation and edit through WeChat PATCH transport');
-    page = await step(() => mini!.switchTab('/pages/home/index'), 'open home wish preview');
+    page = await step(
+      () => mini!.switchTab(`/${miniProgramCoreRoutes.home}`),
+      'open home wish preview',
+    );
     const homeWish = await control('.home-wishes .wd-cell', '一起看星星');
     const homeWishPosition = await step(() => homeWish.offset(), 'read home wish position');
     await step(
@@ -522,7 +534,7 @@ async function main() {
     await step(() => homeWish.tap(), 'open saved wish from home');
     page = await until(async () => {
       const current = await mini!.currentPage();
-      return current?.path === 'pages/wishes/index' && current;
+      return current?.path === miniProgramCoreRoutes.wishes && current;
     }, 'wish list from home preview');
     await has('一起看星星');
     pass('home previews a saved wish and opens its list');
@@ -555,7 +567,10 @@ async function main() {
       ).ok,
       true,
     );
-    page = await step(() => mini!.navigateTo('/pages/calendar/index'), 'open calendar source');
+    page = await step(
+      () => mini!.navigateTo(`/${miniProgramCoreRoutes.calendar}`),
+      'open calendar source',
+    );
     await has('一起看星星');
     const origin = await control('.calendar-source-action', '查看来源');
     const originPosition = await step(() => origin.offset(), 'read calendar source position');
@@ -570,7 +585,7 @@ async function main() {
     await step(() => origin.tap(), 'open calendar wish source');
     page = await until(async () => {
       const current = await mini!.currentPage();
-      return current?.path === 'pages/wishes/index' && current;
+      return current?.path === miniProgramCoreRoutes.wishes && current;
     }, 'wish tab from calendar');
     await has('来自共享日历');
     await has('一起看星星');
@@ -580,7 +595,7 @@ async function main() {
     assert.ok(!(await textOfPage()).includes('来自共享日历'));
     pass('calendar opens the dated wish in its native tab');
 
-    page = await step(() => mini!.navigateTo('/pages/ledger/index'), 'open ledger');
+    page = await step(() => mini!.navigateTo(`/${miniProgramCoreRoutes.ledger}`), 'open ledger');
     await tap('＋ 记一笔');
     await input('0.00', '12.34');
     await tap('保存这一刻');
@@ -589,28 +604,29 @@ async function main() {
       'ledger 1234 cents',
     );
     pass('ledger saves integer cents');
-    const routes = [
-      ['more', '我们的日常'],
-      ['menu', '今天吃什么'],
-      ['anniversaries', '纪念日'],
-      ['calendar', '共享日历'],
-      ['baby', '宝宝成长'],
-      ['work', '工作手记'],
-      ['letters', '时光信箱'],
-      ['memories', '回忆相册'],
-      ['settings', '我们的设置'],
-    ];
-    for (const [route, title] of routes) {
-      page = await step(() => mini!.reLaunch(`/pages/${route}/index`), `open ${route}`);
-      await has(title);
-      await until(async () => !(await page!.$('.loading')), `loaded ${route} content`);
+    const pregnancyResponse = await request('pregnancy', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({
+        title: '模拟器孕期手记',
+        date: calendarDate,
+        type: 'note',
+        content: '页面巡检确认记录已加载',
+      }),
+    });
+    assert.equal(pregnancyResponse.status, 201, 'seed isolated pregnancy page record');
+    for (const route of miniProgramSmokeRoutes) {
+      page = await step(() => mini!.reLaunch(`/${route.path}`), `open ${route.path}`);
+      await has(route.title);
+      await until(async () => !(await page!.$('.loading')), `loaded ${route.path} content`);
+      if ('content' in route) await has(route.content);
       const error = await step(() => page!.$('.error-box'), `read ${route} errors`);
       assert.ok(
         !error || !(await step(() => error.text(), `read ${route} error text`)),
-        `${route} displayed an error`,
+        `${route.path} displayed an error`,
       );
     }
-    pass('all 13 routes render without an error box');
+    pass(`all ${registeredRoutes.length} routes render without an error box`);
 
     if (media) {
       log('Verify native upload, signed photo download and ZIP restore');
@@ -749,7 +765,7 @@ async function main() {
       assert.equal(restoredPhoto.ok, true);
       assert.deepEqual(Buffer.from(await restoredPhoto.arrayBuffer()), photoBytes);
       await until(
-        async () => (await mini!.currentPage())?.path === 'pages/home/index',
+        async () => (await mini!.currentPage())?.path === miniProgramCoreRoutes.home,
         'home after ZIP restore',
       );
       pass('ZIP native download/restore retains photo bytes and authenticated session');

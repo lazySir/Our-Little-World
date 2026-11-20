@@ -9,6 +9,42 @@ export interface VerificationOptions {
   timeoutMs: number;
 }
 
+export const miniProgramCoreRoutes = {
+  auth: 'pages/auth/index',
+  home: 'pages/home/index',
+  wishes: 'pages/wishes/index',
+  ledger: 'pages/ledger/index',
+  calendar: 'pages/calendar/index',
+} as const;
+
+export const miniProgramSmokeRoutes = [
+  { path: 'pages/more/index', title: '我们的日常' },
+  { path: 'pages/menu/index', title: '今天吃什么' },
+  { path: 'pages/anniversaries/index', title: '纪念日' },
+  { path: 'pages/baby/index', title: '宝宝成长' },
+  { path: 'pages/pregnancy/index', title: '孕期手记', content: '页面巡检确认记录已加载' },
+  { path: 'pages/work/index', title: '工作手记' },
+  { path: 'pages/letters/index', title: '时光信箱' },
+  { path: 'pages/memories/index', title: '回忆相册' },
+  { path: 'pages/settings/index', title: '我们的设置' },
+] as const;
+
+export function assertMiniProgramRouteCoverage(
+  registeredRoutes: readonly string[],
+  exercisedRoutes: readonly string[],
+): void {
+  const registered = new Set(registeredRoutes);
+  const exercised = new Set(exercisedRoutes);
+  const missing = registeredRoutes.filter((route) => !exercised.has(route));
+  const unknown = exercisedRoutes.filter((route) => !registered.has(route));
+  const duplicateCount = exercisedRoutes.length - exercised.size;
+  if (missing.length || unknown.length || duplicateCount)
+    throw new Error(
+      `WeChat route coverage mismatch; missing: ${missing.join(', ') || 'none'}; ` +
+        `unknown: ${unknown.join(', ') || 'none'}; duplicates: ${duplicateCount}`,
+    );
+}
+
 export function verificationResult(
   state: {
     hasPrimaryError: boolean;
