@@ -11,16 +11,18 @@
       <view class="calendar-month-title">{{ monthTitle }}</view>
       <wd-button size="small" plain @click="shiftMonth(1)">›</wd-button>
     </view>
-    <view class="chips calendar-filters">
-      <view
+    <view class="chips calendar-filters" role="group" aria-label="日历事件筛选">
+      <button
         v-for="item in filters"
         :key="item.value"
         class="chip"
         :class="{ active: filter === item.value }"
+        :aria-label="`筛选${item.label}`"
+        :aria-pressed="filter === item.value"
         @click="filter = item.value"
       >
         {{ item.label }}
-      </view>
+      </button>
     </view>
     <view v-if="error" class="error-box">
       <view>{{ error }}</view>
@@ -33,11 +35,15 @@
           <text v-for="day in weekDays" :key="day">{{ day }}</text>
         </view>
         <view class="calendar-grid">
-          <view
+          <button
             v-for="(date, index) in cells"
             :key="date || `blank-${index}`"
             class="calendar-day"
             :class="{ blank: !date, today: date && isToday(date), selected: date === selectedDate, 'has-events': date && eventCount(date) }"
+            :disabled="!date"
+            :aria-label="date ? `${date}，${eventCount(date)} 件事件` : undefined"
+            :aria-pressed="date ? date === selectedDate : undefined"
+            :aria-current="date && isToday(date) ? 'date' : undefined"
             @click="selectDate(date)"
           >
             <text v-if="date" class="calendar-day-number">{{ Number(date.slice(-2)) }}</text>
@@ -49,7 +55,7 @@
                 :class="`dot-${event.kind}`"
               />
             </view>
-          </view>
+          </button>
         </view>
       </view>
       <view class="section-head">
@@ -90,6 +96,7 @@ const data = ref<CalendarData>({ month: month.value, date: '', events: [] });
 const loading = ref(true);
 const error = ref('');
 const selectedDate = ref('');
+let loadSequence = 0;
 const filter = ref<'all' | CalendarEventKind>('all');
 const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
 const filters: { value: 'all' | CalendarEventKind; label: string }[] = [
@@ -143,19 +150,25 @@ const cells = computed(() => {
 const selectedEvents = computed(() => eventsByDate.value[selectedDate.value] || []);
 
 async function load() {
+  const sequence = ++loadSequence;
+  const requestedMonth = month.value;
   loading.value = true;
   error.value = '';
   try {
-    const result = await request<CalendarData>(`/calendar?month=${month.value}`);
+    const result = await request<CalendarData>(`/calendar?month=${requestedMonth}`);
+    if (sequence !== loadSequence) return;
     data.value = result;
     month.value = result.month;
     if (!selectedDate.value.startsWith(`${result.month}-`))
       selectedDate.value = result.events[0]?.date || `${result.month}-01`;
   } catch (reason) {
+    if (sequence !== loadSequence) return;
     error.value = reason instanceof Error ? reason.message : '日历暂时打不开，请稍后重试';
   } finally {
-    loading.value = false;
-    uni.stopPullDownRefresh();
+    if (sequence === loadSequence) {
+      loading.value = false;
+      uni.stopPullDownRefresh();
+    }
   }
 }
 function shiftMonth(offset: number) {

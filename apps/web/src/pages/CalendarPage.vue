@@ -12,6 +12,7 @@ const data = ref<CalendarData>({ month: month.value, date: '', events: [] });
 const loading = ref(true);
 const error = ref('');
 const selectedDate = ref('');
+let loadSequence = 0;
 const filter = ref<'all' | CalendarEventKind>('all');
 const filters: { value: 'all' | CalendarEventKind; label: string }[] = [
   { value: 'all', label: '全部' },
@@ -66,18 +67,22 @@ const cells = computed(() => {
 const selectedEvents = computed(() => eventsByDate.value[selectedDate.value] || []);
 
 async function load() {
+  const sequence = ++loadSequence;
+  const requestedMonth = month.value;
   loading.value = true;
   error.value = '';
   try {
-    const result = await api.get<CalendarData>(`/calendar?month=${month.value}`);
+    const result = await api.get<CalendarData>(`/calendar?month=${requestedMonth}`);
+    if (sequence !== loadSequence) return;
     data.value = result;
     month.value = result.month;
     if (!selectedDate.value.startsWith(`${result.month}-`))
       selectedDate.value = result.events[0]?.date || `${result.month}-01`;
   } catch (reason) {
+    if (sequence !== loadSequence) return;
     error.value = reason instanceof Error ? reason.message : '日历暂时打不开，请稍后重试';
   } finally {
-    loading.value = false;
+    if (sequence === loadSequence) loading.value = false;
   }
 }
 function shiftMonth(offset: number) {
@@ -125,13 +130,15 @@ onMounted(load);
         <div class="calendar-weekdays">
           <span v-for="day in weekDays" :key="day">{{ day }}</span>
         </div>
-        <div class="calendar-grid" role="grid" :aria-label="monthTitle">
+        <div class="calendar-grid" role="group" :aria-label="`${monthTitle}日期`">
           <button
             v-for="(date, index) in cells"
             :key="date || `blank-${index}`"
             class="calendar-day"
             :class="{ blank: !date, today: date && isToday(date), selected: date === selectedDate, 'has-events': date && eventCount(date) }"
             :disabled="!date"
+            :aria-pressed="date ? date === selectedDate : undefined"
+            :aria-current="date && isToday(date) ? 'date' : undefined"
             :aria-label="date ? `${date}，${eventCount(date)} 件事件` : undefined"
             @click="selectDate(date)"
           >
