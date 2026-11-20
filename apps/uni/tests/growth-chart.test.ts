@@ -234,6 +234,7 @@ function setupPage(previewPhotos = () => {}) {
     items: ref(
       measurements.map((record) => ({ ...record, type: record.type || 'growth', title: '测量' })),
     ),
+    hasLoaded: ref(true),
     loading: ref(false),
     error: ref(''),
     saving: ref(false),
@@ -277,15 +278,19 @@ test('baby page always supplies unfiltered records to the chart', () => {
   assert.equal(chart.props.records.length, measurements.length);
 });
 
-test('baby page does not display a missing-measurement chart during loading or failure', () => {
+test('baby page waits for a successful first read and keeps the chart on refresh failure', () => {
   const s = setupPage();
+  s.resource.hasLoaded.value = false;
   s.resource.loading.value = true;
   assert.equal(pageChart(s), undefined);
   s.resource.loading.value = false;
   s.resource.error.value = '成长记录读取失败';
   assert.equal(pageChart(s), undefined);
   s.resource.error.value = '';
+  s.resource.hasLoaded.value = true;
   assert.ok(pageChart(s));
+  s.resource.error.value = '成长记录刷新失败';
+  assert.equal(pageChart(s)?.props.records, s.resource.items.value);
 });
 
 test('baby page forwards size changes and returning to the page after its next render', async () => {
@@ -327,7 +332,9 @@ test('baby page album groups photos from growth records and opens the selected p
       ['older-photo', '第一次抬头', '2026-11-01'],
     ],
   );
-  const gallery = nodes(s.render()).filter((node) => node.props?.class === 'baby-album-photo ui-reset');
+  const gallery = nodes(s.render()).filter(
+    (node) => node.props?.class === 'baby-album-photo ui-reset',
+  );
   assert.equal(gallery.length, 2);
   gallery[1].props.onClick();
   assert.deepEqual(selected, [[albumPhotos.map((photo: any) => photo.asset), 1]]);

@@ -32,6 +32,8 @@ npm run test:wechat -- --media
 
 `src/manifest.json` 的 `mp-weixin.appid` 有意留空，未绑定或冒充用户 AppID。导入构建目录前填写自己的 AppID。开发者工具在局域网开发时可以临时关闭合法域名校验；真机正式发布需要在微信后台配置 request、uploadFile、downloadFile 的 HTTPS 合法域名，并确保图片签名地址的域名一致。登录使用本项目自己的双人账号，不依赖微信登录。
 
+读取失败时可直接在页面内重新加载。首页、各记录列表和点单历史只有成功读到数据才会显示空状态或统计；刷新失败会保留上次读到的内容。
+
 ## 图片与备份
 
 照片使用 `uni.chooseImage`、`uni.uploadFile` 和 `uni.previewImage`。完整备份在 H5 使用浏览器下载，微信下载后可分享临时文件。恢复在微信选择聊天文件，在 H5 选择本机文件。

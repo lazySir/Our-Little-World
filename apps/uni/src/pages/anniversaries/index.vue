@@ -14,7 +14,8 @@
       <view>{{ error }}</view>
       <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
     </view>
-    <view v-if="loading" class="loading">在找下一个值得期待的日子…</view>
+    <view v-if="loading && !hasLoaded" class="loading">在找下一个值得期待的日子…</view>
+    <view v-else-if="loading" class="meta" role="status">正在更新纪念日…</view>
     <view v-for="item in sorted" :key="item.id" class="card">
       <view class="between">
         <view class="grow">
@@ -35,7 +36,7 @@
       </view>
     </view>
     <EmptyState
-      v-if="!loading && !items.length"
+      v-if="hasLoaded && !loading && !items.length"
       symbol="♡"
       title="把第一个日子放在这里"
       description="在一起的那天、生日、第一次旅行……"
@@ -79,7 +80,7 @@ import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
 import { useResource } from '../../lib/useResource';
 import { today, nextOccurrence, daysBetween } from '../../lib/domain';
-const { session, items, loading, error, saving, editor, formError, load, save, remove } =
+const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
     useResource('anniversaries'),
   editing = ref(null),
   form = reactive({ title: '', date: today(), recurring: true, description: '', icon: 'heart' });

@@ -18,15 +18,17 @@
         :aria-label="`${tab.label}，${kind === tab.value ? '已选中' : '切换分类'}`"
         :aria-pressed="kind === tab.value"
         @click="kind = tab.value"
-        >{{ tab.label }}</button
       >
+        {{ tab.label }}
+      </button>
     </view>
     <view v-if="error" class="error-box">
       <view>{{ error }}</view>
       <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
     </view>
-    <view v-if="loading" class="loading">正在翻开相册…</view>
-    <template v-else>
+    <view v-if="loading && !hasLoaded" class="loading">正在翻开相册…</view>
+    <view v-else-if="loading" class="meta" role="status">正在更新相册…</view>
+    <template v-if="hasLoaded">
       <view v-for="item in filtered" :key="item.id" class="card">
         <view class="between">
           <view class="card-title">{{ item.title }}</view>
@@ -43,7 +45,9 @@
             class="photo-preview ui-reset"
             :aria-label="`预览 ${item.title} 的第 ${index + 1} 张照片`"
             @click="previewPhotos(item.assets, index)"
-          ><image class="photo" :src="assetUrl(asset)" mode="aspectFill" /></button>
+          >
+            <image class="photo" :src="assetUrl(asset)" mode="aspectFill" />
+          </button>
         </view>
         <view class="actions">
           <button class="text-action ui-reset" @click="edit(item)">编辑</button>
@@ -97,7 +101,7 @@ import PhotoPicker from '../../components/PhotoPicker.vue';
 import { useResource } from '../../lib/useResource';
 import { assetUrl, previewPhotos } from '../../lib/api';
 import { today, splitTags } from '../../lib/domain';
-const { session, items, loading, error, saving, editor, formError, load, save, remove } =
+const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
   useResource('memories');
 const query = ref(''),
   kind = ref('all'),

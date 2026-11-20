@@ -19,15 +19,17 @@
         :aria-label="`${tab.label}，${filter === tab.value ? '已选中' : '切换筛选'}`"
         :aria-pressed="filter === tab.value"
         @click="filter = tab.value"
-        >{{ tab.label }} {{ tab.value === 'all' ? '' : `· ${count(tab.value)}` }}</button
       >
+        {{ tab.label }} {{ tab.value === 'all' ? '' : `· ${count(tab.value)}` }}
+      </button>
     </view>
     <view v-if="error" class="error-box">
       <view>{{ error }}</view>
       <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
     </view>
-    <view v-if="loading" class="loading">正在打开你们的清单…</view>
-    <template v-else>
+    <view v-if="loading && !hasLoaded" class="loading">正在打开你们的清单…</view>
+    <view v-else-if="loading" class="meta" role="status">正在更新清单…</view>
+    <template v-if="hasLoaded">
       <view
         v-for="item in filtered"
         :key="item.id"
@@ -42,8 +44,9 @@
               :aria-label="`${item.title}，${item.status === 'done' ? '已完成' : '标记为完成'}`"
               :aria-pressed="item.status === 'done'"
               @click="toggle(item)"
-              >{{ item.status === 'done' ? '✓' : '' }}</button
             >
+              {{ item.status === 'done' ? '✓' : '' }}
+            </button>
             <view class="grow">
               <view class="card-title">{{ item.title }}</view>
               <view v-if="item.description" class="card-text">{{ item.description }}</view>
@@ -99,7 +102,9 @@
       /><FormField v-model="form.targetDate" label="希望哪天完成" kind="date" /><view
         v-if="editing"
         class="actions"
-        ><button class="text-action delete ui-reset" @click="remove(editing)">删除这件事</button></view
+        ><button class="text-action delete ui-reset" @click="remove(editing)">
+          删除这件事
+        </button></view
       ></EditorSheet
     ></view
   >
@@ -113,7 +118,7 @@ import FormField from '../../components/FormField.vue';
 import { useResource } from '../../lib/useResource';
 import { request, notify, navigate } from '../../lib/api';
 import { today } from '../../lib/domain';
-const { session, items, loading, error, saving, editor, formError, load, save, remove } =
+const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
   useResource('wishes');
 const query = ref(''),
   filter = ref('all'),

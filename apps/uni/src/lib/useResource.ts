@@ -6,6 +6,7 @@ import type { LivingRecord } from '../types';
 export function useResource(path) {
   const session = useSession(),
     items = ref<LivingRecord[]>([]),
+    hasLoaded = ref(false),
     loading = ref(false),
     error = ref(''),
     saving = ref(false),
@@ -19,7 +20,10 @@ export function useResource(path) {
     try {
       if (!(await session.load()) || version !== loadVersion) return;
       const result = await request(`/${path}`);
-      if (version === loadVersion) items.value = result;
+      if (version === loadVersion) {
+        items.value = result;
+        hasLoaded.value = true;
+      }
     } catch (e) {
       if (version === loadVersion) error.value = e.message;
     } finally {
@@ -59,5 +63,17 @@ export function useResource(path) {
   }
   onShow(load);
   onPullDownRefresh(load);
-  return { session, items, loading, error, saving, editor, formError, load, save, remove };
+  return {
+    session,
+    items,
+    hasLoaded,
+    loading,
+    error,
+    saving,
+    editor,
+    formError,
+    load,
+    save,
+    remove,
+  };
 }

@@ -105,3 +105,30 @@ test('an older failed refresh cannot clear the latest loading state or publish i
   assert.equal(s.resource.error.value, '');
   assert.equal(s.stopped(), 1);
 });
+
+test('resource distinguishes an initial failure from a loaded list refresh failure', async () => {
+  const s = setup();
+  assert.equal(s.resource.hasLoaded?.value, false, 'The resource must expose first-load state');
+  const initial = s.show();
+  await drain();
+  s.reads[0].reject(new Error('第一次读取失败'));
+  await initial;
+  assert.equal(s.resource.hasLoaded.value, false);
+  assert.deepEqual(s.resource.items.value, []);
+  assert.equal(s.resource.error.value, '第一次读取失败');
+
+  const retry = s.refresh();
+  await drain();
+  s.reads[1].resolve([{ id: 'saved' }]);
+  await retry;
+  assert.equal(s.resource.hasLoaded.value, true);
+  assert.deepEqual(s.resource.items.value, [{ id: 'saved' }]);
+
+  const refresh = s.refresh();
+  await drain();
+  s.reads[2].reject(new Error('刷新失败'));
+  await refresh;
+  assert.equal(s.resource.hasLoaded.value, true);
+  assert.deepEqual(s.resource.items.value, [{ id: 'saved' }]);
+  assert.equal(s.resource.error.value, '刷新失败');
+});

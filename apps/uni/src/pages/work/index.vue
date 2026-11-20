@@ -14,7 +14,8 @@
       <view>{{ error }}</view>
       <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
     </view>
-    <view v-if="loading" class="loading">工作手记打开中…</view>
+    <view v-if="loading && !hasLoaded" class="loading">工作手记打开中…</view>
+    <view v-else-if="loading" class="meta" role="status">正在更新手记…</view>
     <view v-for="item in filtered" :key="item.id" class="card">
       <view class="between">
         <view class="card-title">{{ item.title }}</view>
@@ -40,7 +41,7 @@
       </view>
     </view>
     <EmptyState
-      v-if="!loading && !filtered.length"
+      v-if="hasLoaded && !loading && !filtered.length"
       symbol="▤"
       title="今天，有什么小进展？"
       description="写下完成的事、遇到的问题，或者一个还在发芽的想法。"
@@ -84,7 +85,7 @@ import PhotoPicker from '../../components/PhotoPicker.vue';
 import { useResource } from '../../lib/useResource';
 import { assetUrl, previewPhotos } from '../../lib/api';
 import { today, splitTags } from '../../lib/domain';
-const { session, items, loading, error, saving, editor, formError, load, save, remove } =
+const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
     useResource('work'),
   query = ref(''),
   tagsText = ref(''),

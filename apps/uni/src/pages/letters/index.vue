@@ -14,7 +14,8 @@
       <view>{{ error }}</view>
       <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
     </view>
-    <view v-if="loading" class="loading">未来的信箱打开中…</view>
+    <view v-if="loading && !hasLoaded" class="loading">未来的信箱打开中…</view>
+    <view v-else-if="loading" class="meta" role="status">正在更新信箱…</view>
     <view v-for="item in items" :key="item.id" class="card letter">
       <view class="row">
         <view class="lock-symbol">{{ item.isLocked ? '▣' : '✉' }}</view>
@@ -37,12 +38,14 @@
       <view v-else class="card-text">{{ item.content }}</view>
       <view class="meta">开启日期 · {{ item.unlockDate }}</view>
       <view v-if="item.authorId === session.user?.id" class="actions">
-        <button v-if="item.isLocked" class="text-action ui-reset" @click="edit(item)">重写这封信</button>
+        <button v-if="item.isLocked" class="text-action ui-reset" @click="edit(item)">
+          重写这封信
+        </button>
         <button class="text-action delete ui-reset" @click="remove(item)">删除</button>
       </view>
     </view>
     <EmptyState
-      v-if="!loading && !items.length"
+      v-if="hasLoaded && !loading && !items.length"
       symbol="✉"
       title="寄一封信给未来吧"
       description="今天的期待、想说的情话，或者下一周年想实现的约定。"
@@ -92,7 +95,7 @@ import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
 import { useResource } from '../../lib/useResource';
 import { today, daysBetween } from '../../lib/domain';
-const { session, items, loading, error, saving, editor, formError, load, save, remove } =
+const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
     useResource('letters'),
   editing = ref(null),
   form = reactive({ title: '', content: '', unlockDate: '', recipient: 'both' });

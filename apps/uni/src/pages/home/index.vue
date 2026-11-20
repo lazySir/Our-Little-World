@@ -8,9 +8,13 @@
       </view>
       <view class="pill">{{ partnerLabel }}</view>
     </view>
-    <view v-if="error" class="error-box">{{ error }}</view>
-    <view v-if="loading" class="loading">正在把今天捧到你面前…</view>
-    <template v-else>
+    <view v-if="error" class="error-box">
+      <view>{{ error }}</view>
+      <wd-button class="retry-button" size="small" plain @click="load()">重新加载</wd-button>
+    </view>
+    <view v-if="loading && !hasLoaded" class="loading">正在把今天捧到你面前…</view>
+    <view v-else-if="loading" class="meta" role="status">正在更新今天的内容…</view>
+    <template v-if="hasLoaded">
       <view class="hero">
         <view class="hero-copy">
           <view class="tiny-stamp">我们已经一起</view>
@@ -37,8 +41,9 @@
             :aria-label="`${item.label}，${myMood === item.value ? '已选中' : '未选中'}`"
             :aria-pressed="myMood === item.value"
             @click="chooseMood(item.value)"
-            >{{ item.icon }} {{ item.label }}</button
           >
+            {{ item.icon }} {{ item.label }}
+          </button>
         </view>
         <view class="field-control">
           <wd-textarea
@@ -103,7 +108,9 @@
       />
       <view class="section-head">
         <view class="section-title">最近的回忆</view>
-        <button class="text-action ui-reset" @click="go('/pages/memories/index')">查看全部 →</button>
+        <button class="text-action ui-reset" @click="go('/pages/memories/index')">
+          查看全部 →
+        </button>
       </view>
       <view v-if="dashboard?.recentMemories?.length" class="card">
         <view
@@ -159,6 +166,7 @@ import { money } from '../../lib/domain';
 import type { Dashboard } from '../../types';
 const session = useSession(),
   dashboard = ref<Dashboard | null>(null),
+  hasLoaded = ref(false),
   loading = ref(true),
   error = ref(''),
   moodSaving = ref(false),
@@ -207,6 +215,7 @@ async function load(force = false) {
     const result = await request('/dashboard');
     if (version !== loadVersion) return;
     dashboard.value = result;
+    hasLoaded.value = true;
     const mine = (dashboard.value.moods || []).find(
       (item) => item.authorId === session.user?.id || item.author?.id === session.user?.id,
     );

@@ -19,23 +19,26 @@
         :aria-label="`${option.label}，${category === option.value ? '已选中' : '切换分类'}`"
         :aria-pressed="category === option.value"
         @click="category = option.value"
-        >{{ option.label }}</button
       >
+        {{ option.label }}
+      </button>
       <button
         class="chip ui-reset"
         :class="{ active: favoriteOnly }"
         aria-label="只看收藏"
         :aria-pressed="favoriteOnly"
         @click="favoriteOnly = !favoriteOnly"
-        >♡ 只看收藏</button
       >
+        ♡ 只看收藏
+      </button>
     </view>
     <view v-if="error" class="error-box">
       <view>{{ error }}</view>
       <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
     </view>
-    <view v-if="loading" class="loading">正在翻开菜单…</view>
-    <template v-else>
+    <view v-if="loading && !hasLoaded" class="loading">正在翻开菜单…</view>
+    <view v-else-if="loading" class="meta" role="status">正在更新菜单…</view>
+    <template v-if="hasLoaded">
       <view v-for="item in filtered" :key="item.id" class="card">
         <view class="row">
           <button
@@ -43,11 +46,13 @@
             class="photo-preview ui-reset"
             aria-label="预览菜单照片"
             @click="previewPhotos([item.asset])"
-          ><image
-            :src="assetUrl(item.asset)"
-            mode="aspectFill"
-            style="width: 130rpx; height: 130rpx; border-radius: 20rpx"
-          /></button>
+          >
+            <image
+              :src="assetUrl(item.asset)"
+              mode="aspectFill"
+              style="width: 130rpx; height: 130rpx; border-radius: 20rpx"
+            />
+          </button>
           <view class="grow">
             <view class="card-title">{{ item.name }}</view>
             <view v-if="item.description" class="card-text">{{ item.description }}</view>
@@ -72,15 +77,17 @@
               class="quantity-btn ui-reset"
               :aria-label="`减少 ${item.name} 数量`"
               @click="change(item.id, -1)"
-              >−</button
             >
+              −
+            </button>
             <view>{{ cart[item.id] || 0 }}</view>
             <button
               class="quantity-btn ui-reset"
               :aria-label="`增加 ${item.name} 数量`"
               @click="change(item.id, 1)"
-              >＋</button
             >
+              ＋
+            </button>
           </view>
         </view>
       </view>
@@ -107,7 +114,13 @@
         placeholder="例如：少糖，今晚一起吃" /></view
     ><view class="section-head"
       ><view class="section-title">我们的点单</view
-      ><view class="muted">{{ orders.length }} 单</view></view
+      ><view class="muted">{{ ordersLoaded ? orders.length + ' 单' : '' }}</view></view
+    ><view v-if="ordersError" class="error-box">
+      <view>{{ ordersError }}</view>
+      <wd-button class="retry-button" size="small" plain @click="loadOrders">重新加载</wd-button>
+    </view>
+    ><view v-if="ordersLoading && !ordersLoaded" class="loading">点单记录打开中…</view
+    ><view v-else-if="ordersLoading" class="meta" role="status">正在更新点单记录…</view
     ><view v-for="order in orders" :key="order.id" class="card"
       ><view class="between"
         ><view class="card-title">{{ money(order.totalCents) }}</view
@@ -122,10 +135,12 @@
           v-if="order.status === 'pending'"
           class="text-action ui-reset"
           @click="completeOrder(order)"
-          >✓ 完成这单</button
+        >
+          ✓ 完成这单</button
         ><button class="text-action delete ui-reset" @click="deleteOrder(order)">删除</button></view
       ></view
-    ><view v-if="!orders.length" class="no-data">想吃的选好后，在这里一起开饭。</view
+    ><view v-if="ordersLoaded && !ordersLoading && !orders.length" class="no-data"
+      >想吃的选好后，在这里一起开饭。</view
     ><EditorSheet
       v-model="editor"
       :title="editing ? '编辑菜单' : '添一道想吃的'"
@@ -158,12 +173,9 @@
         :max="1"
         :disabled="saving"
         @busy="uploading = $event"
-      /><button
-        v-if="editing"
-        class="text-action delete ui-reset"
-        @click="remove(editing)"
-        >删除这项菜单</button
-      ></EditorSheet
+      /><button v-if="editing" class="text-action delete ui-reset" @click="remove(editing)">
+        删除这项菜单
+      </button></EditorSheet
     ></view
   >
 </template>
@@ -178,7 +190,7 @@ import PhotoPicker from '../../components/PhotoPicker.vue';
 import { useResource } from '../../lib/useResource';
 import { request, notify, confirm, assetUrl, previewPhotos } from '../../lib/api';
 import { money, centsFromInput, buildOrderItems } from '../../lib/domain';
-const { session, items, loading, error, saving, editor, formError, load, save, remove } =
+const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
     useResource('menu'),
   category = ref('dish'),
   query = ref(''),
@@ -190,7 +202,10 @@ const { session, items, loading, error, saving, editor, formError, load, save, r
   cart = reactive<Record<string, number>>({}),
   orders = ref([]),
   orderNote = ref(''),
-  orderSaving = ref(false);
+  orderSaving = ref(false),
+  ordersLoaded = ref(false),
+  ordersLoading = ref(false),
+  ordersError = ref('');
 const categories = [
   { value: 'dish', label: '菜品' },
   { value: 'drink', label: '饮品' },
@@ -259,11 +274,18 @@ async function favorite(item) {
 let orderLoadVersion = 0;
 async function loadOrders() {
   const version = ++orderLoadVersion;
+  ordersLoading.value = true;
+  ordersError.value = '';
   try {
     const result = await request('/orders');
-    if (version === orderLoadVersion) orders.value = result;
+    if (version === orderLoadVersion) {
+      orders.value = result;
+      ordersLoaded.value = true;
+    }
   } catch (e) {
-    if (version === orderLoadVersion) notify(e.message);
+    if (version === orderLoadVersion) ordersError.value = e.message;
+  } finally {
+    if (version === orderLoadVersion) ordersLoading.value = false;
   }
 }
 async function submitOrder() {

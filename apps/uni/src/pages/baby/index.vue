@@ -33,7 +33,9 @@
               : '一起等待新生命'
           }}</view>
         </view>
-        <button class="text-action ui-reset" aria-label="编辑宝宝档案" @click="editBaby">编辑</button>
+        <button class="text-action ui-reset" aria-label="编辑宝宝档案" @click="editBaby">
+          编辑
+        </button>
       </view>
       <view v-if="baby.notes" class="card-text">{{ baby.notes }}</view>
     </view>
@@ -45,7 +47,7 @@
       action="建立宝宝档案"
       @action="editBaby" />
     <view
-      v-if="albumPhotos.length || (babyReady && baby)"
+      v-if="hasLoaded && (albumPhotos.length || (babyReady && baby))"
       class="baby-album"
       aria-labelledby="baby-album-title"
     >
@@ -62,7 +64,12 @@
           :key="photo.id"
           class="baby-album-photo ui-reset"
           :aria-label="`预览${photo.title}照片，${photo.date}`"
-          @click="previewPhotos(albumPhotos.map((entry) => entry.asset), index)"
+          @click="
+            previewPhotos(
+              albumPhotos.map((entry) => entry.asset),
+              index,
+            )
+          "
         >
           <image class="baby-album-image" :src="assetUrl(photo.asset)" mode="aspectFill" />
           <view class="baby-album-caption">
@@ -75,9 +82,10 @@
         v-else
         symbol="✿"
         title="相册还在等待第一张照片"
-        description="在成长记录中添加照片，它们会自动收进这里。" />
+        description="在成长记录中添加照片，它们会自动收进这里。"
+      />
     </view>
-    <GrowthChart v-if="!loading && !error" ref="growthChart" :records="items" />
+    <GrowthChart v-if="hasLoaded" ref="growthChart" :records="items" />
     <view class="toolbar">
       <input class="search" v-model="query" placeholder="搜索成长记录" />
       <wd-button size="small" @click="openNew">＋ 记录</wd-button>
@@ -89,7 +97,8 @@
         aria-label="全部记录"
         :aria-pressed="filter === 'all'"
         @click="filter = 'all'"
-        >全部</button
+      >
+        全部</button
       ><button
         v-for="option in types"
         :key="option.value"
@@ -98,52 +107,60 @@
         :aria-label="`${option.label}记录`"
         :aria-pressed="filter === option.value"
         @click="filter = option.value"
-        >{{ option.label }}</button
       >
+        {{ option.label }}
+      </button>
     </view>
     <view class="note">这里只记录家庭日常；身高、体重、喂养和健康备注都可以按需要选填。</view>
-    <view v-if="error" class="error-box">{{ error }}</view>
-    <view v-if="loading" class="loading">成长手账打开中…</view>
-    <view v-for="item in filtered" :key="item.id" class="timeline-item" style="margin-top: 28rpx">
-      <view class="timeline-dot" />
-      <view class="meta" style="margin: 0 0 14rpx"
-        >{{ item.date }} · {{ typeLabel(item.type) }}</view
-      >
-      <view class="card">
-        <view class="card-title">{{ item.title }}</view>
-        <view v-if="item.content" class="card-text">{{ item.content }}</view>
-        <view class="chips">
-          <view v-if="item.heightCm != null" class="pill sage">身高 {{ item.heightCm }} cm</view>
-          <view v-if="item.weightKg != null" class="pill sage">体重 {{ item.weightKg }} kg</view>
-          <view v-if="item.amountMl != null" class="pill gold">{{ item.amountMl }} ml</view>
-          <view v-if="item.durationMinutes != null" class="pill gold"
-            >{{ item.durationMinutes }} 分钟</view
-          >
-        </view>
-        <view v-if="item.assets?.length" class="photo-grid">
-          <button
-            v-for="(asset, index) in item.assets"
-            :key="asset.id"
-            class="photo-preview ui-reset"
-            :aria-label="`预览${item.title}照片 ${index + 1}`"
-            @click="previewPhotos(item.assets, index)"
+    <view v-if="error" class="error-box">
+      <view>{{ error }}</view>
+      <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
+    </view>
+    <view v-if="loading && !hasLoaded" class="loading">成长手账打开中…</view>
+    <view v-else-if="loading" class="meta" role="status">正在更新成长记录…</view>
+    <template v-if="hasLoaded">
+      <view v-for="item in filtered" :key="item.id" class="timeline-item" style="margin-top: 28rpx">
+        <view class="timeline-dot" />
+        <view class="meta" style="margin: 0 0 14rpx"
+          >{{ item.date }} · {{ typeLabel(item.type) }}</view
         >
-            <image class="photo" :src="assetUrl(asset)" mode="aspectFill" />
-          </button>
-        </view>
-        <view class="actions">
-          <button class="text-action ui-reset" @click="edit(item)">编辑</button>
-          <button class="text-action delete ui-reset" @click="remove(item)">删除</button>
+        <view class="card">
+          <view class="card-title">{{ item.title }}</view>
+          <view v-if="item.content" class="card-text">{{ item.content }}</view>
+          <view class="chips">
+            <view v-if="item.heightCm != null" class="pill sage">身高 {{ item.heightCm }} cm</view>
+            <view v-if="item.weightKg != null" class="pill sage">体重 {{ item.weightKg }} kg</view>
+            <view v-if="item.amountMl != null" class="pill gold">{{ item.amountMl }} ml</view>
+            <view v-if="item.durationMinutes != null" class="pill gold"
+              >{{ item.durationMinutes }} 分钟</view
+            >
+          </view>
+          <view v-if="item.assets?.length" class="photo-grid">
+            <button
+              v-for="(asset, index) in item.assets"
+              :key="asset.id"
+              class="photo-preview ui-reset"
+              :aria-label="`预览${item.title}照片 ${index + 1}`"
+              @click="previewPhotos(item.assets, index)"
+            >
+              <image class="photo" :src="assetUrl(asset)" mode="aspectFill" />
+            </button>
+          </view>
+          <view class="actions">
+            <button class="text-action ui-reset" @click="edit(item)">编辑</button>
+            <button class="text-action delete ui-reset" @click="remove(item)">删除</button>
+          </view>
         </view>
       </view>
-    </view>
-    <EmptyState
-      v-if="!loading && !filtered.length"
-      symbol="✿"
-      title="每一次长大，都值得收藏"
-      description="记一记身高、第一次翻身，或者今天安睡的小模样。"
-      action="写下成长记录"
-      @action="openNew" />
+      <EmptyState
+        v-if="!loading && !filtered.length"
+        symbol="✿"
+        title="每一次长大，都值得收藏"
+        description="记一记身高、第一次翻身，或者今天安睡的小模样。"
+        action="写下成长记录"
+        @action="openNew"
+      />
+    </template>
     <EditorSheet
       v-model="profileEditor"
       title="宝宝的小档案"
@@ -220,7 +237,7 @@ import { request, notify, assetUrl, previewPhotos } from '../../lib/api';
 import { today, daysBetween } from '../../lib/domain';
 import { collectBabyAlbumPhotos } from '@our-little-world/shared/baby-album';
 import type { Baby } from '../../types';
-const { session, items, loading, error, saving, editor, formError, save, remove } =
+const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
     useResource('growth'),
   baby = ref<Baby | null>(null),
   babyLoading = ref(true),

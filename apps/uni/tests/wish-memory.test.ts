@@ -29,7 +29,18 @@ const textOf = (node: any): string =>
         ? node
         : '';
 
-function setup() {
+function setup(
+  initialItems = [
+    {
+      id: 'wish-sunset',
+      title: '一起看日落',
+      description: '去海边慢慢散步',
+      status: 'done',
+      category: 'travel',
+      completedAt: '2026-11-19',
+    },
+  ],
+) {
   const wish = {
     id: 'wish-sunset',
     title: '一起看日落',
@@ -47,6 +58,8 @@ function setup() {
   }[] = [];
   const notices: string[] = [];
   const navigations: string[] = [];
+  const hasLoaded = ref(true);
+  const items = ref(initialItems);
   const filename = fileURLToPath(new URL('../src/pages/wishes/index.vue', import.meta.url));
   const descriptor = parse(readFileSync(filename, 'utf8'), { filename }).descriptor;
   const script = compileScript(descriptor, { id: 'wish-memory-test' });
@@ -77,9 +90,10 @@ function setup() {
     '../../lib/useResource': {
       useResource: () => ({
         session: { theme: 'cream' },
-        items: ref([wish]),
+        items,
         loading: ref(false),
         error: ref(''),
+        hasLoaded,
         saving: ref(false),
         editor: ref(false),
         formError: ref(''),
@@ -113,7 +127,16 @@ function setup() {
     assert.ok(button, 'The real wish template must render the conversion action');
     return button;
   }
-  return { wish, writes, notices, navigations, action };
+  return {
+    wish,
+    writes,
+    notices,
+    navigations,
+    action,
+    items,
+    hasLoaded,
+    render: () => render(context, [], {}, context),
+  };
 }
 
 test('a delayed mini-program wish conversion shows progress and a double tap writes and navigates once', async () => {
@@ -175,4 +198,15 @@ test('a failed mini-program wish conversion releases its action and a real retry
   assert.deepEqual(s.navigations, ['/pages/memories/index']);
   assert.equal(s.action().props.loading, false);
   assert.equal(s.action().props.disabled, false);
+});
+
+test('a first wishes read failure does not render an empty-state action', () => {
+  const s = setup([]);
+  s.hasLoaded.value = false;
+  const rendered = nodes(s.render());
+  assert.equal(
+    rendered.some((node) => node.props?.action === '写下第一件事'),
+    false,
+    'A failed first read must not look like a brand-new empty list',
+  );
 });

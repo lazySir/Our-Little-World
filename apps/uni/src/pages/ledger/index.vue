@@ -13,90 +13,94 @@
       <view class="grow" />
       <wd-button size="small" @click="openNew">＋ 记一笔</wd-button>
     </view>
-    <view class="stat-grid">
-      <view class="stat">
-        <view class="stat-label">本月收入</view>
-        <view class="stat-value amount-income">{{ money(summary.income) }}</view>
-      </view>
-      <view class="stat">
-        <view class="stat-label">本月支出</view>
-        <view class="stat-value amount-expense">{{ money(summary.expense) }}</view>
-      </view>
-      <view class="stat">
-        <view class="stat-label">本月结余</view>
-        <view class="stat-value">{{ money(summary.income - summary.expense) }}</view>
-      </view>
-    </view>
-    <view class="section-head">
-      <view class="section-title">支出去哪里了</view>
-    </view>
-    <view class="card">
-      <view v-for="item in categoryStats" :key="item.name" style="margin-bottom: 22rpx">
-        <view class="between">
-          <view class="small">{{ item.name }}</view>
-          <view class="muted">{{ money(item.total) }} · {{ item.percent }}%</view>
-        </view>
-        <view class="progress-track">
-          <view class="progress-bar" :style="{ width: item.percent + '%' }" />
-        </view>
-      </view>
-      <view v-if="!categoryStats.length" class="no-data">这个月还没有支出</view>
-    </view>
-    <view class="section-head">
-      <view class="section-title">最近六个月</view>
-    </view>
-    <view class="card">
-      <view v-for="point in trend" :key="point.month" class="between mini-card">
-        <view class="small">{{ point.month }}</view>
-        <view class="muted">
-          <text class="amount-income">＋{{ money(point.income) }}</text> /
-          <text class="amount-expense">−{{ money(point.expense) }}</text>
-        </view>
-      </view>
-    </view>
-    <view class="chips">
-      <button
-        v-for="option in filters"
-        :key="option.value"
-        class="chip ui-reset"
-        :class="{ active: filter === option.value }"
-        :aria-label="`${option.label}，${filter === option.value ? '已选中' : '切换筛选'}`"
-        :aria-pressed="filter === option.value"
-        @click="filter = option.value"
-        >{{ option.label }}</button
-      >
-    </view>
     <view v-if="error" class="error-box">
       <view>{{ error }}</view>
       <wd-button class="retry-button" size="small" plain @click="load">重新加载</wd-button>
     </view>
-    <view v-if="loading" class="loading">账本打开中…</view>
-    <view v-for="item in filtered" :key="item.id" class="card">
-      <view class="between">
-        <view>
-          <view class="card-title">{{ item.category }}</view>
-          <view class="meta">{{ item.date }} · {{ item.payer || '我们' }}</view>
+    <view v-if="loading && !hasLoaded" class="loading">账本打开中…</view>
+    <view v-else-if="loading" class="meta" role="status">正在更新账本…</view>
+    <template v-if="hasLoaded">
+      <view class="stat-grid">
+        <view class="stat">
+          <view class="stat-label">本月收入</view>
+          <view class="stat-value amount-income">{{ money(summary.income) }}</view>
         </view>
-        <view
-          :class="item.type === 'income' ? 'amount-income' : 'amount-expense'"
-          class="section-title"
-          >{{ item.type === 'income' ? '+' : '−' }}{{ money(item.amountCents) }}</view
+        <view class="stat">
+          <view class="stat-label">本月支出</view>
+          <view class="stat-value amount-expense">{{ money(summary.expense) }}</view>
+        </view>
+        <view class="stat">
+          <view class="stat-label">本月结余</view>
+          <view class="stat-value">{{ money(summary.income - summary.expense) }}</view>
+        </view>
+      </view>
+      <view class="section-head">
+        <view class="section-title">支出去哪里了</view>
+      </view>
+      <view class="card">
+        <view v-for="item in categoryStats" :key="item.name" style="margin-bottom: 22rpx">
+          <view class="between">
+            <view class="small">{{ item.name }}</view>
+            <view class="muted">{{ money(item.total) }} · {{ item.percent }}%</view>
+          </view>
+          <view class="progress-track">
+            <view class="progress-bar" :style="{ width: item.percent + '%' }" />
+          </view>
+        </view>
+        <view v-if="!categoryStats.length" class="no-data">这个月还没有支出</view>
+      </view>
+      <view class="section-head">
+        <view class="section-title">最近六个月</view>
+      </view>
+      <view class="card">
+        <view v-for="point in trend" :key="point.month" class="between mini-card">
+          <view class="small">{{ point.month }}</view>
+          <view class="muted">
+            <text class="amount-income">＋{{ money(point.income) }}</text> /
+            <text class="amount-expense">−{{ money(point.expense) }}</text>
+          </view>
+        </view>
+      </view>
+      <view class="chips">
+        <button
+          v-for="option in filters"
+          :key="option.value"
+          class="chip ui-reset"
+          :class="{ active: filter === option.value }"
+          :aria-label="`${option.label}，${filter === option.value ? '已选中' : '切换筛选'}`"
+          :aria-pressed="filter === option.value"
+          @click="filter = option.value"
         >
+          {{ option.label }}
+        </button>
       </view>
-      <view v-if="item.note" class="card-text">{{ item.note }}</view>
-      <view class="actions">
-        <button class="text-action ui-reset" @click="edit(item)">编辑</button>
-        <button class="text-action delete ui-reset" @click="remove(item)">删除</button>
+      <view v-for="item in filtered" :key="item.id" class="card">
+        <view class="between">
+          <view>
+            <view class="card-title">{{ item.category }}</view>
+            <view class="meta">{{ item.date }} · {{ item.payer || '我们' }}</view>
+          </view>
+          <view
+            :class="item.type === 'income' ? 'amount-income' : 'amount-expense'"
+            class="section-title"
+            >{{ item.type === 'income' ? '+' : '−' }}{{ money(item.amountCents) }}</view
+          >
+        </view>
+        <view v-if="item.note" class="card-text">{{ item.note }}</view>
+        <view class="actions">
+          <button class="text-action ui-reset" @click="edit(item)">编辑</button>
+          <button class="text-action delete ui-reset" @click="remove(item)">删除</button>
+        </view>
       </view>
-    </view>
-    <EmptyState
-      v-if="!loading && !filtered.length"
-      symbol="¥"
-      title="这一页账本还是空的"
-      description="今天的一杯咖啡，也值得好好记下。"
-      action="记第一笔"
-      @action="openNew"
-    />
+      <EmptyState
+        v-if="hasLoaded && !loading && !filtered.length"
+        symbol="¥"
+        title="这一页账本还是空的"
+        description="今天的一杯咖啡，也值得好好记下。"
+        action="记第一笔"
+        @action="openNew"
+      />
+    </template>
     <EditorSheet
       v-model="editor"
       :title="editing ? '编辑这一笔' : '记下一笔日常'"
@@ -131,7 +135,7 @@ import EditorSheet from '../../components/EditorSheet.vue';
 import FormField from '../../components/FormField.vue';
 import { useResource } from '../../lib/useResource';
 import { today, money, centsFromInput } from '../../lib/domain';
-const { session, items, loading, error, saving, editor, formError, load, save, remove } =
+const { session, items, hasLoaded, loading, error, saving, editor, formError, load, save, remove } =
     useResource('ledger'),
   month = ref(today().slice(0, 7)),
   filter = ref('all'),

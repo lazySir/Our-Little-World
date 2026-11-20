@@ -15,6 +15,14 @@ const nodes = (node: any): any[] =>
     : node && typeof node === 'object'
       ? [node, ...nodes(node.children)]
       : [];
+const textOf = (node: any): string =>
+  Array.isArray(node)
+    ? node.map(textOf).join('')
+    : node && typeof node === 'object'
+      ? textOf(node.children)
+      : typeof node === 'string'
+        ? node
+        : '';
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: Error) => void;
@@ -27,7 +35,12 @@ function deferred<T>() {
 async function drain() {
   for (let i = 0; i < 10; i++) await Promise.resolve();
 }
-function setup(t: any, withDate = true, pendingWrite?: Promise<void>) {
+function setup(
+  t: any,
+  withDate = true,
+  pendingWrite?: Promise<void>,
+  dashboardRead?: () => Promise<any>,
+) {
   const previousTZ = process.env.TZ;
   process.env.TZ = 'Asia/Shanghai';
   t.after(() => {
@@ -84,7 +97,7 @@ function setup(t: any, withDate = true, pendingWrite?: Promise<void>) {
           }
           return {};
         }
-        return structuredClone(dashboard);
+        return dashboardRead ? dashboardRead() : structuredClone(dashboard);
       },
       notify(message: string) {
         notices.push(message);
@@ -164,6 +177,62 @@ test('home previews up to four pending wishes between its feature grid and recen
   assert.ok(
     featureIndex < headingIndex && headingIndex < previewIndex && previewIndex < memoryIndex,
   );
+});
+
+test('home hides default empty content after the first dashboard read fails and offers retry', async (t) => {
+  const failure = deferred<any>();
+  const s = setup(t, true, undefined, () => failure.promise);
+  const pending = s.view.load();
+  await drain();
+  failure.reject(new Error('首页暂时打不开'));
+  await pending;
+  const rendered = nodes(s.render());
+  assert.equal(
+    rendered.some((node) => node.props?.class === 'hero'),
+    false,
+    'The first dashboard failure must not render zero-value dashboard content',
+  );
+  assert.equal(
+    rendered.some((node) => node.props?.action === '写下第一个愿望'),
+    false,
+    'The first dashboard failure must not render empty wish guidance',
+  );
+  assert.ok(
+    rendered.some((node) => node.type === 'wd-button' && node.children === '重新加载'),
+    'The dashboard failure must expose a retry action',
+  );
+});
+
+test('home keeps its last dashboard visible when a later refresh fails', async (t) => {
+  const firstRead = deferred<any>();
+  const refreshRead = deferred<any>();
+  const reads = [firstRead, refreshRead];
+  const s = setup(t, true, undefined, () => reads.shift()!.promise);
+  const snapshot = {
+    date: '2026-10-31',
+    daysTogether: 999,
+    moods: [],
+    upcomingAnniversaries: [],
+    monthly: { incomeCents: 0, expenseCents: 0, balanceCents: 0 },
+    pendingWishes: [{ id: 'saved-wish', title: '已经保存的愿望' }],
+    recentMemories: [],
+  };
+  const initial = s.view.load();
+  await drain();
+  firstRead.resolve(snapshot);
+  await initial;
+  assert.equal(s.view.hasLoaded.value, true);
+
+  const refresh = s.view.load();
+  await drain();
+  refreshRead.reject(new Error('暂时无法更新'));
+  await refresh;
+
+  const rendered = nodes(s.render());
+  assert.deepEqual(s.view.dashboard.value, snapshot);
+  assert.ok(rendered.some((node) => node.props?.class === 'hero'));
+  assert.ok(rendered.some((node) => node.children === '暂时无法更新'));
+  assert.ok(rendered.some((node) => node.type === 'wd-button' && node.children === '重新加载'));
 });
 
 test('home mood choices render as named buttons with an exposed pressed state', async (t) => {
