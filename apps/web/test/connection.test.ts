@@ -23,6 +23,7 @@ function setup() {
   const navigations: string[] = [];
   const api = {
     TOKEN_KEY: 'little-world-token',
+    hasSavedSession: () => Boolean(storage.get('little-world-token')),
     getBase: () => storage.get('little-world-api'),
     api: {
       get(path: string) {
@@ -141,10 +142,41 @@ test('a late hydration success cannot restore an old account after clearing its 
 test('a failed hydration completes after clearing its own expired token', async () => {
   const s = setup();
   const pending = s.store.hydrate();
-  s.requests[0].reject(new Error('session expired'));
+  s.requests[0].reject(Object.assign(new Error('session expired'), { status: 401 }));
   await pending;
   assert.equal(s.storage.has('little-world-token'), false);
   assert.equal(s.store.ready, true);
+});
+
+test('offline hydration preserves the saved token and a retry restores the session', async () => {
+  const s = setup();
+  const hydration = s.store.hydrate();
+  s.requests[0].reject(new Error('暂时连接不到小世界'));
+  await hydration;
+  assert.equal(s.storage.get('little-world-token'), 'old-token');
+  assert.equal(s.store.authenticated, false);
+
+  const retry = s.store.refresh();
+  assert.equal(s.requests[1].path, '/auth/me');
+  s.requests[1].resolve(sessionDetails('恢复后的登录', 'rose'));
+  assert.equal(await retry, true);
+  assert.equal(s.store.user.nickname, '恢复后的登录');
+  assert.equal(s.storage.get('little-world-token'), 'old-token');
+});
+
+test('the auth page can restore a saved session and return to the requested page', async () => {
+  const s = setup();
+  const view = s.auth();
+  assert.equal(view.savedSession.value, true);
+
+  const restore = view.restoreSavedSession();
+  assert.equal(s.requests[0].path, '/auth/me');
+  s.requests[0].resolve(sessionDetails('回家的我', 'rose'));
+  await restore;
+
+  assert.equal(s.store.authenticated, true);
+  assert.equal(view.savedSession.value, false);
+  assert.deepEqual(s.navigations, ['/']);
 });
 
 const sessionDetails = (nickname: string, theme: string) => ({

@@ -150,6 +150,25 @@ test('a server error during profile enrichment retains the accepted login', asyn
   assert.deepEqual(s.warnings, []);
 });
 
+test('a temporary profile outage preserves the token so the saved session can be retried', async (t) => {
+  let attempts = 0;
+  const s = setup(t, async () => {
+    attempts++;
+    return attempts === 1
+      ? Response.json({ message: '服务暂时不可用' }, { status: 503 })
+      : Response.json({ user: account.user, space: account.space, partner: null });
+  });
+  s.storage.set('little-world-token', account.token);
+
+  await s.store.hydrate();
+  assert.equal(s.storage.get('little-world-token'), account.token);
+  assert.equal(s.store.authenticated, false);
+
+  assert.equal(await s.store.refresh(), true);
+  assert.equal(s.store.user.nickname, account.user.nickname);
+  assert.equal(s.storage.get('little-world-token'), account.token);
+});
+
 for (const mode of ['setup', 'join', 'login']) {
   test(`a rejected ${mode} credential request does not expire an existing session`, async (t) => {
     const s = setup(t, async () => Response.json({ message: '凭据无效' }, { status: 401 }));

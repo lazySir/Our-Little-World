@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { api, getBase, connectBase } from '../api';
+import { api, getBase, connectBase, hasSavedSession } from '../api';
 import { today } from '../domain';
 import { useSession } from '../stores/session';
 import HouseArt from '../components/HouseArt.vue';
@@ -14,6 +14,8 @@ const session = useSession(),
   checking = ref(true),
   error = ref(''),
   initialized = ref(true),
+  savedSession = ref(hasSavedSession()),
+  restoring = ref(false),
   formRef = ref<any>(),
   addressOpen = ref(false),
   connecting = ref(false),
@@ -87,6 +89,7 @@ async function submit() {
             };
     const result = await api.post(`/auth/${mode.value}`, payload);
     session.accept(result);
+    savedSession.value = false;
     // The auth response already contains the user and space needed to enter.
     await session.refresh().catch(() => {});
     if (!session.authenticated) return;
@@ -96,6 +99,22 @@ async function submit() {
     error.value = e.message;
   } finally {
     loading.value = false;
+  }
+}
+async function restoreSavedSession() {
+  if (!savedSession.value || restoring.value || session.authenticated) return;
+  restoring.value = true;
+  error.value = '';
+  try {
+    if (await session.refresh() && session.authenticated) {
+      savedSession.value = false;
+      router.replace(String(route.query.redirect || '/'));
+    }
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    restoring.value = false;
+    savedSession.value = hasSavedSession() && !session.authenticated;
   }
 }
 async function saveAddress() {
@@ -115,7 +134,12 @@ async function saveAddress() {
     connecting.value = false;
   }
 }
-onMounted(check);
+onMounted(() => {
+  void check();
+  window.addEventListener('online', restoreSavedSession);
+  if (savedSession.value && navigator.onLine) void restoreSavedSession();
+});
+onUnmounted(() => window.removeEventListener('online', restoreSavedSession));
 </script>
 <template>
   <div class="auth-page">
@@ -162,6 +186,20 @@ onMounted(check);
                 : '把今天的小事，也写进我们的故事里。'
           }}
         </p>
+        <el-alert
+          v-if="savedSession"
+          title="发现本机保存的登录状态，网络恢复后可以继续使用。"
+          type="info"
+          show-icon
+          :closable="false"
+        />
+        <el-button
+          v-if="savedSession"
+          class="auth-submit"
+          :loading="restoring"
+          @click="restoreSavedSession"
+          >恢复已有登录</el-button
+        >
         <el-alert
           v-if="error"
           :title="error"

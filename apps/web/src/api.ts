@@ -3,6 +3,16 @@ import { setBusinessDate } from './domain';
 import { createAssetRefresher } from '@our-little-world/shared/asset-refresh';
 export const TOKEN_KEY = 'little-world-token';
 export const BASE_KEY = 'little-world-api';
+export const hasSavedSession = () => Boolean(localStorage.getItem(TOKEN_KEY));
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
 let businessDateRequestSequence = 0;
 let appliedBusinessDateRequestSequence = 0;
 export const getBase = () =>
@@ -61,7 +71,7 @@ export async function request<T = any>(path: string, options: ApiOptions = {}): 
         (path === '/auth/me' || !path.startsWith('/auth/'))
       )
         window.dispatchEvent(new Event('session-expired'));
-      throw new Error(details?.message || `请求失败（${response.status}）`);
+      throw new ApiError(details?.message || `请求失败（${response.status}）`, response.status);
     }
     if (binary) return response.blob() as Promise<T>;
     const result = response.status === 204 ? null : await response.json();

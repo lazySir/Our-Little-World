@@ -33,8 +33,8 @@ export const useSession = defineStore('session', {
               const data = await api.get('/auth/me', { canExpireSession: currentRead });
               if (currentRead()) Object.assign(this, data);
             }
-          } catch {
-            if (currentRead()) {
+          } catch (error) {
+            if (currentRead() && error?.status === 401) {
               localStorage.removeItem(TOKEN_KEY);
               this.ready = true;
             }
