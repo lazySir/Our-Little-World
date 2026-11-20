@@ -192,6 +192,7 @@ async function load() {
   } catch (reason) {
     if (sequence !== loadSequence) return;
     error.value = reason instanceof Error ? reason.message : '日历暂时打不开，请稍后重试';
+    if (hasLoaded.value) month.value = data.value.month;
   } finally {
     if (sequence === loadSequence) {
       loading.value = false;
@@ -203,8 +204,7 @@ function shiftMonth(offset: number) {
   const [year, value] = month.value.split('-').map(Number);
   const next = new Date(Date.UTC(year, value - 1 + offset, 1));
   month.value = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`;
-  selectedDate.value = '';
-  load();
+  return load();
 }
 function selectDate(date: string | null) {
   if (date) selectedDate.value = date;

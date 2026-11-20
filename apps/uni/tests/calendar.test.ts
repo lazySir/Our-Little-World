@@ -164,6 +164,29 @@ test('a first calendar read failure does not render a false empty calendar and r
   assert.ok(textOf(rendered).includes('一起看海'));
 });
 
+test('a failed month change restores the last successful month and its selected date', async () => {
+  const s = setup();
+  const firstRead = s.view.load();
+  s.reads[0].resolve({
+    month: '2026-11',
+    date: '2026-11-20',
+    events: [{ id: 'saved', kind: 'wish', date: '2026-11-20', title: '一起看海' }],
+  });
+  await firstRead;
+
+  const nextMonthRead = s.view.shiftMonth(1);
+  assert.equal(s.paths[1], '/calendar?month=2026-12');
+  s.reads[1].reject(new Error('暂时断开连接'));
+  await nextMonthRead;
+
+  assert.equal(s.view.month.value, '2026-11');
+  assert.equal(s.view.selectedDate.value, '2026-11-20');
+  const rendered = s.render();
+  assert.ok(textOf(rendered).includes('一起看海'));
+  assert.ok(rendered.some((node) => hasClass(node, 'calendar-day') && node.props?.['aria-label']?.startsWith('2026-11-30')));
+  assert.equal(rendered.some((node) => node.props?.['aria-label']?.startsWith('2026-12-31')), false);
+});
+
 test('mini program calendar template exposes semantic controls for filters and dates', () => {
   const source = readFileSync(new URL('../src/pages/calendar/index.vue', import.meta.url), 'utf8');
   const filterButton = source.match(/<button\s+v-for="item in filters"[\s\S]*?<\/button>/)?.[0];
